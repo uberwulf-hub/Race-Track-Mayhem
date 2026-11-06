@@ -21,7 +21,22 @@ down to your car for **3… 2… 1… GO!**
 ![The five rooms](docs/screenshot-rooms.png)
 
 
-## How to play it on your computer
+## Download
+
+- **SauceStore:** install *Race Track Mayhem* from the store with one click.
+- **Directly:** download `RaceTrackMayhem-windows.zip` from the [latest release](https://github.com/uberwulf-hub/Race-Track-Mayhem/releases/latest),
+  unzip it and run `RaceTrackMayhem.exe`.
+
+### Publishing a new version
+Bump the version and push a tag. GitHub Actions builds the Windows zip and publishes the release
+(see `.github/workflows/release.yml`), and SauceStore shows the update within about 10 minutes.
+```
+git tag v1.0.1
+git push origin v1.0.1
+```
+The store listing comes from `saucestore.json` (name, description, icon, credits).
+
+## How to play it on your computer (from the source code)
 
 1. Install **Godot 4.3 or newer** (the standard version, not .NET) from <https://godotengine.org/download>.
 2. Get the code:

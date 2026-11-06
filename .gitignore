@@ -1,6 +1,5 @@
 # Godot 4
 .godot/
-export_presets.cfg
 *.translation
 /android/
 build/

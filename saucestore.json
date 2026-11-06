@@ -1,0 +1,20 @@
+{
+  "name": "Race Track Mayhem",
+  "category": "Game",
+  "description": "A toy-car racing game for kids. Pick one of five toy cars and race around five tracks set up in giant rooms of the house: the bedroom, playroom, kitchen, bathroom and living room. Loop-de-loops, corkscrews, spiral climbs, ramp jumps, boost pads and a Ready, Set, GO! countdown. Keyboard or game controller.",
+  "icon": "store/icon.png",
+  "assets": { "windows": "RaceTrackMayhem-windows.zip" },
+  "requirements": [
+    "Windows 10 or 11 (64-bit)",
+    "About 150 MB of disk space",
+    "Graphics that support OpenGL 3.3 (almost any PC from the last 10 years)",
+    "Keyboard, or an Xbox-style game controller"
+  ],
+  "rightsConfirmed": true,
+  "credits": [
+    { "asset": "Godot Engine (game engine, bundled in the .exe)", "author": "Juan Linietsky, Ariel Manzur and Godot Engine contributors", "license": "MIT", "source": "https://godotengine.org/license" },
+    { "asset": "Sound effects, voices, jingles and UI sounds", "author": "Kenney (www.kenney.nl)", "license": "CC0 1.0", "source": "https://kenney.nl/assets" },
+    { "asset": "Tire skid and brake sound", "author": "Landeplage", "license": "CC0 1.0", "source": "https://github.com/KenneyNL/Starter-Kit-Racing" },
+    { "asset": "Music: 5 Chiptunes (Action)", "author": "Juhani Junkala", "license": "CC0 1.0", "source": "https://opengameart.org/content/5-chiptunes-action" }
+  ]
+}

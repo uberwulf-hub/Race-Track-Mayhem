@@ -13,6 +13,7 @@ var _follow_timer := 0.0
 var _main_box: VBoxContainer
 var _options_panel: Control
 var _help_panel: Control
+var _credits_panel: Control
 var _laps_label: Label
 var _diff_button: Button
 var _title_letters: Array[Label] = []
@@ -124,6 +125,10 @@ func _build_ui() -> void:
 
 	_options_panel = _build_options(root)
 	_help_panel = _build_help(root)
+	_credits_panel = _build_credits(root)
+	var credits_btn := _button(root, "Credits", func(): _show_panel(_credits_panel))
+	credits_btn.add_theme_font_size_override("font_size", 20)
+	RaceHud.pin(credits_btn, Vector2(0, 1), Vector2(16, -64), Vector2(130, 48))
 
 
 func _title_row(text: String, size: int, colors: Array) -> HBoxContainer:
@@ -144,7 +149,7 @@ func _title_row(text: String, size: int, colors: Array) -> HBoxContainer:
 	return row
 
 
-func _button(parent: Container, text: String, cb: Callable) -> Button:
+func _button(parent: Control, text: String, cb: Callable) -> Button:
 	var b := Button.new()
 	b.text = text
 	b.pressed.connect(func():
@@ -177,6 +182,7 @@ func _show_panel(panel: Control) -> void:
 	_main_box.visible = panel == null
 	_options_panel.visible = panel == _options_panel
 	_help_panel.visible = panel == _help_panel
+	_credits_panel.visible = panel == _credits_panel
 	if panel == null:
 		(_main_box.get_child(0) as Button).grab_focus()
 	else:
@@ -269,6 +275,28 @@ func _build_help(root: Control) -> Control:
 		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		box.add_child(l)
 	_button(box, "Got it!", func(): _show_panel(null))
+	return parts[0]
+
+
+func _build_credits(root: Control) -> Control:
+	var parts := _panel(root, "Credits")
+	var box: VBoxContainer = parts[1]
+	var lines := [
+		"Race Track Mayhem",
+		"",
+		"Made with the Godot Engine (godotengine.org)",
+		"Godot is (c) Juan Linietsky, Ariel Manzur and contributors, MIT license",
+		"",
+		"Sound effects: Kenney (kenney.nl) and Landeplage, CC0",
+		"Music: Juhani Junkala, \"5 Chiptunes (Action)\", CC0",
+		"",
+		"Full license texts are in the licenses folder.",
+	]
+	for line in lines:
+		var l := RaceHud.make_label(line, 22, Color.WHITE, 6)
+		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		box.add_child(l)
+	_button(box, "Back", func(): _show_panel(null))
 	return parts[0]
 
 
