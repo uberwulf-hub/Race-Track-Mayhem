@@ -11,6 +11,8 @@ signal lap_completed(racer: Racer, lap: int, lap_time: float)
 signal finished(racer: Racer)
 signal crashed(racer: Racer)
 signal boosted(racer: Racer)
+signal landed(racer: Racer, strength: float)
+signal bumped(racer: Racer, strength: float)
 
 enum Mode { DRIVING, FALLING }
 
@@ -69,6 +71,8 @@ var ai_wobble_phase := 0.0
 var rubber_band := 1.0
 
 var model: ToyCarModel
+var _sparks: CPUParticles3D
+var scraping := false
 var _visual_basis := Basis.IDENTITY
 
 
@@ -81,6 +85,8 @@ func setup(p_track: Track, car_def: Dictionary, p_is_player: bool, p_name: Strin
 	name = p_name.replace(" ", "")
 	model = ToyCarModel.new().setup(car_def)
 	add_child(model)
+	_sparks = _make_sparks()
+	add_child(_sparks)
 	ai_wobble_phase = randf() * TAU
 	ai_line = randf_range(-1.2, 1.2)
 	return self
@@ -192,10 +198,14 @@ func _physics_process(delta: float) -> void:
 	lateral += (lateral_vel + slide * grip) * delta
 
 	var limit := Track.HALF_WIDTH - CAR_HALF_WIDTH
+	scraping = false
 	if absf(lateral) > limit:
 		lateral = clampf(lateral, -limit, limit)
 		lateral_vel = 0.0
 		speed *= pow(0.55, delta)     # scraping the wall slows you down
+		scraping = absf(speed) > 8.0 and air_t < 0.0
+	_sparks.emitting = scraping
+	_sparks.position = Vector3(signf(lateral) * 0.7, 0.25, 0.2)
 
 	# --- jumps ---
 	in_air = air_t >= 0.0
@@ -205,6 +215,7 @@ func _physics_process(delta: float) -> void:
 	else:
 		if air_height > 0.4:
 			Sfx.play("land", 1.0, -6.0 if not is_player else 0.0)
+			landed.emit(self, air_height)
 		air_height = 0.0
 
 	# --- loop: too slow upside down and you fall off! ---
@@ -261,6 +272,11 @@ func _update_transform(delta: float, snap: bool) -> void:
 		var q_to := b.orthonormalized().get_rotation_quaternion()
 		_visual_basis = Basis(q_from.slerp(q_to, minf(1.0, delta * 14.0)))
 	global_transform = Transform3D(_visual_basis, pos)
+	if model and model.shadow:
+		model.shadow.visible = true
+		model.shadow.position.y = 0.03 - air_height
+		var shrink := clampf(1.0 - air_height * 0.15, 0.5, 1.0)
+		model.shadow.scale = Vector3(shrink, 1.0, shrink)
 
 
 # ---------------------------------------------------------------------------
@@ -269,11 +285,16 @@ func _update_transform(delta: float, snap: bool) -> void:
 
 func _start_fall(frame: Transform3D) -> void:
 	mode = Mode.FALLING
+	if model and model.shadow:
+		model.shadow.visible = false
 	_fall_vel = -frame.basis.z * speed + frame.basis.y * -2.0
 	_fall_spin = Vector3(randf_range(-6, 6), randf_range(-4, 4), randf_range(-6, 6))
 	_fall_timer = 1.6
 	# Respawn back before the boost pad leading into the loop.
-	var loop_start := float(track.loops[0][0]) if track.loops.size() > 0 else s
+	var loop_start := s
+	for r in track.loops:
+		if s >= float(r[0]) - 1.0 and s <= float(r[1]) + 1.0:
+			loop_start = float(r[0])
 	_respawn_s = loop_start - 26.0
 	crashed.emit(self)
 
@@ -363,6 +384,7 @@ func bump_with(other: Racer) -> void:
 	behind.s = fposmod(behind.s, track.length)
 	if _bump_cooldown <= 0.0 and (is_player or other.is_player):
 		Sfx.play("bump", randf_range(0.9, 1.2))
+		(self if is_player else other).bumped.emit(self if is_player else other, overlap_s)
 		_bump_cooldown = 0.35
 		other._bump_cooldown = 0.35
 
@@ -388,3 +410,29 @@ func _ai_inputs() -> Vector3:
 	var steer := clampf((target - lateral) * 0.9 - lateral_vel * 0.12, -1.0, 1.0)
 	var throttle := ai_skill
 	return Vector3(throttle, 0.0, steer)
+
+
+func _make_sparks() -> CPUParticles3D:
+	var p := CPUParticles3D.new()
+	p.amount = 24
+	p.lifetime = 0.3
+	p.emitting = false
+	p.local_coords = false
+	p.direction = Vector3(0, 1, 1)
+	p.spread = 40.0
+	p.initial_velocity_min = 4.0
+	p.initial_velocity_max = 9.0
+	p.gravity = Vector3(0, -20, 0)
+	p.scale_amount_min = 0.05
+	p.scale_amount_max = 0.1
+	var mesh := SphereMesh.new()
+	mesh.radius = 0.5
+	mesh.height = 1.0
+	mesh.radial_segments = 4
+	mesh.rings = 2
+	var mat := StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.albedo_color = Color(1.0, 0.85, 0.3)
+	mesh.material = mat
+	p.mesh = mesh
+	return p

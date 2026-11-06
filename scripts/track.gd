@@ -24,6 +24,28 @@ const FLAG_GAP := 1               # no track here (jump!)
 const FLAG_BOOST := 2             # speed boost pad
 const FLAG_LOOP := 4              # inside the loop-de-loop
 const FLAG_START := 8             # start / finish line
+const FLAG_TWIST := 16            # corkscrew (also flagged as a loop)
+
+## The tracks you can race on. `layout` picks the builder function below.
+const TRACKS: Array[Dictionary] = [
+	{
+		"id": "bedroom_speedway",
+		"name": "Bedroom Speedway",
+		"blurb": "The classic! A loop-de-loop, a big jump and a hill.",
+		"features": ["Loop-de-loop", "Ramp jump", "Hill", "Chicane"],
+		"stars": 1,
+	},
+	{
+		"id": "toy_box_twister",
+		"name": "Toy Box Twister",
+		"blurb": "A figure-8 that flies over itself, with a corkscrew!",
+		"features": ["Corkscrew", "Figure-8 bridge", "Loop-de-loop", "Jump"],
+		"stars": 2,
+	},
+]
+
+var layout_id := 0
+var stretch := Vector2.ZERO   # how long the auto-sized straights came out
 
 const TRACK_COLOR := Color(1.0, 0.45, 0.05)
 const TRACK_DARK := Color(0.85, 0.32, 0.02)
@@ -52,11 +74,7 @@ var _raw_fwd: Array[Vector3] = []
 var _raw_up: Array[Vector3] = []
 var _raw_flags: Array[int] = []
 var _marks: Dictionary = {}
-
-
-func _ready() -> void:
-	if count == 0:
-		build()
+var _start_lights: Array[StandardMaterial3D] = []
 
 
 func build() -> void:
@@ -66,6 +84,7 @@ func build() -> void:
 	_build_mesh()
 	_build_boost_pads()
 	_build_start_line()
+	_build_road_details()
 	_build_supports()
 	_build_loop_stand()
 
@@ -76,6 +95,15 @@ func build() -> void:
 # ---------------------------------------------------------------------------
 
 func _layout(stretch_a: float, stretch_b: float) -> void:
+	match layout_id:
+		1:
+			_layout_twister(stretch_a, stretch_b)
+		_:
+			_layout_speedway(stretch_a, stretch_b)
+
+
+## Track 1: Bedroom Speedway.
+func _layout_speedway(stretch_a: float, stretch_b: float) -> void:
 	_mark("A")
 	_straight(stretch_a)                # start / finish straight
 	_straight(9.0, FLAG_BOOST)          # boost pad before the loop
@@ -101,6 +129,99 @@ func _layout(stretch_a: float, stretch_b: float) -> void:
 	_straight(6.0)
 	_turn(90.0, 17.0, 22.0)
 	_straight(26.0)                     # run up to the line (starting grid)
+
+
+## Track 2: Toy Box Twister. A figure-8: the right-hand loop has a corkscrew,
+## then the track climbs over a bridge, crossing above the start straight,
+## and the left-hand loop has a chicane, a jump and a loop-de-loop.
+func _layout_twister(stretch_a: float, stretch_b: float) -> void:
+	_straight(14.0)                     # start line -> north
+	_straight(8.0, FLAG_BOOST)
+	_straight(40.0)                     # the bridge crosses over this bit
+	_turn(90.0, 14.0, 22.0)             # -> east
+	_straight(8.0)
+	_straight(8.0, FLAG_BOOST)
+	_corkscrew(62.0, 5.5)               # CORKSCREW!
+	_straight(8.0)
+	_turn(90.0, 14.0, 22.0)             # -> south
+	_straight(10.0)
+	_turn(90.0, 14.0, 22.0)             # -> west
+	_straight_to_x(_bridge_half_length())
+	_bridge()                           # flies over the start straight
+	_straight(8.0)
+	_turn(-40.0, 12.0, -14.0)           # chicane
+	_turn(80.0, 12.0, 18.0)
+	_turn(-40.0, 12.0, -14.0)
+	_straight(6.0)
+	_turn(-90.0, 15.0, -22.0)           # -> south (left-hand half of the 8)
+	_mark("A")
+	_straight(stretch_a)
+	_jump()
+	_straight(10.0)
+	_turn(-90.0, 15.0, -22.0)           # -> east
+	_mark("B")
+	_straight(stretch_b)
+	_straight(8.0, FLAG_BOOST)
+	_straight(6.0)
+	_loop(8.5, -10.0)                   # loop drifts north, away from the wall
+	_straight(10.0)
+	_turn(-90.0, 15.0, -22.0)           # -> north, back to the line
+	_straight(16.0)
+
+
+const BRIDGE_ANGLE := 14.0
+const BRIDGE_RADIUS := 25.0
+const BRIDGE_RAMP := 16.0
+const BRIDGE_TOP := 14.0
+
+
+func _bridge() -> void:
+	_pitch(BRIDGE_ANGLE, BRIDGE_RADIUS)
+	_straight(BRIDGE_RAMP)
+	_pitch(-BRIDGE_ANGLE, BRIDGE_RADIUS)
+	_straight(BRIDGE_TOP)
+	_pitch(-BRIDGE_ANGLE, BRIDGE_RADIUS)
+	_straight(BRIDGE_RAMP)
+	_pitch(BRIDGE_ANGLE, BRIDGE_RADIUS)
+
+
+func _bridge_half_length() -> float:
+	var th := deg_to_rad(BRIDGE_ANGLE)
+	return 2.0 * BRIDGE_RADIUS * sin(th) + BRIDGE_RAMP * cos(th) + BRIDGE_TOP * 0.5
+
+
+## Drives straight on until the turtle reaches world x = `x` (heading must be
+## roughly along the x axis).
+func _straight_to_x(x: float) -> void:
+	if absf(_fwd.x) < 0.5:
+		push_warning("_straight_to_x needs an east/west heading")
+		return
+	var len := (x - _pos.x) / _fwd.x
+	if len > 0.0:
+		_straight(len)
+	else:
+		push_warning("Track piece overlaps: _straight_to_x went backwards (%.1f)" % len)
+
+
+## A corkscrew: the road twists all the way around while going forward.
+## The car spirals around a line `radius` above the road.
+func _corkscrew(length: float, radius: float) -> void:
+	var f0 := _fwd
+	var u0 := _up
+	var axis := _pos + u0 * radius
+	var n := maxi(16, ceili((length + TAU * radius) * 1.3 / RAW_STEP))
+	for i in n:
+		var t := float(i + 1) / n
+		var e := t * t * (3.0 - 2.0 * t)          # ease in and out
+		var de := 6.0 * t * (1.0 - t)             # how fast it's twisting
+		var a := TAU * e
+		var d := (-u0).rotated(f0, a)             # from the axis out to the road
+		_pos = axis + f0 * length * t + d * radius
+		_fwd = (f0 * length + f0.cross(d) * TAU * radius * de).normalized()
+		_up = -d
+		_emit(FLAG_LOOP | FLAG_TWIST)
+	_fwd = f0
+	_up = u0
 
 
 func _jump() -> void:
@@ -226,6 +347,7 @@ func _build_closed_layout() -> void:
 		var y := (-da.x * err.z + err.x * da.z) / det
 		a = maxf(4.0, a + x)
 		b = maxf(4.0, b + y)
+	stretch = Vector2(a, b)
 	_reset_turtle()
 	_layout(a, b)
 	var closing := _pos.distance_to(Vector3(0.0, BASE_HEIGHT, 0.0))
@@ -542,6 +664,21 @@ func _build_start_line() -> void:
 	banner.material_override = banner_mat
 	banner.position = Vector3(0.0, 8.4 - BASE_HEIGHT, 0.0)
 	arch.add_child(banner)
+	# Three start lights under the banner (see set_start_lights).
+	for i in 3:
+		var bulb := MeshInstance3D.new()
+		var sm := SphereMesh.new()
+		sm.radius = 0.45
+		sm.height = 0.9
+		bulb.mesh = sm
+		var lm := StandardMaterial3D.new()
+		lm.albedo_color = Color(0.25, 0.05, 0.05)
+		lm.emission_enabled = true
+		lm.emission = Color.BLACK
+		bulb.material_override = lm
+		bulb.position = Vector3((i - 1) * 1.3, 7.0 - BASE_HEIGHT, 0.0)
+		arch.add_child(bulb)
+		_start_lights.append(lm)
 	for face: float in [-1.0, 1.0]:
 		var label := Label3D.new()
 		label.text = "START  *  FINISH"
@@ -552,6 +689,70 @@ func _build_start_line() -> void:
 		label.position = Vector3(0.0, 8.4 - BASE_HEIGHT, face * 0.17)
 		label.rotation.y = 0.0 if face > 0.0 else PI
 		arch.add_child(label)
+
+
+## Countdown lights on the start arch: 0 = off, 1..3 = that many red, 4 = all green.
+func set_start_lights(stage: int) -> void:
+	for i in _start_lights.size():
+		var m := _start_lights[i]
+		var col := Color.BLACK
+		if stage >= 4:
+			col = Color(0.2, 1.0, 0.3)
+		elif i < stage:
+			col = Color(1.0, 0.15, 0.1)
+		m.albedo_color = col if col != Color.BLACK else Color(0.25, 0.05, 0.05)
+		m.emission = col
+		m.emission_energy_multiplier = 3.0
+
+
+## Grooves down the road and little blue clips joining the track pieces.
+func _build_road_details() -> void:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var groove := Color(0.78, 0.3, 0.02)
+	for i in count:
+		var j := (i + 1) % count
+		if ((flags[i] | flags[j]) & (FLAG_GAP | FLAG_BOOST)) != 0:
+			continue
+		var ti := sample(i * spacing)
+		var tj := sample(j * spacing)
+		for x: float in [-HALF_WIDTH * 0.42, HALF_WIDTH * 0.42]:
+			var w := 0.09
+			var a := ti.origin + ti.basis.x * (x - w) + ti.basis.y * 0.015
+			var b := ti.origin + ti.basis.x * (x + w) + ti.basis.y * 0.015
+			var c := tj.origin + tj.basis.x * (x + w) + tj.basis.y * 0.015
+			var d := tj.origin + tj.basis.x * (x - w) + tj.basis.y * 0.015
+			_add_tri(st, a, b, c, ti.basis.y, groove)
+			_add_tri(st, a, c, d, ti.basis.y, groove)
+	var mi := MeshInstance3D.new()
+	mi.name = "Grooves"
+	mi.mesh = st.commit()
+	mi.material_override = _plastic(Color.WHITE)
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(mi)
+
+	var clip_mat := StandardMaterial3D.new()
+	clip_mat.albedo_color = Color(0.15, 0.45, 1.0)
+	clip_mat.roughness = 0.3
+	var mm := MultiMesh.new()
+	mm.transform_format = MultiMesh.TRANSFORM_3D
+	mm.mesh = MeshKit.rounded_box(Vector3(RAIL_THICK + 0.18, 0.22, 0.55), 0.08, 2)
+	var xforms: Array[Transform3D] = []
+	for i in range(0, count, CONNECTOR_EVERY):
+		if (flags[i] & FLAG_GAP) != 0:
+			continue
+		var t := sample(i * spacing)
+		for side: float in [-1.0, 1.0]:
+			var p := t.origin + t.basis.x * side * (HALF_WIDTH + RAIL_THICK * 0.5) + t.basis.y * (RAIL_HEIGHT + 0.1)
+			xforms.append(Transform3D(t.basis, p))
+	mm.instance_count = xforms.size()
+	for k in xforms.size():
+		mm.set_instance_transform(k, xforms[k])
+	var mmi := MultiMeshInstance3D.new()
+	mmi.name = "Clips"
+	mmi.multimesh = mm
+	mmi.material_override = clip_mat
+	add_child(mmi)
 
 
 func _build_supports() -> void:
@@ -572,10 +773,19 @@ func _build_supports() -> void:
 		var p := points[i]
 		var raised := p.y - THICKNESS - 0.05
 		var ok := (flags[i] & (FLAG_GAP | FLAG_LOOP)) == 0 and ups[i].y > 0.8 and raised > 0.9
+		var twist_side := (flags[i] & FLAG_TWIST) != 0 and absf(ups[i].y) < 0.25
+		if twist_side:
+			var tw := sample(i * spacing)
+			var under := tw.origin - tw.basis.y * (THICKNESS + 0.4)
+			xforms.append(Transform3D(Basis().scaled(Vector3(1.2, under.y, 1.2)), Vector3(under.x, under.y * 0.5, under.z)))
+			i += 14
+			continue
 		if ok:
 			for side: float in [-1.0, 1.0]:
 				var t := sample(i * spacing)
 				var base := t.origin + t.basis.x * side * (HALF_WIDTH - 0.6) - t.basis.y * THICKNESS
+				if _track_below(base):
+					continue
 				var h := base.y
 				var xf := Transform3D(Basis().scaled(Vector3(1.0, h, 1.0)), Vector3(base.x, h * 0.5, base.z))
 				xforms.append(xf)
@@ -592,9 +802,20 @@ func _build_supports() -> void:
 	add_child(mmi)
 
 
+## True if another (lower) part of the track runs underneath this point.
+func _track_below(p: Vector3) -> bool:
+	for k in range(0, count, 2):
+		var q := points[k]
+		if q.y < p.y - 1.5 and Vector2(q.x - p.x, q.z - p.z).length() < HALF_WIDTH + RAIL_THICK + 1.0:
+			return true
+	return false
+
+
 func _build_loop_stand() -> void:
 	# A chunky blue clamp under each loop holds the entry and exit lanes together.
 	for r in loops:
+		if (flags_at(r[0] + 1.0) & FLAG_TWIST) != 0:
+			continue
 		var a := sample(r[0])
 		var b := sample(r[1])
 		var centre := (a.origin + b.origin) * 0.5

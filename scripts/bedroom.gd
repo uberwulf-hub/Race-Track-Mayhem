@@ -24,6 +24,8 @@ func build(p_track: Track) -> Bedroom:
 	_build_dresser()
 	_build_teddy()
 	_build_toys()
+	_build_poster()
+	_build_shelf()
 	return self
 
 
@@ -51,6 +53,10 @@ func _build_environment() -> void:
 	env.glow_enabled = true
 	env.glow_intensity = 0.3
 	env.glow_bloom = 0.05
+	env.fog_enabled = true
+	env.fog_light_color = Color(0.75, 0.85, 1.0)
+	env.fog_density = 0.0005
+	env.fog_sky_affect = 0.0
 	env.adjustment_enabled = true
 	env.adjustment_saturation = 1.15
 	var we := WorldEnvironment.new()
@@ -83,11 +89,15 @@ func _mat(color: Color, rough: float = 0.8) -> StandardMaterial3D:
 	return m
 
 
-func _box(size: Vector3, pos: Vector3, mat: Material, shadow := true, parent: Node3D = null) -> MeshInstance3D:
+func _box(size: Vector3, pos: Vector3, mat: Material, shadow := true, parent: Node3D = null, round_amt := 0.15) -> MeshInstance3D:
 	var mi := MeshInstance3D.new()
-	var mesh := BoxMesh.new()
-	mesh.size = size
-	mi.mesh = mesh
+	var smallest := minf(size.x, minf(size.y, size.z))
+	if round_amt <= 0.0 or smallest < 0.3:
+		var mesh := BoxMesh.new()
+		mesh.size = size
+		mi.mesh = mesh
+	else:
+		mi.mesh = MeshKit.rounded_box(size, smallest * round_amt, 3)
 	mi.material_override = mat
 	mi.position = pos
 	if not shadow:
@@ -183,23 +193,23 @@ func _build_floor() -> void:
 
 
 func _build_walls() -> void:
-	var wall_mat := _mat(Color(0.62, 0.82, 0.95), 0.95)
+	var wall_mat := _wallpaper()
 	var trim := _mat(Color(0.98, 0.98, 0.95), 0.6)
 	var r := room_rect
 	var h := WALL_HEIGHT
 	var c := center()
 	# Walls don't cast shadows so the sun can shine in.
-	_box(Vector3(r.size.x, h, 2.0), Vector3(c.x, h * 0.5, r.position.y - 1.0), wall_mat, false)
-	_box(Vector3(r.size.x, h, 2.0), Vector3(c.x, h * 0.5, r.end.y + 1.0), wall_mat, false)
-	_box(Vector3(2.0, h, r.size.y), Vector3(r.position.x - 1.0, h * 0.5, c.z), wall_mat, false)
-	_box(Vector3(2.0, h, r.size.y), Vector3(r.end.x + 1.0, h * 0.5, c.z), wall_mat, false)
+	_box(Vector3(r.size.x, h, 2.0), Vector3(c.x, h * 0.5, r.position.y - 1.0), wall_mat, false, null, 0.0)
+	_box(Vector3(r.size.x, h, 2.0), Vector3(c.x, h * 0.5, r.end.y + 1.0), wall_mat, false, null, 0.0)
+	_box(Vector3(2.0, h, r.size.y), Vector3(r.position.x - 1.0, h * 0.5, c.z), wall_mat, false, null, 0.0)
+	_box(Vector3(2.0, h, r.size.y), Vector3(r.end.x + 1.0, h * 0.5, c.z), wall_mat, false, null, 0.0)
 	# Skirting boards
 	_box(Vector3(r.size.x, 3.0, 0.6), Vector3(c.x, 1.5, r.position.y + 0.3), trim)
 	_box(Vector3(r.size.x, 3.0, 0.6), Vector3(c.x, 1.5, r.end.y - 0.3), trim)
 	_box(Vector3(0.6, 3.0, r.size.y), Vector3(r.position.x + 0.3, 1.5, c.z), trim)
 	_box(Vector3(0.6, 3.0, r.size.y), Vector3(r.end.x - 0.3, 1.5, c.z), trim)
 	# Ceiling
-	_box(Vector3(r.size.x + 4.0, 1.0, r.size.y + 4.0), Vector3(c.x, h + 0.5, c.z), _mat(Color(0.97, 0.97, 0.95)), false)
+	_box(Vector3(r.size.x + 4.0, 1.0, r.size.y + 4.0), Vector3(c.x, h + 0.5, c.z), _mat(Color(0.97, 0.97, 0.95)), false, null, 0.0)
 	# Painted stars on the walls
 	var star_mat := _mat(Color(1.0, 0.9, 0.3), 0.5)
 	for i in 14:
@@ -428,3 +438,96 @@ func _build_toys() -> void:
 		var wrap := _cylinder(0.58, 5.0, Vector3(-0.5, 0, 0), _mat(col.lightened(0.5), 0.9), crayon)
 		wrap.rotation.z = PI * 0.5
 		c_placed += 1
+
+
+## Soft blue wallpaper with stripes and little stars (world-space mapped).
+func _wallpaper() -> StandardMaterial3D:
+	var img := Image.create(64, 64, false, Image.FORMAT_RGB8)
+	var base := Color(0.62, 0.8, 0.95)
+	var stripe := Color(0.68, 0.85, 0.98)
+	for x in 64:
+		for y in 64:
+			var c := stripe if (x / 16) % 2 == 0 else base
+			# tiny star in the middle of each light stripe
+			var dx := absi((x % 32) - 8)
+			var dy := absi((y % 32) - 16)
+			if dx + dy <= 2 or (dx == 0 and dy <= 3) or (dy == 0 and dx <= 3):
+				c = Color(1.0, 0.95, 0.6)
+			img.set_pixel(x, y, c)
+	img.generate_mipmaps()
+	var m := StandardMaterial3D.new()
+	m.albedo_texture = ImageTexture.create_from_image(img)
+	m.roughness = 0.95
+	m.uv1_triplanar = true
+	m.uv1_world_triplanar = true
+	m.uv1_scale = Vector3(1.0 / 12.0, 1.0 / 12.0, 1.0 / 12.0)
+	return m
+
+
+## A big race poster on the side wall.
+func _build_poster() -> void:
+	var r := room_rect
+	var poster := Node3D.new()
+	poster.name = "Poster"
+	add_child(poster)
+	poster.position = Vector3(r.position.x + 0.3, 38.0, r.position.y + r.size.y * 0.62)
+	poster.rotation.y = PI * 0.5
+	_box(Vector3(34.0, 24.0, 0.4), Vector3.ZERO, _mat(Color(1.0, 0.97, 0.85), 0.8), false, poster, 0.0)
+	_box(Vector3(36.0, 26.0, 0.2), Vector3(0, 0, -0.15), _mat(Color(0.95, 0.3, 0.3), 0.6), false, poster, 0.0)
+	# A cartoon car drawing
+	var red := _mat(Color(0.9, 0.15, 0.12), 0.5)
+	_box(Vector3(16.0, 4.0, 0.3), Vector3(0, -3.0, 0.35), red, false, poster)
+	_box(Vector3(8.0, 3.5, 0.3), Vector3(-1.0, 0.5, 0.35), red, false, poster)
+	_box(Vector3(6.0, 2.4, 0.2), Vector3(-1.0, 0.6, 0.5), _mat(Color(0.5, 0.8, 1.0), 0.2), false, poster)
+	for x: float in [-5.0, 5.0]:
+		var wheel := _cylinder(2.0, 0.4, Vector3(x, -5.2, 0.5), _mat(Color(0.1, 0.1, 0.1), 0.6), poster)
+		wheel.rotation.x = PI * 0.5
+		var hub := _cylinder(0.9, 0.5, Vector3(x, -5.2, 0.55), _mat(Color(0.9, 0.9, 0.9), 0.3), poster)
+		hub.rotation.x = PI * 0.5
+	for i in 3:
+		_box(Vector3(3.0 - i * 0.6, 0.5, 0.2), Vector3(-11.0 - i * 0.4, -2.0 + i * 1.3, 0.4), _mat(Color(0.3, 0.3, 0.3), 0.8), false, poster)
+	var title := Label3D.new()
+	title.text = "RACE DAY!"
+	title.font_size = 200
+	title.pixel_size = 0.03
+	title.outline_size = 30
+	title.modulate = Color(1.0, 0.55, 0.1)
+	title.outline_modulate = Color(0.25, 0.1, 0.3)
+	title.position = Vector3(0, 7.5, 0.4)
+	poster.add_child(title)
+
+
+## A shelf above the bed with shiny trophies.
+func _build_shelf() -> void:
+	var r := room_rect
+	var shelf := Node3D.new()
+	shelf.name = "Shelf"
+	add_child(shelf)
+	shelf.position = Vector3(r.end.x - 3.0, 36.0, r.position.y + 70.0)
+	_box(Vector3(6.0, 0.8, 30.0), Vector3.ZERO, _mat(Color(0.85, 0.6, 0.35), 0.6), true, shelf)
+	var gold := StandardMaterial3D.new()
+	gold.albedo_color = Color(1.0, 0.78, 0.2)
+	gold.metallic = 0.85
+	gold.roughness = 0.25
+	var silver := StandardMaterial3D.new()
+	silver.albedo_color = Color(0.85, 0.87, 0.9)
+	silver.metallic = 0.85
+	silver.roughness = 0.25
+	var cups := [[gold, 1.3, -9.0], [silver, 1.0, 0.0], [gold, 0.9, 8.0]]
+	for cup: Array in cups:
+		var m: StandardMaterial3D = cup[0]
+		var k: float = cup[1]
+		var z: float = cup[2]
+		_box(Vector3(2.4, 1.2, 2.4) * k, Vector3(0, 1.0 * k, z), _mat(Color(0.2, 0.15, 0.1), 0.4), true, shelf)
+		_cylinder(0.35 * k, 2.0 * k, Vector3(0, 2.6 * k, z), m, shelf)
+		var bowl := MeshInstance3D.new()
+		var cm := CylinderMesh.new()
+		cm.top_radius = 1.6 * k
+		cm.bottom_radius = 0.5 * k
+		cm.height = 2.6 * k
+		bowl.mesh = cm
+		bowl.material_override = m
+		bowl.position = Vector3(0, 4.8 * k, z)
+		shelf.add_child(bowl)
+		for side: float in [-1.0, 1.0]:
+			_sphere(0.6 * k, Vector3(0, 5.0 * k, z + side * 1.7 * k), m, Vector3(0.4, 1.0, 0.6), shelf)

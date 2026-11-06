@@ -3,11 +3,10 @@ extends Node
 ## controls and the shared UI theme.
 
 const SAVE_PATH := "user://race_track_mayhem.cfg"
-const TRACK_ID := "bedroom_speedway"
-const TRACK_NAME := "Bedroom Speedway"
 const DIFFICULTY_NAMES := ["Easy", "Normal", "Hard"]
 
 var selected_car: int = 0
+var selected_track: int = 0
 var laps: int = 3
 var difficulty: int = 0          # 0 easy, 1 normal, 2 hard
 var master_volume: float = 0.8
@@ -42,6 +41,10 @@ func goto_garage() -> void:
 	goto("res://scenes/vehicle_select.tscn")
 
 
+func goto_track_select() -> void:
+	goto("res://scenes/track_select.tscn")
+
+
 func goto_race() -> void:
 	goto("res://scenes/race.tscn")
 
@@ -56,6 +59,7 @@ func load_settings() -> void:
 		_apply_volume()
 		return
 	selected_car = int(cfg.get_value("player", "car", 0))
+	selected_track = clampi(int(cfg.get_value("player", "track", 0)), 0, Track.TRACKS.size() - 1)
 	laps = int(cfg.get_value("settings", "laps", 3))
 	difficulty = int(cfg.get_value("settings", "difficulty", 0))
 	master_volume = float(cfg.get_value("settings", "volume", 0.8))
@@ -70,6 +74,7 @@ func load_settings() -> void:
 func save_settings() -> void:
 	var cfg := ConfigFile.new()
 	cfg.set_value("player", "car", selected_car)
+	cfg.set_value("player", "track", selected_track)
 	cfg.set_value("settings", "laps", laps)
 	cfg.set_value("settings", "difficulty", difficulty)
 	cfg.set_value("settings", "volume", master_volume)
@@ -92,19 +97,31 @@ func _apply_volume() -> void:
 ## Records a finished race. Returns true if it was a new best race time.
 func submit_result(race_time: float, best_lap: float) -> bool:
 	var new_record := false
-	var key := "%s_%d" % [TRACK_ID, laps]
+	var key := "%s_%d" % [track_id(), laps]
 	if not best_times.has(key) or race_time < float(best_times[key]):
 		best_times[key] = race_time
 		new_record = true
-	if best_lap > 0.0 and (not best_laps.has(TRACK_ID) or best_lap < float(best_laps[TRACK_ID])):
-		best_laps[TRACK_ID] = best_lap
+	if best_lap > 0.0 and (not best_laps.has(track_id()) or best_lap < float(best_laps[track_id()])):
+		best_laps[track_id()] = best_lap
 	save_settings()
 	return new_record
 
 
 func best_time_for_current() -> float:
-	var key := "%s_%d" % [TRACK_ID, laps]
+	return best_time_for(selected_track)
+
+
+func best_time_for(track_index: int) -> float:
+	var key := "%s_%d" % [Track.TRACKS[track_index]["id"], laps]
 	return float(best_times.get(key, -1.0))
+
+
+func track_id() -> String:
+	return Track.TRACKS[selected_track]["id"]
+
+
+func track_name() -> String:
+	return Track.TRACKS[selected_track]["name"]
 
 
 static func format_time(t: float) -> String:

@@ -84,7 +84,7 @@ func _choose() -> void:
 	Game.selected_car = _index
 	Game.save_settings()
 	Sfx.play("go")
-	Game.goto_race()
+	Game.goto_track_select()
 
 
 # ---------------------------------------------------------------------------

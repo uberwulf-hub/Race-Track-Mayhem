@@ -9,10 +9,15 @@ var _front_pivots: Array[Node3D] = []  # steering pivots
 var _wheel_radius := 0.3
 var _spin := 0.0
 var body_root: Node3D                  # tilts a little for squash & stretch
+var shadow: MeshInstance3D             # soft blob shadow on the ground
 
 
-func setup(car_def: Dictionary) -> ToyCarModel:
+func setup(car_def: Dictionary, with_shadow := true) -> ToyCarModel:
 	car = car_def
+	if with_shadow:
+		shadow = MeshKit.shadow_quad(1.9, 2.9, 0.6)
+		shadow.position.y = 0.03
+		add_child(shadow)
 	body_root = Node3D.new()
 	body_root.name = "Body"
 	add_child(body_root)
@@ -41,11 +46,21 @@ func animate(speed: float, steer: float, delta: float) -> void:
 # Materials & shape helpers
 # ---------------------------------------------------------------------------
 
-static func plastic(color: Color, gloss: float = 0.25) -> StandardMaterial3D:
+static func plastic(color: Color, gloss: float = 0.22) -> StandardMaterial3D:
 	var m := StandardMaterial3D.new()
 	m.albedo_color = color
 	m.roughness = gloss
-	m.metallic_specular = 0.7
+	m.metallic_specular = 0.8
+	m.rim_enabled = true
+	m.rim = 0.25
+	m.rim_tint = 0.6
+	return m
+
+
+static func glass() -> StandardMaterial3D:
+	var m := plastic(Color(0.45, 0.8, 1.0), 0.04)
+	m.metallic = 0.35
+	m.metallic_specular = 1.0
 	return m
 
 
@@ -57,11 +72,15 @@ static func glowing(color: Color, energy: float = 1.5) -> StandardMaterial3D:
 	return m
 
 
-func _box(parent: Node3D, size: Vector3, pos: Vector3, mat: Material, rot := Vector3.ZERO) -> MeshInstance3D:
+func _box(parent: Node3D, size: Vector3, pos: Vector3, mat: Material, rot := Vector3.ZERO, round_amt := 0.3) -> MeshInstance3D:
 	var mi := MeshInstance3D.new()
-	var mesh := BoxMesh.new()
-	mesh.size = size
-	mi.mesh = mesh
+	var smallest := minf(size.x, minf(size.y, size.z))
+	if smallest < 0.08:
+		var bm := BoxMesh.new()
+		bm.size = size
+		mi.mesh = bm
+	else:
+		mi.mesh = MeshKit.rounded_box(size, smallest * round_amt, 3)
 	mi.material_override = mat
 	mi.position = pos
 	mi.rotation = rot
@@ -194,11 +213,11 @@ func _lights(front_z: float, back_z: float, y: float, spread: float) -> void:
 func _build_sport() -> void:
 	var body := plastic(car["body"])
 	var accent := plastic(car["accent"])
-	var glass := plastic(Color(0.35, 0.75, 0.95), 0.05)
+	var gl := glass()
 	_wheel_radius = 0.3
 	_box(body_root, Vector3(1.12, 0.36, 2.05), Vector3(0, 0.45, 0.0), body)
 	_box(body_root, Vector3(1.04, 0.2, 0.6), Vector3(0, 0.36, -1.1), body, Vector3(-0.25, 0, 0))   # nose
-	_box(body_root, Vector3(0.9, 0.34, 0.95), Vector3(0, 0.78, 0.15), glass)                        # cabin
+	_box(body_root, Vector3(0.9, 0.34, 0.95), Vector3(0, 0.78, 0.15), gl)                        # cabin
 	_box(body_root, Vector3(0.86, 0.06, 0.8), Vector3(0, 0.96, 0.18), body)                         # roof
 	_box(body_root, Vector3(1.16, 0.07, 1.9), Vector3(0, 0.56, 0.0), accent)                        # racing stripe band
 	_box(body_root, Vector3(1.2, 0.06, 0.32), Vector3(0, 0.95, 0.98), accent)                       # spoiler
@@ -215,11 +234,11 @@ func _build_sport() -> void:
 func _build_monster() -> void:
 	var body := plastic(car["body"])
 	var dark := plastic(car["accent"], 0.5)
-	var glass := plastic(Color(0.35, 0.75, 0.95), 0.05)
+	var gl := glass()
 	_wheel_radius = 0.56
 	_box(body_root, Vector3(0.9, 0.2, 1.7), Vector3(0, 0.62, 0), dark)                             # chassis
 	_box(body_root, Vector3(1.15, 0.45, 2.0), Vector3(0, 1.05, 0.0), body)
-	_box(body_root, Vector3(0.95, 0.42, 0.85), Vector3(0, 1.48, 0.15), glass)
+	_box(body_root, Vector3(0.95, 0.42, 0.85), Vector3(0, 1.48, 0.15), gl)
 	_box(body_root, Vector3(1.0, 0.08, 0.9), Vector3(0, 1.72, 0.15), body)
 	_box(body_root, Vector3(1.2, 0.12, 0.25), Vector3(0, 0.85, -1.05), dark)                       # bumper
 	_box(body_root, Vector3(1.2, 0.12, 0.25), Vector3(0, 0.85, 1.05), dark)
@@ -266,13 +285,13 @@ func _build_buggy() -> void:
 func _build_van() -> void:
 	var body := plastic(car["body"])
 	var accent := plastic(car["accent"])
-	var glass := plastic(Color(0.35, 0.75, 0.95), 0.05)
+	var gl := glass()
 	_wheel_radius = 0.3
 	_box(body_root, Vector3(1.18, 0.95, 2.1), Vector3(0, 0.8, 0.05), body)
 	_box(body_root, Vector3(1.12, 0.45, 0.4), Vector3(0, 0.55, -1.12), body)                     # bonnet
-	_box(body_root, Vector3(1.0, 0.35, 0.05), Vector3(0, 1.0, -1.0), glass, Vector3(-0.35, 0, 0))   # windscreen
+	_box(body_root, Vector3(1.0, 0.35, 0.05), Vector3(0, 1.0, -1.0), gl, Vector3(-0.35, 0, 0))   # windscreen
 	for side: float in [-1.0, 1.0]:
-		_box(body_root, Vector3(0.02, 0.3, 1.5), Vector3(side * 0.6, 1.02, 0.15), glass)
+		_box(body_root, Vector3(0.02, 0.3, 1.5), Vector3(side * 0.6, 1.02, 0.15), gl)
 		_box(body_root, Vector3(0.02, 0.14, 1.9), Vector3(side * 0.6, 0.6, 0.05), accent)            # stripe
 	_box(body_root, Vector3(1.0, 0.06, 1.7), Vector3(0, 1.3, 0.15), accent)                       # roof rack
 	# Polka dots, because bubblegum.

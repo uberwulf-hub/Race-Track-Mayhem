@@ -36,6 +36,7 @@ var _engine_playback: AudioStreamGeneratorPlayback
 var _engine_phase := 0.0
 var _engine_phase2 := 0.0
 var _engine_freq := 60.0
+var _shake := 0.0
 
 
 func _ready() -> void:
@@ -44,6 +45,7 @@ func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	track = Track.new()
 	track.name = "Track"
+	track.layout_id = Game.selected_track
 	add_child(track)
 	track.build()
 
@@ -115,6 +117,8 @@ func _spawn_racers() -> void:
 		_add_flame(r)
 		if is_player:
 			player = r
+			r.landed.connect(func(_r: Racer, h: float): _shake = maxf(_shake, clampf(h * 0.12, 0.1, 0.45)))
+			r.bumped.connect(func(_r: Racer, h: float): _shake = maxf(_shake, clampf(h * 0.15, 0.08, 0.3)))
 
 
 func _add_flame(r: Racer) -> void:
@@ -190,15 +194,19 @@ func _process(delta: float) -> void:
 				match step:
 					0:
 						hud.show_countdown("3", Color(1.0, 0.3, 0.25))
+						track.set_start_lights(1)
 						Sfx.play("beep")
 					1:
 						hud.show_countdown("2", Color(1.0, 0.75, 0.2))
+						track.set_start_lights(2)
 						Sfx.play("beep")
 					2:
 						hud.show_countdown("1", Color(1.0, 0.95, 0.3))
+						track.set_start_lights(3)
 						Sfx.play("beep")
 					3:
 						hud.show_countdown("GO!", Color(0.35, 1.0, 0.4))
+						track.set_start_lights(4)
 						Sfx.play("go")
 						_set_state(State.RACING)
 		State.FINISHED:
@@ -386,6 +394,10 @@ func _update_camera(delta: float) -> void:
 			var fov_target := 64.0 + clampf(player.speed - 25.0, 0.0, 30.0) * 0.35
 			camera.fov = lerpf(camera.fov, fov_target, k * 0.5)
 			_safe_look_at(pose[1], _cam_up)
+			if _shake > 0.0:
+				camera.global_position += Vector3(randf_range(-1, 1), randf_range(-1, 1), randf_range(-1, 1)) * _shake
+				_shake = maxf(0.0, _shake - delta * 1.5)
+			hud.speed_effect = clampf((player.speed - 38.0) / 20.0, 0.0, 1.0) if (player.boost_timer > 0.0 or player.turbo_on or player.speed > 45.0) else 0.0
 		CamMode.HIGH:
 			var target := player.global_position + Vector3(0, 26.0, 22.0)
 			camera.global_position = camera.global_position.lerp(target, k)

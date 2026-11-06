@@ -24,6 +24,8 @@ var _minimap: Minimap
 var _root: Control
 var _message_tween: Tween
 var _center_tween: Tween
+var _speed_lines: SpeedLines
+var speed_effect := 0.0     # 0..1, set by the race camera
 
 
 static func make_label(text: String, size: int, color: Color = Color.WHITE, outline: int = 10) -> Label:
@@ -58,6 +60,12 @@ func setup(p_track: Track, p_racers: Array[Racer], p_player: Racer) -> void:
 	_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_root.theme = Game.ui_theme
 	add_child(_root)
+
+	# --- speed lines (drawn first so they sit under everything) ---
+	_speed_lines = SpeedLines.new()
+	_speed_lines.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_speed_lines.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_root.add_child(_speed_lines)
 
 	# --- top left: lap + time ---
 	var tl := VBoxContainer.new()
@@ -135,7 +143,7 @@ func setup(p_track: Track, p_racers: Array[Racer], p_player: Racer) -> void:
 	var t1 := make_label("RACE TRACK MAYHEM", 40, Color(1.0, 0.6, 0.15), 12)
 	t1.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_title_box.add_child(t1)
-	var t2 := make_label(Game.TRACK_NAME, 84, Color(1.0, 0.95, 0.4), 18)
+	var t2 := make_label(Game.track_name(), 84, Color(1.0, 0.95, 0.4), 18)
 	t2.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_title_box.add_child(t2)
 	var t3 := make_label("%d laps  *  %s" % [Game.laps, Game.DIFFICULTY_NAMES[Game.difficulty]], 32, Color.WHITE, 10)
@@ -171,7 +179,7 @@ func _make_bar(fill: Color) -> ProgressBar:
 
 func set_race_ui_visible(v: bool) -> void:
 	for c in _root.get_children():
-		if c == _center_label or c == _message_label or c == _title_box:
+		if c == _center_label or c == _message_label or c == _title_box or c == _speed_lines:
 			continue
 		c.visible = v
 
@@ -221,7 +229,7 @@ func fade_hint() -> void:
 	tw.tween_property(_hint_label, "modulate:a", 0.0, 1.0)
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	if player == null:
 		return
 	var shown_lap := clampi(player.lap + 1, 1, player.laps_to_win)
@@ -240,6 +248,8 @@ func _process(_delta: float) -> void:
 	_turbo_bar.value = player.turbo
 	_turbo_label.modulate = Color(1, 1, 1, 1.0 if player.turbo > 0.05 else 0.5)
 	_minimap.queue_redraw()
+	_speed_lines.amount = lerpf(_speed_lines.amount, speed_effect, minf(1.0, delta * 6.0))
+	_speed_lines.queue_redraw()
 
 
 ## Little top-down map of the track with a dot for each car.
@@ -276,3 +286,26 @@ class Minimap extends Control:
 		var pp := Vector2(hud.player.global_position.x, hud.player.global_position.z) * sc + off
 		draw_circle(pp, 9.0, Color.WHITE)
 		draw_circle(pp, 6.5, hud.player.car["body"])
+
+
+## White streaks rushing out from the middle of the screen when going really fast.
+class SpeedLines extends Control:
+	var amount := 0.0
+	var _seeds: Array[Vector3] = []
+
+	func _draw() -> void:
+		if amount < 0.02:
+			return
+		if _seeds.is_empty():
+			for i in 70:
+				_seeds.append(Vector3(randf() * TAU, randf(), randf_range(0.6, 1.4)))
+		var c := size * 0.5
+		var radius := size.length() * 0.5
+		var t := Time.get_ticks_msec() / 1000.0
+		for sd in _seeds:
+			var phase := fmod(sd.y + t * 2.2 * sd.z, 1.0)
+			var dir := Vector2(cos(sd.x), sin(sd.x))
+			var r0 := radius * (0.45 + phase * 0.6)
+			var r1 := r0 + radius * 0.18 * sd.z
+			var a := amount * 0.45 * (1.0 - phase)
+			draw_line(c + dir * r0, c + dir * r1, Color(1, 1, 1, a), 3.0 * sd.z, true)

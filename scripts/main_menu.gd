@@ -21,6 +21,7 @@ var _time := 0.0
 
 func _ready() -> void:
 	track = Track.new()
+	track.layout_id = randi() % Track.TRACKS.size()
 	add_child(track)
 	track.build()
 	var room := Bedroom.new()
