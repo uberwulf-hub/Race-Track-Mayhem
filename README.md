@@ -8,12 +8,18 @@ Pick a toy car and a track, then race four computer cars around an orange plasti
 kid's bedroom floor. Each race starts with the camera looking at the whole bedroom, then it swoops
 down to your car for **3… 2… 1… GO!**
 
-**Tracks**
-- **Bedroom Speedway** ★☆☆: loop-de-loop, ramp jump, banked turns, chicane, hill, boost pads.
-- **Toy Box Twister** ★★☆: a figure-8 that crosses over itself on a bridge, with a
-  **corkscrew**, a loop-de-loop, a jump, a chicane and boost pads.
+**5 tracks, each in its own room**
 
-![Toy Box Twister](docs/screenshot-twister.png)
+| Track | Room | Trickiness | Highlights |
+|---|---|---|---|
+| Bedroom Speedway | Bedroom: bed, teddy bear, rainbow rug | ★☆☆ | loop-de-loop, ramp jump, hill, chicane |
+| Toy Box Twister | Playroom: foam mat, rainbow, ball pit, toy chest | ★★☆ | figure-8 bridge over itself, corkscrew, loop |
+| Kitchen Kerfuffle | Kitchen: checker tiles, fridge, table, giant fruit | ★★☆ | spiral climb, big drop, double jump, S-bends |
+| Bubble Bath Bash | Bathroom: bubbly tub, GIANT rubber duck | ★★☆ | double loop, wavy bumps, zig-zags, jump |
+| Sofa Slalom | Living room at sunset: sofa, TV, sleeping cat | ★★★ | slalom, spiral, corkscrew, loop, jump |
+
+![The five rooms](docs/screenshot-rooms.png)
+
 
 ## How to play it on your computer
 
@@ -59,7 +65,7 @@ If you go too slowly upside down, you fall off. **MAYHEM!**
 
 | File | What it does |
 |---|---|
-| `scripts/track.gd` | Builds the tracks. **Each track is a `_layout_...()` function**, a list of pieces like `_straight(10)`, `_turn(90, 15, 20)`, `_loop(8.5, 10)`, `_corkscrew(62, 5.5)`, `_bridge()` and `_jump()`. The circuit closes itself automatically. Add an entry to `TRACKS` and a layout function to make a new track. |
+| `scripts/track.gd` | Builds the tracks. **Each track is a `_layout_...()` function**, a list of pieces like `_straight(10)`, `_turn(90, 15, 20)`, `_loop(8.5, 10)`, `_corkscrew(62, 5.5)`, `_helix(360, 13, 7.5)`, `_slalom(5, 34, 13)`, `_waves(3)`, `_bridge()` and `_jump()`. The circuit closes itself automatically. Add an entry to `TRACKS` (with its `room`) and a layout function to make a new track. |
 | `scripts/mesh_kit.gd` | Rounded "toy" box meshes and soft blob shadows. |
 | `scripts/track_select.gd` | Track-picking screen. |
 | `scripts/car_data.gd` | The cars, their colors and stats. Add a new car here. |
@@ -67,9 +73,10 @@ If you go too slowly upside down, you fall off. **MAYHEM!**
 | `scripts/racer.gd` | Driving: speed, steering, boosts, jumps, falling off the loop, bumping, and the computer driver. |
 | `scripts/race.gd` | Race flow: intro, countdown, camera, places, pause menu, results. |
 | `scripts/race_hud.gd` | On-screen display and mini-map. |
-| `scripts/bedroom.gd` | The bedroom: floor, rug, bed, teddy, blocks, crayons, beach ball, window. |
+| `scripts/rooms/room.gd` | Base class for the rooms: lighting, floor, walls, window, door and shape helpers. |
+| `scripts/rooms/*_room.gd` | One file per room theme (bedroom, playroom, kitchen, bathroom, living room). Each one sets its colours and builds its furniture. |
 | `scripts/main_menu.gd`, `scripts/vehicle_select.gd` | Menu screens. |
 | `scripts/game_state.gd`, `scripts/sfx.gd` | Settings and saving, controls, UI theme, sound effects and music. |
 
-Ideas for next time: more rooms (a kitchen-table track, a bathtub track), unlockable cars,
+Ideas for next time: an outdoor garden track, unlockable cars,
 a split-screen two-player mode, and a ghost car of your best lap.

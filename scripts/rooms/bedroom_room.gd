@@ -1,190 +1,35 @@
-class_name Bedroom
-extends Node3D
-## A giant kid's bedroom built around the toy track: wooden floor, rug, bed,
-## teddy bear, toy blocks, crayons, a beach ball, a window with sunshine...
-## 1 unit is roughly 5 cm, so the room is huge compared to the cars.
-
-const WALL_HEIGHT := 70.0
-
-var room_rect: Rect2          # floor area (x, z)
-var track: Track
-var _rng := RandomNumberGenerator.new()
+class_name BedroomRoom
+extends Room
+## Bedroom Speedway's room: wooden floor, rainbow rug, bed, dresser,
+## teddy bear, toy blocks, crayons, beach ball, poster and trophy shelf.
 
 
-func build(p_track: Track) -> Bedroom:
-	track = p_track
-	_rng.seed = 12345
-	var r := track.get_aabb_xz()
-	room_rect = Rect2(r.position - Vector2(42.0, 34.0), r.size + Vector2(42.0 + 52.0, 34.0 + 40.0))
-	_build_environment()
-	_build_floor()
-	_build_walls()
-	_build_window()
+func _configure() -> void:
+	curtain_color = Color(0.95, 0.45, 0.55)
+
+
+func _floor_image() -> Image:
+	return Room.wood_image(Color(0.62, 0.42, 0.25))
+
+
+func _wall_image() -> Image:
+	return Room.stripes_image(Color(0.62, 0.8, 0.95), Color(0.68, 0.85, 0.98), Color(1.0, 0.95, 0.6))
+
+
+func _build_props() -> void:
+	_build_rug()
+	_build_wall_stars()
 	_build_bed()
 	_build_dresser()
 	_build_teddy()
 	_build_toys()
 	_build_poster()
 	_build_shelf()
-	return self
 
 
-func center() -> Vector3:
-	var c := room_rect.get_center()
-	return Vector3(c.x, 0.0, c.y)
-
-
-## A nice high corner view that shows the whole room (used for the intro zoom).
-func overview_position() -> Vector3:
-	return Vector3(room_rect.position.x + 14.0, WALL_HEIGHT - 6.0, room_rect.end.y - 12.0)
-
-
-# ---------------------------------------------------------------------------
-
-func _build_environment() -> void:
-	var env := Environment.new()
-	env.background_mode = Environment.BG_COLOR
-	env.background_color = Color(0.55, 0.75, 0.95)
-	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_color = Color(1.0, 0.93, 0.85)
-	env.ambient_light_energy = 0.35
-	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
-	env.tonemap_exposure = 0.9
-	env.glow_enabled = true
-	env.glow_intensity = 0.3
-	env.glow_bloom = 0.05
-	env.fog_enabled = true
-	env.fog_light_color = Color(0.75, 0.85, 1.0)
-	env.fog_density = 0.0005
-	env.fog_sky_affect = 0.0
-	env.adjustment_enabled = true
-	env.adjustment_saturation = 1.15
-	var we := WorldEnvironment.new()
-	we.environment = env
-	add_child(we)
-
-	var sun := DirectionalLight3D.new()
-	sun.name = "Sun"
-	sun.light_color = Color(1.0, 0.95, 0.85)
-	sun.light_energy = 0.9
-	sun.shadow_enabled = true
-	sun.directional_shadow_max_distance = 220.0
-	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
-	sun.rotation_degrees = Vector3(-55.0, -35.0, 0.0)
-	add_child(sun)
-
-	var lamp := OmniLight3D.new()
-	lamp.position = center() + Vector3(0.0, WALL_HEIGHT - 8.0, 0.0)
-	lamp.omni_range = 260.0
-	lamp.omni_attenuation = 0.6
-	lamp.light_energy = 0.25
-	lamp.light_color = Color(1.0, 0.9, 0.75)
-	add_child(lamp)
-
-
-func _mat(color: Color, rough: float = 0.8) -> StandardMaterial3D:
-	var m := StandardMaterial3D.new()
-	m.albedo_color = color
-	m.roughness = rough
-	return m
-
-
-func _box(size: Vector3, pos: Vector3, mat: Material, shadow := true, parent: Node3D = null, round_amt := 0.15) -> MeshInstance3D:
-	var mi := MeshInstance3D.new()
-	var smallest := minf(size.x, minf(size.y, size.z))
-	if round_amt <= 0.0 or smallest < 0.3:
-		var mesh := BoxMesh.new()
-		mesh.size = size
-		mi.mesh = mesh
-	else:
-		mi.mesh = MeshKit.rounded_box(size, smallest * round_amt, 3)
-	mi.material_override = mat
-	mi.position = pos
-	if not shadow:
-		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	(parent if parent else self).add_child(mi)
-	return mi
-
-
-func _sphere(radius: float, pos: Vector3, mat: Material, scale_v := Vector3.ONE, parent: Node3D = null) -> MeshInstance3D:
-	var mi := MeshInstance3D.new()
-	var mesh := SphereMesh.new()
-	mesh.radius = radius
-	mesh.height = radius * 2.0
-	mi.mesh = mesh
-	mi.material_override = mat
-	mi.position = pos
-	mi.scale = scale_v
-	(parent if parent else self).add_child(mi)
-	return mi
-
-
-func _cylinder(radius: float, height: float, pos: Vector3, mat: Material, parent: Node3D = null) -> MeshInstance3D:
-	var mi := MeshInstance3D.new()
-	var mesh := CylinderMesh.new()
-	mesh.top_radius = radius
-	mesh.bottom_radius = radius
-	mesh.height = height
-	mesh.radial_segments = 32
-	mi.mesh = mesh
-	mi.material_override = mat
-	mi.position = pos
-	(parent if parent else self).add_child(mi)
-	return mi
-
-
-## True if a spot on the floor is far enough from the track to put stuff there.
-func _clear_of_track(p: Vector3, radius: float) -> bool:
-	var min_d := Track.HALF_WIDTH + radius + 2.0
-	for k in range(0, track.count, 2):
-		var q := track.points[k]
-		if Vector2(q.x - p.x, q.z - p.z).length() < min_d:
-			return false
-	return true
-
-
-# ---------------------------------------------------------------------------
-# Floor, walls, window
-# ---------------------------------------------------------------------------
-
-func _build_floor() -> void:
-	var img := Image.create(256, 256, false, Image.FORMAT_RGB8)
-	var planks := 4
-	for x in 256:
-		var plank := x * planks / 256
-		var shade := 0.9 + 0.1 * sin(plank * 12.9898)
-		for y in 256:
-			var grain := 0.06 * sin(y * 0.11 + sin(x * 0.3 + plank) * 2.0) + 0.03 * sin(y * 0.53 + x * 0.07)
-			var c := Color(0.62, 0.42, 0.25) * (shade + grain)
-			if x % (256 / planks) < 2:
-				c = Color(0.38, 0.24, 0.13)
-			var seam := (y + plank * 97) % 256
-			if seam < 2:
-				c = Color(0.42, 0.27, 0.15)
-			c.a = 1.0
-			img.set_pixel(x, y, c)
-	img.generate_mipmaps()
-	var tex := ImageTexture.create_from_image(img)
-	var m := StandardMaterial3D.new()
-	m.albedo_texture = tex
-	m.roughness = 0.45
-	m.uv1_scale = Vector3(room_rect.size.x / 24.0, room_rect.size.y / 24.0, 1.0)
-	m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
-
-	var floor_mi := MeshInstance3D.new()
-	floor_mi.name = "Floor"
-	var pm := PlaneMesh.new()
-	pm.size = room_rect.size
-	floor_mi.mesh = pm
-	floor_mi.material_override = m
-	floor_mi.position = center()
-	add_child(floor_mi)
-
-	# A big round rug under the middle of the track.
-	var rug_mat := _mat(Color(0.35, 0.55, 0.95), 1.0)
-	var rug := _cylinder(1.0, 0.12, Vector3.ZERO, rug_mat)
+func _build_rug() -> void:
 	var tr := track.get_aabb_xz()
-	rug.position = Vector3(tr.get_center().x, 0.06, tr.get_center().y)
+	var rug := _cylinder(1.0, 0.12, Vector3(tr.get_center().x, 0.06, tr.get_center().y), _mat(Color(0.35, 0.55, 0.95), 1.0))
 	rug.scale = Vector3(tr.size.x * 0.42, 1.0, tr.size.y * 0.42)
 	var rug2 := _cylinder(1.0, 0.14, rug.position, _mat(Color(0.98, 0.85, 0.35), 1.0))
 	rug2.scale = rug.scale * Vector3(0.8, 1.0, 0.8)
@@ -192,79 +37,15 @@ func _build_floor() -> void:
 	rug3.scale = rug.scale * Vector3(0.55, 1.0, 0.55)
 
 
-func _build_walls() -> void:
-	var wall_mat := _wallpaper()
-	var trim := _mat(Color(0.98, 0.98, 0.95), 0.6)
+func _build_wall_stars() -> void:
 	var r := room_rect
-	var h := WALL_HEIGHT
-	var c := center()
-	# Walls don't cast shadows so the sun can shine in.
-	_box(Vector3(r.size.x, h, 2.0), Vector3(c.x, h * 0.5, r.position.y - 1.0), wall_mat, false, null, 0.0)
-	_box(Vector3(r.size.x, h, 2.0), Vector3(c.x, h * 0.5, r.end.y + 1.0), wall_mat, false, null, 0.0)
-	_box(Vector3(2.0, h, r.size.y), Vector3(r.position.x - 1.0, h * 0.5, c.z), wall_mat, false, null, 0.0)
-	_box(Vector3(2.0, h, r.size.y), Vector3(r.end.x + 1.0, h * 0.5, c.z), wall_mat, false, null, 0.0)
-	# Skirting boards
-	_box(Vector3(r.size.x, 3.0, 0.6), Vector3(c.x, 1.5, r.position.y + 0.3), trim)
-	_box(Vector3(r.size.x, 3.0, 0.6), Vector3(c.x, 1.5, r.end.y - 0.3), trim)
-	_box(Vector3(0.6, 3.0, r.size.y), Vector3(r.position.x + 0.3, 1.5, c.z), trim)
-	_box(Vector3(0.6, 3.0, r.size.y), Vector3(r.end.x - 0.3, 1.5, c.z), trim)
-	# Ceiling
-	_box(Vector3(r.size.x + 4.0, 1.0, r.size.y + 4.0), Vector3(c.x, h + 0.5, c.z), _mat(Color(0.97, 0.97, 0.95)), false, null, 0.0)
-	# Painted stars on the walls
 	var star_mat := _mat(Color(1.0, 0.9, 0.3), 0.5)
 	for i in 14:
-		var along := _rng.randf_range(0.05, 0.95)
-		var y := _rng.randf_range(25.0, h - 8.0)
+		var pos := Vector3(r.position.x + r.size.x * _rng.randf_range(0.05, 0.95), _rng.randf_range(25.0, WALL_HEIGHT - 8.0), r.position.y + 0.05)
 		var sz := _rng.randf_range(1.5, 3.0)
-		var pos := Vector3(r.position.x + r.size.x * along, y, r.position.y + 0.05)
 		var star := _box(Vector3(sz, sz, 0.2), pos, star_mat, false)
 		star.rotation.z = PI * 0.25
-	# A door on the near wall
-	_box(Vector3(18.0, 42.0, 0.8), Vector3(r.end.x - 30.0, 21.0, r.end.y - 0.2), _mat(Color(0.98, 0.95, 0.9), 0.5), false)
-	_sphere(1.0, Vector3(r.end.x - 37.0, 20.0, r.end.y - 1.0), _mat(Color(0.9, 0.75, 0.2), 0.2))
 
-
-func _build_window() -> void:
-	var r := room_rect
-	var cx := r.position.x + r.size.x * 0.62
-	var z := r.position.y + 0.2
-	var frame_mat := _mat(Color(0.98, 0.98, 0.98), 0.5)
-	var sky := StandardMaterial3D.new()
-	sky.albedo_color = Color(0.6, 0.85, 1.0)
-	sky.emission_enabled = true
-	sky.emission = Color(0.65, 0.88, 1.0)
-	sky.emission_energy_multiplier = 1.4
-	_box(Vector3(44.0, 32.0, 0.3), Vector3(cx, 38.0, z + 0.2), sky, false)
-	_box(Vector3(48.0, 2.0, 1.2), Vector3(cx, 54.0, z + 0.4), frame_mat, false)
-	_box(Vector3(48.0, 2.0, 2.4), Vector3(cx, 22.0, z + 1.0), frame_mat, false)
-	_box(Vector3(2.0, 32.0, 1.2), Vector3(cx - 23.0, 38.0, z + 0.4), frame_mat, false)
-	_box(Vector3(2.0, 32.0, 1.2), Vector3(cx + 23.0, 38.0, z + 0.4), frame_mat, false)
-	_box(Vector3(1.0, 32.0, 1.0), Vector3(cx, 38.0, z + 0.4), frame_mat, false)
-	_box(Vector3(46.0, 1.0, 1.0), Vector3(cx, 38.0, z + 0.4), frame_mat, false)
-	# A little sun and a cloud outside
-	var sun_mat := StandardMaterial3D.new()
-	sun_mat.albedo_color = Color(1.0, 0.9, 0.3)
-	sun_mat.emission_enabled = true
-	sun_mat.emission = Color(1.0, 0.85, 0.2)
-	sun_mat.emission_energy_multiplier = 2.0
-	var sun := _cylinder(4.0, 0.2, Vector3(cx + 12.0, 47.0, z + 0.45), sun_mat)
-	sun.rotation.x = PI * 0.5
-	var cloud := _mat(Color.WHITE, 1.0)
-	for i in 3:
-		var c := _sphere(3.0, Vector3(cx - 12.0 + i * 3.5, 44.0 + (1.0 if i == 1 else 0.0), z + 0.4), cloud, Vector3(1.0, 0.8, 0.1))
-		c.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	# Curtains
-	var curtain := _mat(Color(0.95, 0.45, 0.55), 1.0)
-	for side: float in [-1.0, 1.0]:
-		var cur := _box(Vector3(9.0, 40.0, 1.5), Vector3(cx + side * 28.0, 36.0, z + 1.6), curtain, false)
-		cur.rotation.y = 0.0
-	var rod := _cylinder(0.6, 70.0, Vector3(cx, 57.0, z + 2.0), frame_mat)
-	rod.rotation.z = PI * 0.5
-
-
-# ---------------------------------------------------------------------------
-# Furniture
-# ---------------------------------------------------------------------------
 
 func _build_bed() -> void:
 	var r := room_rect
@@ -440,31 +221,6 @@ func _build_toys() -> void:
 		c_placed += 1
 
 
-## Soft blue wallpaper with stripes and little stars (world-space mapped).
-func _wallpaper() -> StandardMaterial3D:
-	var img := Image.create(64, 64, false, Image.FORMAT_RGB8)
-	var base := Color(0.62, 0.8, 0.95)
-	var stripe := Color(0.68, 0.85, 0.98)
-	for x in 64:
-		for y in 64:
-			var c := stripe if (x / 16) % 2 == 0 else base
-			# tiny star in the middle of each light stripe
-			var dx := absi((x % 32) - 8)
-			var dy := absi((y % 32) - 16)
-			if dx + dy <= 2 or (dx == 0 and dy <= 3) or (dy == 0 and dx <= 3):
-				c = Color(1.0, 0.95, 0.6)
-			img.set_pixel(x, y, c)
-	img.generate_mipmaps()
-	var m := StandardMaterial3D.new()
-	m.albedo_texture = ImageTexture.create_from_image(img)
-	m.roughness = 0.95
-	m.uv1_triplanar = true
-	m.uv1_world_triplanar = true
-	m.uv1_scale = Vector3(1.0 / 12.0, 1.0 / 12.0, 1.0 / 12.0)
-	return m
-
-
-## A big race poster on the side wall.
 func _build_poster() -> void:
 	var r := room_rect
 	var poster := Node3D.new()
@@ -497,7 +253,6 @@ func _build_poster() -> void:
 	poster.add_child(title)
 
 
-## A shelf above the bed with shiny trophies.
 func _build_shelf() -> void:
 	var r := room_rect
 	var shelf := Node3D.new()

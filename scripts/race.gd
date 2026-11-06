@@ -1,5 +1,5 @@
 extends Node3D
-## Runs a race: builds the bedroom and the track, puts cars on the grid,
+## Runs a race: builds the themed room and the track, puts cars on the grid,
 ## does the big zoom-in intro and the 3-2-1-GO countdown, then keeps score
 ## until everyone crosses the finish line.
 
@@ -11,7 +11,7 @@ const INTRO_ZOOM := 3.6        # seconds zooming down to the car
 const RACER_NAMES := ["You", "Zoomy", "Vroomer", "Speedy", "Turbo Tom"]
 
 var track: Track
-var bedroom: Bedroom
+var room: Room
 var racers: Array[Racer] = []
 var player: Racer
 var hud: RaceHud
@@ -51,10 +51,10 @@ func _ready() -> void:
 	add_child(track)
 	track.build()
 
-	bedroom = Bedroom.new()
-	bedroom.name = "Bedroom"
-	add_child(bedroom)
-	bedroom.build(track)
+	room = Room.create(Track.TRACKS[Game.selected_track]["room"])
+	room.name = "Room"
+	add_child(room)
+	room.build(track)
 
 	_spawn_racers()
 
@@ -64,7 +64,7 @@ func _ready() -> void:
 	camera.far = 600.0
 	add_child(camera)
 	camera.current = true
-	_intro_from = bedroom.overview_position()
+	_intro_from = room.overview_position()
 	var tr := track.get_aabb_xz()
 	_intro_look = Vector3(tr.get_center().x, 0.0, tr.get_center().y)
 	camera.global_position = _intro_from
@@ -75,7 +75,7 @@ func _ready() -> void:
 	hud.setup(track, racers, player)
 	hud.show_title(true)
 
-	for n: Node in [track, bedroom, camera, hud]:
+	for n: Node in [track, room, camera, hud]:
 		n.process_mode = Node.PROCESS_MODE_PAUSABLE
 	for r in racers:
 		r.process_mode = Node.PROCESS_MODE_PAUSABLE

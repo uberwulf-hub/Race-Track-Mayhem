@@ -31,16 +31,52 @@ const TRACKS: Array[Dictionary] = [
 	{
 		"id": "bedroom_speedway",
 		"name": "Bedroom Speedway",
+		"room": "bedroom",
+		"room_name": "The Bedroom",
 		"blurb": "The classic! A loop-de-loop, a big jump and a hill.",
 		"features": ["Loop-de-loop", "Ramp jump", "Hill", "Chicane"],
 		"stars": 1,
+		"color": Color(0.35, 0.55, 0.95),
 	},
 	{
 		"id": "toy_box_twister",
 		"name": "Toy Box Twister",
+		"room": "playroom",
+		"room_name": "The Playroom",
 		"blurb": "A figure-8 that flies over itself, with a corkscrew!",
 		"features": ["Corkscrew", "Figure-8 bridge", "Loop-de-loop", "Jump"],
 		"stars": 2,
+		"color": Color(0.95, 0.45, 0.2),
+	},
+	{
+		"id": "kitchen_kerfuffle",
+		"name": "Kitchen Kerfuffle",
+		"room": "kitchen",
+		"room_name": "The Kitchen",
+		"blurb": "Spiral up high, zoom back down, then jump twice!",
+		"features": ["Spiral climb", "Big drop", "Double jump", "S-bends"],
+		"stars": 2,
+		"color": Color(0.3, 0.7, 0.6),
+	},
+	{
+		"id": "bubble_bath_bash",
+		"name": "Bubble Bath Bash",
+		"room": "bathroom",
+		"room_name": "The Bathroom",
+		"blurb": "Two loops in a row, wobbly waves and a duck to dodge!",
+		"features": ["Double loop", "Wavy bumps", "Zig-zags", "Jump"],
+		"stars": 2,
+		"color": Color(0.35, 0.7, 0.95),
+	},
+	{
+		"id": "sofa_slalom",
+		"name": "Sofa Slalom",
+		"room": "living_room",
+		"room_name": "The Living Room",
+		"blurb": "The ultimate challenge: wiggles, a spiral, a corkscrew AND a loop.",
+		"features": ["Slalom", "Spiral", "Corkscrew", "Loop", "Jump"],
+		"stars": 3,
+		"color": Color(0.75, 0.35, 0.55),
 	},
 ]
 
@@ -98,6 +134,12 @@ func _layout(stretch_a: float, stretch_b: float) -> void:
 	match layout_id:
 		1:
 			_layout_twister(stretch_a, stretch_b)
+		2:
+			_layout_kitchen(stretch_a, stretch_b)
+		3:
+			_layout_bathroom(stretch_a, stretch_b)
+		4:
+			_layout_living_room(stretch_a, stretch_b)
 		_:
 			_layout_speedway(stretch_a, stretch_b)
 
@@ -167,6 +209,149 @@ func _layout_twister(stretch_a: float, stretch_b: float) -> void:
 	_straight(10.0)
 	_turn(-90.0, 15.0, -22.0)           # -> north, back to the line
 	_straight(16.0)
+
+
+## Track 3: Kitchen Kerfuffle. Spirals up high, drops back down, S-bends,
+## then two jumps in a row.
+func _layout_kitchen(stretch_a: float, stretch_b: float) -> void:
+	_mark("A")
+	_straight(stretch_a)                # north
+	_straight(8.0, FLAG_BOOST)
+	_turn(90.0, 16.0, 20.0)             # -> east
+	_straight(22.0)
+	_helix(360.0, 13.0, 7.5, 12.0)      # spiral climb
+	_straight(6.0)
+	_ramp_down(7.5)                     # big drop
+	_straight(8.0, FLAG_BOOST)
+	_straight(24.0)
+	_turn(90.0, 15.0, 22.0)             # -> south
+	_turn(-60.0, 14.0, -16.0)           # S-bends
+	_turn(120.0, 14.0, 22.0)
+	_turn(-60.0, 14.0, -16.0)
+	_straight(8.0)
+	_turn(90.0, 15.0, 22.0)             # -> west
+	_mark("B")
+	_straight(stretch_b)
+	_straight(6.0, FLAG_BOOST)
+	_jump()
+	_straight(7.0)
+	_jump()                             # double jump!
+	_straight(8.0)
+	_turn(90.0, 16.0, 22.0)             # -> north
+	_straight(22.0)
+
+
+## Track 4: Bubble Bath Bash. Two loops back to back, wavy bumps,
+## zig-zags and a jump.
+func _layout_bathroom(stretch_a: float, stretch_b: float) -> void:
+	_mark("A")
+	_straight(stretch_a)                # north
+	_straight(8.0, FLAG_BOOST)
+	_straight(4.0)
+	_loop(8.0, 9.5)                     # loop one...
+	_straight(5.0)
+	_straight(6.0, FLAG_BOOST)
+	_loop(8.0, 9.5)                     # ...loop two!
+	_straight(10.0)
+	_turn(90.0, 17.0, 22.0)             # -> east
+	_waves(3)
+	_straight(6.0)
+	_turn(90.0, 15.0, 22.0)             # -> south
+	_straight(22.0)
+	_turn(-90.0, 12.0, -20.0)           # zig...
+	_turn(90.0, 12.0, 20.0)             # ...zag
+	_straight(24.0)
+	_turn(90.0, 15.0, 22.0)             # -> west
+	_mark("B")
+	_straight(stretch_b)
+	_jump()
+	_straight(8.0)
+	_turn(90.0, 15.0, 22.0)             # -> north
+	_straight(24.0)
+
+
+## Track 5: Sofa Slalom. Everything at once: slalom, spiral, big drop,
+## corkscrew, loop, more slalom and a jump.
+func _layout_living_room(stretch_a: float, stretch_b: float) -> void:
+	_mark("A")
+	_straight(stretch_a)                # north
+	_straight(8.0, FLAG_BOOST)
+	_turn(90.0, 15.0, 22.0)             # -> east
+	_slalom(5, 34.0, 13.0)
+	_straight(6.0)
+	_helix(-360.0, 12.0, 7.5, -12.0)    # spiral climb (to the left)
+	_straight(4.0)
+	_ramp_down(7.5)
+	_straight(6.0, FLAG_BOOST)
+	_corkscrew(60.0, 5.5)
+	_straight(6.0)
+	_turn(90.0, 15.0, 22.0)             # -> south
+	_straight(14.0)
+	_straight(6.0, FLAG_BOOST)
+	_loop(8.5, 10.0)
+	_straight(24.0)
+	_turn(90.0, 15.0, 22.0)             # -> west
+	_mark("B")
+	_straight(stretch_b)
+	_slalom(3, 30.0, 14.0)
+	_straight(4.0)
+	_jump()
+	_straight(6.0)
+	_turn(90.0, 16.0, 22.0)             # -> north
+	_straight(22.0)
+
+
+## A spiral: turns `deg` while climbing `rise` (gentle at both ends).
+func _helix(deg: float, radius: float, rise: float, bank: float = 0.0) -> void:
+	var arc := deg_to_rad(absf(deg)) * radius
+	var n := maxi(8, ceili(arc / RAW_STEP))
+	var step := arc / n
+	var dyaw := -deg_to_rad(deg) / n
+	var heading := Vector3(_fwd.x, 0.0, _fwd.z).normalized()
+	for i in n:
+		var t0 := float(i) / n
+		var t1 := float(i + 1) / n
+		var dy := rise * (smoothstep(0.0, 1.0, t1) - smoothstep(0.0, 1.0, t0))
+		heading = heading.rotated(Vector3.UP, dyaw * 0.5)
+		_pos += heading * step + Vector3.UP * dy
+		var f := (heading * step + Vector3.UP * dy).normalized()
+		heading = heading.rotated(Vector3.UP, dyaw * 0.5)
+		var right := f.cross(Vector3.UP).normalized()
+		_fwd = f
+		_up = right.cross(f).normalized()
+		_roll = bank * sin(PI * t1)
+		_emit(0)
+	_roll = 0.0
+	_fwd = heading
+	_up = Vector3.UP
+
+
+## A straight ramp that goes down exactly `height` and levels out again.
+func _ramp_down(height: float, angle: float = 12.0, radius: float = 25.0) -> void:
+	var th := deg_to_rad(angle)
+	var curve_drop := 2.0 * radius * (1.0 - cos(th))
+	var len := maxf(0.0, (height - curve_drop) / sin(th))
+	_pitch(-angle, radius)
+	_straight(len)
+	_pitch(angle, radius)
+
+
+## Little bumps in a row, like waves.
+func _waves(count: int, angle: float = 9.0, radius: float = 22.0) -> void:
+	for i in count:
+		_pitch(angle, radius)
+		_pitch(-angle * 2.0, radius)
+		_pitch(angle, radius)
+
+
+## Wiggles left and right, ending up pointing the same way.
+func _slalom(wiggles: int, deg: float, radius: float) -> void:
+	_turn(deg * 0.5, radius, deg * 0.4)
+	var dir := -1.0
+	for i in wiggles - 1:
+		_turn(deg * dir, radius, deg * 0.5 * dir)
+		dir = -dir
+	_turn(deg * 0.5 * dir, radius, deg * 0.4 * dir)
 
 
 const BRIDGE_ANGLE := 14.0

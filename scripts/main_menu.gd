@@ -1,6 +1,6 @@
 extends Node3D
-## Title screen. Computer cars race around the bedroom in the background
-## while the camera slowly circles the room.
+## Title screen. Computer cars race around one of the rooms (picked at
+## random) in the background while the camera slowly circles it.
 
 var track: Track
 var camera: Camera3D
@@ -25,7 +25,7 @@ func _ready() -> void:
 	track.layout_id = randi() % Track.TRACKS.size()
 	add_child(track)
 	track.build()
-	var room := Bedroom.new()
+	var room := Room.create(Track.TRACKS[track.layout_id]["room"])
 	add_child(room)
 	room.build(track)
 	var r := track.get_aabb_xz()
@@ -251,7 +251,7 @@ func _build_help(root: Control) -> Control:
 	var parts := _panel(root, "How to Play")
 	var box: VBoxContainer = parts[1]
 	var lines := [
-		"Pick your toy car, then race 4 other cars around the bedroom!",
+		"Pick your toy car, then race 4 other cars around the house!",
 		"",
 		"Go:  W  or  Up arrow",
 		"Steer:  A / D  or  Left / Right arrows",
