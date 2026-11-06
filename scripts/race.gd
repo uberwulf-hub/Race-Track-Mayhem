@@ -63,15 +63,14 @@ func _ready() -> void:
 	# The race node keeps listening while paused (so ESC can un-pause);
 	# everything that moves is pausable.
 	process_mode = Node.PROCESS_MODE_ALWAYS
-	track = Track.new()
+	track = Track.for_index(Game.selected_track)
 	track.name = "Track"
-	track.layout_id = Game.selected_track
 	add_child(track)
 	track.build()
 	skid_marks = SkidMarks.new()
 	track.add_child(skid_marks)
 
-	room = Room.create(Track.TRACKS[Game.selected_track]["room"])
+	room = Room.create(Game.track_info(Game.selected_track)["room"])
 	room.name = "Room"
 	add_child(room)
 	room.build(track)
@@ -493,7 +492,11 @@ func _on_respawned(r: Racer) -> void:
 	v.camera.global_position = pose[0]
 	v.cam_up = pose[2]
 	v.hud.fade_in()
-	v.hud.flash_message("Get Back to the Race!", Color(0.5, 1.0, 0.6), 1.4)
+	if r.skipped_ahead:
+		r.skipped_ahead = false
+		v.hud.flash_message("Tricky! Let's hop past that bit!", Color(0.5, 1.0, 0.6), 1.6)
+	else:
+		v.hud.flash_message("Get Back to the Race!", Color(0.5, 1.0, 0.6), 1.4)
 	if r == player and ghost:
 		ghost.lap_spoiled()
 

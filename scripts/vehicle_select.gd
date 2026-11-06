@@ -113,6 +113,10 @@ func _choose() -> void:
 		Game.goto_garage()
 		return
 	Game.picking = 1
+	if Game.skip_track_select and not Game.gp_active:
+		Game.skip_track_select = false
+		Game.goto_race()
+		return
 	if Game.gp_active:
 		Game.selected_track = 0
 		Game.goto_race()
@@ -121,6 +125,7 @@ func _choose() -> void:
 
 
 func _go_back() -> void:
+	Game.skip_track_select = false
 	if Game.two_player and Game.picking == 2:
 		Game.picking = 1
 		Game.goto_garage()

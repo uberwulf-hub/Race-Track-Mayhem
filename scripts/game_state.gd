@@ -39,6 +39,13 @@ var gp_points: Dictionary = {}   # racer name -> points
 var gp_roster: Array = []        # [{name, car, player (0 = computer, 1 or 2)}], same for the whole cup
 var last_unlocks: Array = []     # unlocks earned by the last race, shown on the results screen
 
+# Track Builder
+const MAX_CUSTOM_TRACKS := 12
+const ROOM_THEMES := [["bedroom", "The Bedroom"], ["playroom", "The Playroom"], ["kitchen", "The Kitchen"], ["bathroom", "The Bathroom"], ["living_room", "The Living Room"], ["garden", "The Garden"]]
+var custom_tracks: Array = []    # [{"name": String, "room": String, "pieces": Array[String]}]
+var editing_slot := -1           # which custom track the builder is editing (-1 = a new one)
+var skip_track_select := false   # "Race It!" in the builder goes straight to the race
+
 var ui_theme: Theme
 
 
@@ -73,6 +80,11 @@ func goto_track_select() -> void:
 	goto("res://scenes/track_select.tscn")
 
 
+func goto_editor(slot: int = -1) -> void:
+	editing_slot = slot
+	goto("res://scenes/track_editor.tscn")
+
+
 func goto_race() -> void:
 	goto("res://scenes/race.tscn")
 
@@ -87,7 +99,8 @@ func load_settings() -> void:
 		_apply_volume()
 		return
 	selected_car = int(cfg.get_value("player", "car", 0))
-	selected_track = clampi(int(cfg.get_value("player", "track", 0)), 0, Track.TRACKS.size() - 1)
+	custom_tracks = cfg.get_value("builder", "tracks", [])
+	selected_track = clampi(int(cfg.get_value("player", "track", 0)), 0, track_count() - 1)
 	laps = int(cfg.get_value("settings", "laps", 3))
 	difficulty = int(cfg.get_value("settings", "difficulty", 0))
 	master_volume = float(cfg.get_value("settings", "volume", 0.8))
@@ -129,6 +142,7 @@ func save_settings() -> void:
 	cfg.set_value("progress", "trophies", trophies)
 	cfg.set_value("progress", "custom", custom)
 	cfg.set_value("player", "p2_car", p2_car)
+	cfg.set_value("builder", "tracks", custom_tracks)
 	cfg.save(SAVE_PATH)
 
 
@@ -236,16 +250,16 @@ func best_time_for_current() -> float:
 
 
 func best_time_for(track_index: int) -> float:
-	var key := "%s_%d" % [Track.TRACKS[track_index]["id"], laps]
+	var key := "%s_%d" % [track_info(track_index)["id"], laps]
 	return float(best_times.get(key, -1.0))
 
 
 func track_id() -> String:
-	return Track.TRACKS[selected_track]["id"]
+	return track_info(selected_track)["id"]
 
 
 func track_name() -> String:
-	return Track.TRACKS[selected_track]["name"]
+	return track_info(selected_track)["name"]
 
 
 static func format_time(t: float) -> String:
@@ -465,3 +479,51 @@ func gp_standings() -> Array:
 		rows.append({"name": r["name"], "car": r["car"], "player": r["player"], "points": int(gp_points.get(r["name"], 0))})
 	rows.sort_custom(func(a, b): return a["points"] > b["points"])
 	return rows
+
+
+# --------------------------------------------------------------------------
+# All tracks: the built-in ones, then the player's own from the Track Builder
+# --------------------------------------------------------------------------
+
+func track_count() -> int:
+	return Track.TRACKS.size() + custom_tracks.size()
+
+
+func is_custom_track(index: int) -> bool:
+	return index >= Track.TRACKS.size()
+
+
+static func room_name(theme: String) -> String:
+	for r in ROOM_THEMES:
+		if r[0] == theme:
+			return r[1]
+	return "The Bedroom"
+
+
+## Card details for any track (built-in or custom).
+func track_info(index: int) -> Dictionary:
+	if index < Track.TRACKS.size():
+		return Track.TRACKS[maxi(index, 0)]
+	var slot := index - Track.TRACKS.size()
+	if slot >= custom_tracks.size():
+		return Track.TRACKS[0]
+	var t: Dictionary = custom_tracks[slot]
+	var pieces: Array = t.get("pieces", [])
+	var feats: Array = []
+	for id in pieces:
+		var nm: String = Track.piece_info(String(id)).get("name", "")
+		if nm != "" and not feats.has(nm) and not nm in ["Straight", "Turn Left", "Turn Right", "Bend Left", "Bend Right"]:
+			feats.append(nm)
+	if feats.is_empty():
+		feats.append("Built by you!")
+	return {
+		"id": "custom_%d_%s" % [slot, String(t.get("name", "")).to_snake_case()],
+		"name": t.get("name", "My Track"),
+		"room": t.get("room", "bedroom"),
+		"room_name": room_name(t.get("room", "bedroom")),
+		"blurb": "A track YOU built! %d pieces." % pieces.size(),
+		"features": feats.slice(0, 5),
+		"stars": 0,
+		"color": Color(0.95, 0.55, 0.15),
+		"custom": true,
+	}

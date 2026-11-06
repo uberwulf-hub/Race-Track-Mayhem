@@ -68,6 +68,9 @@ var _fall_timer := 0.0
 var _respawn_s := 0.0
 var _respawn_speed := 0.0
 var braking := false           # for brake sounds
+var skipped_ahead := false     # set when a car was helped past a spot it kept falling at
+var _same_spot_falls := 0
+var _last_fall_at := -1000.0
 # Bump physics: a sideways shove and a spin that fade away.
 var knock := 0.0               # extra sideways speed from being hit
 var spin := 0.0                # how far the car is twisted (radians)
@@ -412,6 +415,13 @@ func _launch(frame: Transform3D) -> void:
 	_air_launch = frame.origin + frame.basis.x * lateral
 	_air_pos = _air_launch
 	_air_vel = -frame.basis.z * speed + frame.basis.x * lateral_vel * 0.5
+	# Super-fast cars fly a bit less far so they still land on the runway
+	# (too-slow cars still fall short).
+	var gap_len := Vector2(track.sample(gap_end).origin.x - frame.origin.x, track.sample(gap_end).origin.z - frame.origin.z).length()
+	var angle := asin(clampf(-frame.basis.z.y, 0.05, 0.9))
+	var max_speed := sqrt((gap_len + 10.0) * AIR_GRAVITY / maxf(sin(2.0 * angle), 0.2))
+	if _air_vel.length() > max_speed:
+		_air_vel = _air_vel.normalized() * max_speed
 	_air_dir = Vector3(-frame.basis.z.x, 0.0, -frame.basis.z.z).normalized()
 	_air_right = Vector3(frame.basis.x.x, 0.0, frame.basis.x.z).normalized()
 	_sparks.emitting = false
@@ -428,10 +438,16 @@ func _process_air(delta: float, steer: float) -> void:
 	var along := rel.dot(_air_dir)
 	var new_s := _air_s0 + along
 	lateral = _air_lat0 + rel.dot(_air_right)
+	var past_gap := new_s >= _air_gap_end
+	if past_gap:
+		# The track may curve after the landing ramp: measure against the
+		# nearest bit of track under the car, not a straight line.
+		new_s = _nearest_s(_air_pos, maxf(_air_gap_end, new_s - 15.0), new_s + 15.0)
+		var f := track.sample(new_s)
+		lateral = (_air_pos - f.origin).dot(f.basis.x)
 	var surf := track.sample(new_s)
 	var height := (_air_pos - surf.origin).dot(surf.basis.y)
 	var landing_top := track.sample(_air_gap_end).origin.y
-	var past_gap := new_s >= _air_gap_end
 
 	if not past_gap and _air_pos.y < landing_top - 0.8:
 		# Too slow: dropped into the gap!
@@ -476,6 +492,22 @@ func _process_air(delta: float, steer: float) -> void:
 			model.shadow.global_transform = Transform3D(Basis(), Vector3(_air_pos.x, ground + 0.03, _air_pos.z))
 
 
+## The track distance between a and b whose centre line is closest to p
+## (sideways distance only).
+func _nearest_s(p: Vector3, a: float, b: float) -> float:
+	var best := a
+	var best_d := INF
+	var t := a
+	while t <= b:
+		var q := track.sample(t).origin
+		var d := Vector2(q.x - p.x, q.z - p.z).length_squared()
+		if d < best_d:
+			best_d = d
+			best = t
+		t += 0.5
+	return best
+
+
 func _set_track_pos(new_s: float) -> void:
 	var moved := new_s - _air_s0
 	total = _air_total0 + moved
@@ -488,6 +520,24 @@ func _set_track_pos(new_s: float) -> void:
 
 ## Sends the car tumbling off the track. It reappears at `at` with `start_speed`.
 func _fall_off(vel: Vector3, at: float, start_speed: float, reason: String) -> void:
+	# Fell at the same spot twice in a row? Put the car just past the
+	# tricky bit so nobody gets stuck forever.
+	if absf(fposmod(at - _last_fall_at + track.length * 0.5, track.length) - track.length * 0.5) < 6.0:
+		_same_spot_falls += 1
+	else:
+		_same_spot_falls = 0
+	_last_fall_at = at
+	if _same_spot_falls >= 2 and reason in ["jump", "loop"]:
+		var past := _air_gap_end + 4.0 if reason == "jump" else at + 60.0
+		if reason == "loop":
+			for r in track.loops:
+				if absf(fposmod(at + 26.0 - float(r[0]) + track.length * 0.5, track.length) - track.length * 0.5) < 2.0:
+					past = float(r[1]) + 4.0
+		skipped_ahead = true
+		at = past
+		start_speed = float(stats["top_speed"]) * 0.5
+		_same_spot_falls = 0
+		_last_fall_at = -1000.0
 	mode = Mode.FALLING
 	in_air = false
 	_sparks.emitting = false
@@ -521,7 +571,7 @@ func _process_falling(delta: float) -> void:
 func respawn_at(at: float, start_speed: float = 0.0) -> void:
 	var back := fposmod(s - at, track.length)
 	if back > track.length * 0.5:
-		back = 0.0
+		back -= track.length   # a little way ahead (being helped past a tricky bit)
 	total -= back
 	s = fposmod(total, track.length)
 	lateral = 0.0

@@ -17,14 +17,17 @@ var _laps_label: Label
 var _dots: HBoxContainer
 var _race_button: Button
 var _maps: Array = []          # cached [points, heights, max_h, rect] per track
+var _custom_row: HBoxContainer
+var _delete_button: Button
+var _delete_armed := false
 
 
 func _ready() -> void:
 	Sfx.play_music("garage")
 	theme = Game.ui_theme
 	set_anchors_preset(Control.PRESET_FULL_RECT)
-	_index = clampi(Game.selected_track, 0, Track.TRACKS.size() - 1)
-	for i in Track.TRACKS.size():
+	_index = clampi(Game.selected_track, 0, Game.track_count() - 1)
+	for i in Game.track_count():
 		_maps.append(TrackMap.compute(i))
 
 	var bg := ColorRect.new()
@@ -75,6 +78,14 @@ func _ready() -> void:
 	info.add_child(_blurb_label)
 	_best_label = RaceHud.make_label("", 22, Color(0.7, 1.0, 0.75), 6)
 	info.add_child(_best_label)
+	# Your own tracks can be changed or thrown away.
+	_custom_row = HBoxContainer.new()
+	_custom_row.add_theme_constant_override("separation", 10)
+	info.add_child(_custom_row)
+	var edit := _button(_custom_row, "Edit", func(): Game.goto_editor(_index - Track.TRACKS.size()))
+	_delete_button = _button(_custom_row, "Delete", _delete_custom)
+	for b: Button in [edit, _delete_button]:
+		b.add_theme_font_size_override("font_size", 20)
 
 	# Arrows on either side
 	var left := _button(self, "<", func(): _change(-1))
@@ -91,7 +102,7 @@ func _ready() -> void:
 	_dots.add_theme_constant_override("separation", 12)
 	RaceHud.pin(_dots, Vector2(0.5, 1), Vector2(-200, -132), Vector2(400, 30))
 	add_child(_dots)
-	for i in Track.TRACKS.size():
+	for i in Game.track_count():
 		var d := Panel.new()
 		d.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		_dots.add_child(d)
@@ -102,6 +113,8 @@ func _ready() -> void:
 	RaceHud.pin(bottom, Vector2(0.5, 1), Vector2(-500, -92), Vector2(1000, 80))
 	add_child(bottom)
 	_button(bottom, "Back", _go_back)
+	var build := _button(bottom, "Build a Track!", func(): Game.goto_editor(-1))
+	build.add_theme_font_size_override("font_size", 24)
 	bottom.add_child(RaceHud.make_label("   Laps:", 30))
 	var minus := _button(bottom, "-", func(): _change_laps(-1))
 	_laps_label = RaceHud.make_label(str(Game.laps), 40, Color(1.0, 0.9, 0.3))
@@ -138,7 +151,7 @@ func _go_back() -> void:
 
 
 func _change(d: int) -> void:
-	_index = wrapi(_index + d, 0, Track.TRACKS.size())
+	_index = wrapi(_index + d, 0, Game.track_count())
 	Sfx.play("click", 1.0 + d * 0.1)
 	_show()
 	# A little bounce so it feels like flipping a card
@@ -147,14 +160,34 @@ func _change(d: int) -> void:
 	create_tween().tween_property(_card, "scale", Vector2.ONE, 0.25).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 
+func _delete_custom() -> void:
+	if not _delete_armed:
+		_delete_armed = true
+		_delete_button.text = "Sure?"
+		return
+	var slot := _index - Track.TRACKS.size()
+	if slot >= 0 and slot < Game.custom_tracks.size():
+		Game.custom_tracks.remove_at(slot)
+		Game.selected_track = clampi(Game.selected_track, 0, Game.track_count() - 1)
+		Game.save_settings()
+		Sfx.play("crash", 1.3, -10.0)
+		Game.goto_track_select()
+
+
 func _show() -> void:
-	var info: Dictionary = Track.TRACKS[_index]
+	_delete_armed = false
+	if _delete_button:
+		_delete_button.text = "Delete"
+	_custom_row.visible = Game.is_custom_track(_index)
+	var info: Dictionary = Game.track_info(_index)
 	var col: Color = info["color"]
 	_card_style.bg_color = col.darkened(0.15)
-	_room_label.text = "%d / %d   -   %s" % [_index + 1, Track.TRACKS.size(), info["room_name"]]
+	_room_label.text = "%d / %d   -   %s" % [_index + 1, Game.track_count(), info["room_name"]]
 	_name_label.text = info["name"]
 	var stars := int(info["stars"])
 	_stars_label.text = "Trickiness  " + "★".repeat(stars) + "☆".repeat(3 - stars)
+	if info.get("custom", false):
+		_stars_label.text = "Made by YOU!"
 	var lines := PackedStringArray()
 	for f: String in info["features"]:
 		lines.append("*  " + f)
@@ -166,7 +199,7 @@ func _show() -> void:
 		var dot := _dots.get_child(i) as Panel
 		var sb := StyleBoxFlat.new()
 		sb.set_corner_radius_all(12)
-		sb.bg_color = Track.TRACKS[i]["color"]
+		sb.bg_color = Game.track_info(i)["color"]
 		sb.set_border_width_all(4 if i == _index else 0)
 		sb.border_color = Color.WHITE
 		dot.add_theme_stylebox_override("panel", sb)
@@ -210,8 +243,7 @@ class TrackMap extends Control:
 	var rect := Rect2()
 
 	static func compute(index: int) -> Array:
-		var t := Track.new()
-		t.layout_id = index
+		var t := Track.for_index(index)
 		t._build_closed_layout()
 		t._resample()
 		var p := PackedVector2Array()

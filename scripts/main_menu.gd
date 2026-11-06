@@ -122,8 +122,14 @@ func _build_ui() -> void:
 	for b: Button in [play, cup]:
 		b.add_theme_font_size_override("font_size", 38)
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_players_button = _button(_main_box, "", _toggle_players)
+	var mid := _row(_main_box)
+	_players_button = _button(mid, "", _toggle_players)
 	_update_players_button()
+	var builder := _button(mid, "Track Builder", func():
+		Game.end_grand_prix()
+		Game.goto_editor(-1))
+	for b: Button in [_players_button, builder]:
+		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var more := _row(_main_box)
 	for b: Button in [_button(more, "Options", func(): _show_panel(_options_panel)), _button(more, "How to Play", func(): _show_panel(_help_panel))]:
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -196,7 +202,7 @@ func _toggle_players() -> void:
 
 
 func _update_players_button() -> void:
-	_players_button.text = "Players:  2  (split screen)" if Game.two_player else "Players:  1"
+	_players_button.text = "Players: 2" if Game.two_player else "Players: 1"
 
 
 func _panel(root: Control, title_text: String) -> Array:
@@ -325,6 +331,7 @@ func _build_help(root: Control) -> Control:
 		"Drive over glowing pads for a BOOST. Steer into turns or you'll fly off!",
 		"Win races to earn STARS and unlock paint, stickers, wheels...",
 		"...and win a Grand Prix to unlock the SECRET car!",
+		"TRACK BUILDER: snap pieces together to build and race your own tracks!",
 	]
 	for line in lines:
 		var l := RaceHud.make_label(line, 22, Color.WHITE, 6)

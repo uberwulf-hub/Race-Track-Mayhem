@@ -23,6 +23,8 @@ down to your car for **3… 2… 1… GO!**
 
 ![Backyard Blast, out in the garden](docs/screenshot-garden.png)
 
+![The Track Builder](docs/screenshot-track-builder.png)
+
 ![Version 1.1: menu, garage paint jobs, split screen, podium, living room](docs/screenshot-v1.1.png)
 
 
@@ -78,6 +80,16 @@ Whenever you come off the track, the screen fades and you're put back where you 
 
 ## What's in the game
 
+**Track Builder.** Build your own tracks from the main menu or the track picker:
+- **Pieces:** Straight, Turn Left/Right, Bend Left/Right, Boost Pad, Loop, Corkscrew, Jump, Big Jump, Hill, Bumps, Spiral and Wiggles.
+- **Live preview:** a toy car drives your track while you build. A bouncing arrow shows where the next piece goes.
+- **Always a working circuit:** the road back to the start line is drawn for you, so any combination of pieces makes a working track.
+  If your pieces already come back around (like four left turns), they're joined up directly.
+- **Kid-proof stunts:** loops, corkscrews and jumps come with their own boost pad, so cars are fast enough.
+  A warning shows if the track runs into itself.
+- **Make it yours:** pick a room (or the garden), name your track, and save up to 12 tracks. Race them from the track picker,
+  where you can also edit or delete them. Your best times and ghost car are kept for each one.
+
 **Ways to play**
 - **Quick Race:** pick a car and any of the 6 tracks.
 - **Grand Prix:** race all 6 tracks in a row for points (10, 8, 6, 5, 4), then a trophy ceremony on the podium.
@@ -125,6 +137,7 @@ They replace the built-in sounds on your computer only, and that folder is never
 | `scripts/track.gd` | Builds the tracks. **Each track is a `_layout_...()` function**, a list of pieces like `_straight(10)`, `_turn(90, 15, 20)`, `_loop(8.5, 10)`, `_corkscrew(62, 5.5)`, `_helix(360, 13, 7.5)`, `_slalom(5, 34, 13)`, `_waves(3)`, `_bridge()` and `_jump()`. The circuit closes itself automatically. Add an entry to `TRACKS` (with its `room`) and a layout function to make a new track. |
 | `scripts/mesh_kit.gd` | Rounded "toy" box meshes and soft blob shadows. |
 | `scripts/track_select.gd` | Track-picking screen. |
+| `scripts/track_editor.gd` | The Track Builder. Pieces are defined in `Track.PIECES` and built in `Track._piece()`; the road home is a turn-straight-turn path (`Track.dubins()`). |
 | `scripts/car_data.gd` | The cars, their colors and stats. Add a new car here. |
 | `scripts/toy_car_model.gd` | Builds each car's 3D model from simple shapes. |
 | `scripts/racer.gd` | Driving: speed, steering, boosts, jumps, falling off the loop, bumping, and the computer driver. |
@@ -140,4 +153,4 @@ They replace the built-in sounds on your computer only, and that folder is never
 | `scripts/main_menu.gd`, `scripts/vehicle_select.gd` | Main menu, and the garage (car picking and paint jobs). |
 | `scripts/game_state.gd`, `scripts/sfx.gd` | Settings and saving, controls, UI theme, sound effects and music. |
 
-Ideas for next time: a track editor, online leaderboards, and an Android version.
+Ideas for next time: online leaderboards, and an Android version.

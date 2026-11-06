@@ -92,6 +92,48 @@ const TRACKS: Array[Dictionary] = [
 
 var layout_id := 0
 var stretch := Vector2.ZERO   # how long the auto-sized straights came out
+var custom := false           # a track built in the Track Builder
+var custom_pieces: Array = [] # its piece ids, in order (see PIECES)
+var builder_end := Transform3D()  # where the last piece ends (the builder's arrow goes here)
+
+## The pieces kids can build with in the Track Builder. Stunt pieces come
+## with their own boost pad so cars are always fast enough.
+const PIECES: Array[Dictionary] = [
+	{"id": "straight", "name": "Straight", "color": Color(1.0, 0.55, 0.15)},
+	{"id": "left", "name": "Turn Left", "color": Color(0.3, 0.6, 1.0)},
+	{"id": "right", "name": "Turn Right", "color": Color(0.3, 0.6, 1.0)},
+	{"id": "bend_left", "name": "Bend Left", "color": Color(0.45, 0.75, 1.0)},
+	{"id": "bend_right", "name": "Bend Right", "color": Color(0.45, 0.75, 1.0)},
+	{"id": "boost", "name": "Boost Pad", "color": Color(0.2, 0.9, 0.95)},
+	{"id": "loop", "name": "Loop", "color": Color(0.95, 0.3, 0.35)},
+	{"id": "corkscrew", "name": "Corkscrew", "color": Color(0.9, 0.35, 0.8)},
+	{"id": "jump", "name": "Jump", "color": Color(1.0, 0.8, 0.15)},
+	{"id": "big_jump", "name": "Big Jump", "color": Color(1.0, 0.65, 0.1)},
+	{"id": "hill", "name": "Hill", "color": Color(0.35, 0.8, 0.35)},
+	{"id": "bumps", "name": "Bumps", "color": Color(0.55, 0.85, 0.3)},
+	{"id": "spiral", "name": "Spiral", "color": Color(0.7, 0.45, 0.95)},
+	{"id": "wiggles", "name": "Wiggles", "color": Color(0.95, 0.5, 0.7)},
+]
+
+
+## Makes a Track for any track number: built-in tracks first, then the
+## player's own tracks from the Track Builder.
+static func for_index(index: int) -> Track:
+	var t := Track.new()
+	t.layout_id = index
+	if index >= TRACKS.size():
+		t.custom = true
+		var slot := index - TRACKS.size()
+		if slot < Game.custom_tracks.size():
+			t.custom_pieces = Game.custom_tracks[slot].get("pieces", [])
+	return t
+
+
+static func piece_info(id: String) -> Dictionary:
+	for p in PIECES:
+		if p["id"] == id:
+			return p
+	return {}
 
 const TRACK_COLOR := Color(1.0, 0.45, 0.05)
 const TRACK_DARK := Color(0.85, 0.32, 0.02)
@@ -406,6 +448,180 @@ func _slalom(wiggles: int, deg: float, radius: float) -> void:
 	_turn(deg * 0.5 * dir, radius, deg * 0.4 * dir)
 
 
+# ---------------------------------------------------------------------------
+# Track Builder tracks
+# ---------------------------------------------------------------------------
+
+const GRID_LENGTH := 26.0
+const CLOSE_RADIUS := 17.0
+
+
+## A start straight, the kid's pieces, then a road that finds its own way
+## back to the start line.
+func _build_custom_layout() -> void:
+	_reset_turtle()
+	for id in custom_pieces:
+		_piece(String(id))
+	var right := _fwd.cross(_up).normalized()
+	builder_end = Transform3D(Basis(right, _up, -_fwd), _pos)
+	_close_to_start()
+	_raw_pos[_raw_pos.size() - 1] = Vector3(0.0, BASE_HEIGHT, 0.0)
+
+
+func _piece(id: String) -> void:
+	match id:
+		"straight":
+			_straight(12.0)
+		"left":
+			_turn(-90.0, 16.0, -20.0)
+		"right":
+			_turn(90.0, 16.0, 20.0)
+		"bend_left":
+			_turn(-45.0, 20.0, -12.0)
+		"bend_right":
+			_turn(45.0, 20.0, 12.0)
+		"boost":
+			_straight(8.0, FLAG_BOOST)
+		"loop":
+			_straight(8.0, FLAG_BOOST)
+			_straight(4.0)
+			_loop(8.5, 10.0)
+			_straight(6.0)
+		"corkscrew":
+			_straight(8.0, FLAG_BOOST)
+			_corkscrew(60.0, 5.5)
+			_straight(4.0)
+		"jump":
+			_straight(8.0, FLAG_BOOST)
+			_straight(4.0)
+			_jump()
+			_straight(16.0)         # a long runway to land on
+		"big_jump":
+			_straight(8.0, FLAG_BOOST)
+			_straight(6.0)
+			_big_jump()
+			_straight(20.0)
+		"hill":
+			_hill()
+		"bumps":
+			_waves(3)
+		"spiral":
+			_straight(4.0)
+			_helix(360.0, 13.0, 7.5, 12.0)
+			_straight(4.0)
+			_ramp_down(7.5)
+		"wiggles":
+			_slalom(4, 32.0, 13.0)
+
+
+## Drives the turtle back to just behind the start line: turn, straight,
+## turn (the shortest such path, often called a Dubins path), then the
+## starting-grid straight.
+func _close_to_start() -> void:
+	# Come back down to the floor first if anything left us up high.
+	var drop := _pos.y - BASE_HEIGHT
+	if drop > 0.5:
+		_fwd = Vector3(_fwd.x, 0.0, _fwd.z).normalized()
+		_up = Vector3.UP
+		_ramp_down(drop)
+	_fwd = Vector3(_fwd.x, 0.0, _fwd.z).normalized()
+	_up = Vector3.UP
+	# Already back at the start (like a square of four turns)? Just join up.
+	var heading := Vector2(_fwd.x, _fwd.z)
+	var north := Vector2(0.0, -1.0)
+	var to_start := Vector2(-_pos.x, -_pos.z)
+	var already_home := to_start.length() < 2.0 and heading.dot(north) > 0.97
+	var lined_up := _pos.z > 2.0 and absf(_pos.x) < _pos.z * 0.25 and heading.dot(north) > 0.95
+	if (already_home or lined_up) and not custom_pieces.is_empty():
+		_pos.y = BASE_HEIGHT
+		if to_start.length() > 0.01:
+			_fwd = Vector3(to_start.x, 0.0, to_start.y).normalized()
+			_straight(to_start.length())
+		return
+	var target := Vector2(0.0, GRID_LENGTH)
+	var path := dubins(Vector2(_pos.x, _pos.z), Vector2(_fwd.x, _fwd.z), target, Vector2(0.0, -1.0), CLOSE_RADIUS)
+	if path.is_empty():
+		push_warning("Couldn't find a way back to the start.")
+	else:
+		_turn(path[0], CLOSE_RADIUS, signf(path[0]) * 16.0)
+		_straight(maxf(path[1], 0.01))
+		_turn(path[2], CLOSE_RADIUS, signf(path[2]) * 16.0)
+	_pos.y = BASE_HEIGHT
+	var remaining := Vector2(_pos.x, _pos.z).distance_to(Vector2.ZERO)
+	_fwd = Vector3(-_pos.x, 0.0, -_pos.z).normalized() if remaining > 0.01 else Vector3.FORWARD
+	_straight(remaining)
+
+
+## Shortest turn-straight-turn path between two poses on the floor.
+## Returns [first turn degrees (+ = right), straight length, last turn degrees]
+## or [] if none was found.
+static func dubins(p0: Vector2, h0: Vector2, p1: Vector2, h1: Vector2, r: float) -> Array:
+	h0 = h0.normalized()
+	h1 = h1.normalized()
+	var best: Array = []
+	var best_len := INF
+	for s1: float in [1.0, -1.0]:          # 1 = right, -1 = left
+		for s2: float in [1.0, -1.0]:
+			var c1 := p0 + _side(h0, s1) * r
+			var c2 := p1 + _side(h1, s2) * r
+			var v := c2 - c1
+			var d := v.length()
+			if d < 0.001:
+				continue
+			var cands: Array[Vector2] = []
+			if s1 == s2:
+				cands.append(v / d)
+			elif d >= 2.0 * r:
+				var a := asin(2.0 * r / d)
+				cands.append((v / d).rotated(a))
+				cands.append((v / d).rotated(-a))
+			for t in cands:
+				var q1 := c1 - _side(t, s1) * r
+				var q2 := c2 - _side(t, s2) * r
+				var seg := q2 - q1
+				var len := seg.length()
+				if len > 0.001 and seg.normalized().dot(t) < 0.999:
+					continue
+				var a1 := _turn_amount(h0, t, s1)
+				var a2 := _turn_amount(t, h1, s2)
+				var total := (a1 + a2) * r + len
+				if total < best_len:
+					best_len = total
+					best = [rad_to_deg(a1) * s1, len, rad_to_deg(a2) * s2]
+	return best
+
+
+## Unit vector to the right (s = 1) or left (s = -1) of heading h, in the
+## same x/z convention as the turtle (right of north is +x).
+static func _side(h: Vector2, s: float) -> Vector2:
+	return Vector2(-h.y, h.x) * s
+
+
+## How far (radians, 0..TAU) you turn going from heading a to heading b,
+## turning right (s = 1) or left (s = -1).
+static func _turn_amount(a: Vector2, b: Vector2, s: float) -> float:
+	var pa := atan2(a.x, a.y)
+	var pb := atan2(b.x, b.y)
+	var d := (pa - pb) if s > 0.0 else (pb - pa)
+	return fposmod(d, TAU)
+
+
+## How many places the track runs into itself (0 = perfect).
+func count_clashes() -> int:
+	var bad := 0
+	var n := count
+	for i in range(0, n, 3):
+		for j in range(i + 3, n, 3):
+			var ds := mini(j - i, n - (j - i)) * spacing
+			if ds < 30.0:
+				continue
+			var a := points[i]
+			var b := points[j]
+			if absf(a.y - b.y) < 4.0 and Vector2(a.x - b.x, a.z - b.z).length() < HALF_WIDTH * 2.0 + 0.5:
+				bad += 1
+	return bad
+
+
 const BRIDGE_ANGLE := 14.0
 const BRIDGE_RADIUS := 25.0
 const BRIDGE_RAMP := 16.0
@@ -574,6 +790,9 @@ func _reset_turtle() -> void:
 ## Builds the layout once, measures how far from the start it ended up, then
 ## stretches straights A and B so the ends meet exactly.
 func _build_closed_layout() -> void:
+	if custom:
+		_build_custom_layout()
+		return
 	var a := 30.0
 	var b := 30.0
 	_reset_turtle()
