@@ -41,6 +41,7 @@ func _input(event: InputEvent) -> void:
 		_change(1)
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("ui_cancel"):
+		Sfx.play("back")
 		Game.goto_menu()
 
 

@@ -199,17 +199,21 @@ func _process(delta: float) -> void:
 						hud.show_countdown("3", Color(1.0, 0.3, 0.25))
 						track.set_start_lights(1)
 						Sfx.play("beep")
+						Sfx.play("voice_3")
 					1:
 						hud.show_countdown("2", Color(1.0, 0.75, 0.2))
 						track.set_start_lights(2)
 						Sfx.play("beep")
+						Sfx.play("voice_2")
 					2:
 						hud.show_countdown("1", Color(1.0, 0.95, 0.3))
 						track.set_start_lights(3)
 						Sfx.play("beep")
+						Sfx.play("voice_1")
 					3:
 						hud.show_countdown("GO!", Color(0.35, 1.0, 0.4))
 						track.set_start_lights(4)
+						Sfx.play("voice_go")
 						Sfx.play("go")
 						_set_state(State.RACING)
 		State.FINISHED:
@@ -296,6 +300,7 @@ func _on_finished(r: Racer) -> void:
 	if r.place == 1:
 		hud.flash_message("YOU WIN!!!", Color(1.0, 0.85, 0.15), 2.5)
 		Sfx.play("win")
+		get_tree().create_timer(1.2).timeout.connect(func(): Sfx.play("voice_win"))
 		_spawn_confetti()
 	else:
 		hud.flash_message("FINISHED %s!" % Game.ordinal(r.place), Color(0.6, 0.9, 1.0), 2.5)

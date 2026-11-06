@@ -273,4 +273,5 @@ func _build_help(root: Control) -> Control:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("ui_cancel") and not _main_box.visible:
+		Sfx.play("back")
 		_show_panel(null)

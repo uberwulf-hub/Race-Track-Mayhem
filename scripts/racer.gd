@@ -208,7 +208,10 @@ func _physics_process(delta: float) -> void:
 	_sparks.position = Vector3(signf(lateral) * 0.7, 0.25, 0.2)
 
 	# --- jumps ---
+	var was_in_air := in_air
 	in_air = air_t >= 0.0
+	if in_air and not was_in_air:
+		Sfx.play("jump", randf_range(0.95, 1.1), 0.0 if is_player else -9.0)
 	if in_air:
 		var hop := clampf((speed - 18.0) * 0.12, 0.3, 3.0)
 		air_height = 4.0 * hop * air_t * (1.0 - air_t)

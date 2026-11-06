@@ -138,6 +138,9 @@ func stop_music(fade: float = 0.8) -> void:
 
 func play(sound: String, pitch: float = 1.0, volume_db: float = 0.0) -> void:
 	if not _sounds.has(sound):
+		# Sounds with no synthesized fallback (like voices) are looked up once.
+		_sounds[sound] = _find_files(SFX_DIR, sound)
+	if (_sounds[sound] as Array).is_empty():
 		return
 	var p := _players[_next]
 	_next = (_next + 1) % _players.size()
