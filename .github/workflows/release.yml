@@ -1,12 +1,17 @@
-# Builds the Windows version and publishes a GitHub release whenever a version
-# tag (like v1.0.1) is pushed. SauceStore picks the release up automatically.
-#
-#   git tag v1.0.1 && git push origin v1.0.1
+# Builds the Windows version and publishes a GitHub release. SauceStore picks
+# the release up automatically. Two ways to start it:
+#   - push a version tag:   git tag v1.0.1 && git push origin v1.0.1
+#   - or on GitHub: Actions > Release > Run workflow, and type the version (v1.0.1)
 name: Release
 
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to publish, like v1.0.1"
+        required: true
 
 permissions:
   contents: write
@@ -67,8 +72,11 @@ jobs:
       - name: Publish the release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ inputs.version || github.ref_name }}
         run: |
-          gh release create "$GITHUB_REF_NAME" dist/RaceTrackMayhem-windows.zip \
+          # Creates the tag on GitHub too if it doesn't exist yet.
+          gh release create "$VERSION" dist/RaceTrackMayhem-windows.zip \
             --repo "$GITHUB_REPOSITORY" \
-            --title "Race Track Mayhem $GITHUB_REF_NAME" \
+            --target "$GITHUB_SHA" \
+            --title "Race Track Mayhem $VERSION" \
             --generate-notes

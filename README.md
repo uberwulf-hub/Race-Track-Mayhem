@@ -28,8 +28,9 @@ down to your car for **3… 2… 1… GO!**
   unzip it and run `RaceTrackMayhem.exe`.
 
 ### Publishing a new version
-Bump the version and push a tag. GitHub Actions builds the Windows zip and publishes the release
-(see `.github/workflows/release.yml`), and SauceStore shows the update within about 10 minutes.
+Push a version tag, or on GitHub open **Actions → Release → Run workflow** and type the version.
+GitHub Actions builds the Windows zip and publishes the release (see `.github/workflows/release.yml`),
+and SauceStore shows the update within about 10 minutes.
 ```
 git tag v1.0.1
 git push origin v1.0.1
