@@ -223,6 +223,7 @@ func _build_views() -> void:
 		h.setup(track, racers, humans[i])
 		if split:
 			h.player_tag = "P%d" % (i + 1)
+			h.hide_hint()
 		h.show_title(true)
 		v.hud = h
 		v.audio = CarAudio.new()
@@ -352,6 +353,11 @@ func _process(delta: float) -> void:
 				_refresh_results()
 	_update_flames()
 	for v in views:
+		if v.viewport:
+			# Draw each half's HUD a bit smaller so it fits half the screen.
+			var want := Vector2i(Vector2(v.viewport.size) * 1.6)
+			if v.viewport.size_2d_override != want:
+				v.viewport.size_2d_override = want
 		_update_view_extras(v, delta)
 		_update_camera(v, delta)
 

@@ -231,7 +231,12 @@ func _build_window() -> void:
 		c.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	var curtain := _mat(curtain_color, 1.0)
 	for side: float in [-1.0, 1.0]:
-		_box(Vector3(9.0, 40.0, 1.5), Vector3(cx + side * 28.0, 36.0, z + 1.6), curtain, false)
+		var pivot := Node3D.new()
+		pivot.position = Vector3(cx + side * 28.0, 56.0, z + 1.6)
+		add_child(pivot)
+		_box(Vector3(9.0, 40.0, 1.5), Vector3(0, -20.0, 0), curtain, false, pivot)
+		var ph := side
+		animate(func(t: float, _d: float): pivot.rotation.x = -0.04 - 0.035 * (1.0 + sin(t * 0.8 + ph)))
 	var rod := _cylinder(0.6, 70.0, Vector3(cx, 57.0, z + 2.0), frame_mat)
 	rod.rotation.z = PI * 0.5
 

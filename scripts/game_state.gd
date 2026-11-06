@@ -31,6 +31,7 @@ var custom: Dictionary = {}      # car id -> {"paint": id, "sticker": id, "wheel
 
 # Game modes
 var two_player := false
+var picking := 1                 # which player is choosing a car in the garage
 var p2_car: int = 1
 var gp_active := false
 var gp_race := 0                 # which race of the cup (0..4)

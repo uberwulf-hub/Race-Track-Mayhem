@@ -148,6 +148,10 @@ func _xylophone() -> void:
 func _train() -> void:
 	var r := room_rect
 	var train := _node("Train", Vector3(r.position.x + 30.0, 0.0, r.end.y - 10.0))
+	var x0 := train.position.x
+	animate(func(t: float, _d: float):
+		train.position.x = x0 + sin(t * 0.25) * 18.0
+		train.position.y = absf(sin(t * 8.0)) * 0.25)
 	var cols := [Color(0.9, 0.2, 0.2), Color(0.25, 0.5, 0.95), Color(1.0, 0.8, 0.15)]
 	for car in 3:
 		var x := car * 13.0

@@ -68,6 +68,31 @@ func _counters() -> void:
 	var ox := x0 + length + 10.0
 	_box(Vector3(18.0, 20.0, 16.0), Vector3(ox, 10.0, z), _shiny(Color(0.95, 0.95, 0.95)))
 	_box(Vector3(12.0, 8.0, 0.4), Vector3(ox, 9.0, z + 8.1), _glow(Color(1.0, 0.45, 0.1), 0.4), false)
+	# A pot of soup bubbling away
+	_cylinder(4.0, 5.0, Vector3(ox - 4.0, 23.0, z - 3.5), _shiny(Color(0.85, 0.25, 0.2)))
+	var steam := CPUParticles3D.new()
+	steam.position = Vector3(ox - 4.0, 26.0, z - 3.5)
+	steam.amount = 24
+	steam.lifetime = 3.0
+	steam.direction = Vector3.UP
+	steam.spread = 15.0
+	steam.initial_velocity_min = 2.0
+	steam.initial_velocity_max = 4.0
+	steam.gravity = Vector3(0, 0.5, 0)
+	steam.scale_amount_min = 1.0
+	steam.scale_amount_max = 2.5
+	var puff := SphereMesh.new()
+	puff.radius = 0.6
+	puff.height = 1.2
+	puff.radial_segments = 8
+	puff.rings = 4
+	var steam_mat := StandardMaterial3D.new()
+	steam_mat.albedo_color = Color(1, 1, 1, 0.25)
+	steam_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	steam_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	puff.material = steam_mat
+	steam.mesh = puff
+	add_child(steam)
 	for i in 4:
 		_sphere(0.9, Vector3(ox - 6.0 + i * 4.0, 17.0, z + 8.4), _mat(Color(0.2, 0.2, 0.2), 0.4))
 		var burner := _cylinder(2.6, 0.3, Vector3(ox + (-4.0 if i % 2 == 0 else 4.0), 20.2, z + (-3.5 if i < 2 else 3.5)), _mat(Color(0.15, 0.15, 0.15), 0.5))

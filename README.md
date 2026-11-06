@@ -20,6 +20,8 @@ down to your car for **3… 2… 1… GO!**
 
 ![The five rooms](docs/screenshot-rooms.png)
 
+![Version 1.1: menu, garage paint jobs, split screen, podium, living room](docs/screenshot-v1.1.png)
+
 
 ## Download
 
@@ -50,19 +52,22 @@ There are no art or sound files. The cars, track, bedroom and sound effects are 
 
 ## Controls
 
-| Action | Keyboard | Gamepad |
-|---|---|---|
-| Go | W / ↑ | A or right trigger |
-| Steer | A D / ← → | Left stick / D-pad |
-| Brake / reverse | S / ↓ | X or left trigger |
-| **Turbo** (blue bar) | Space / Shift | B or right bumper |
-| Back on track | R | Y |
-| Change camera | C | Left bumper |
-| Pause | Esc / P | Start |
+| Action | 1 player | Player 1 (split screen) | Player 2 (split screen) | Gamepad |
+|---|---|---|---|---|
+| Go | W / ↑ | W | ↑ | A or right trigger |
+| Steer | A D / ← → | A D | ← → | Left stick / D-pad |
+| Brake / reverse | S / ↓ | S | ↓ | X or left trigger |
+| **Turbo** (blue bar) | Space / Shift | Space / Shift | Enter / Ctrl / Num 0 | B or right bumper |
+| Back on track | R | R | Backspace | Y |
+| Change camera | C | C | C | Left bumper |
+| Pause | Esc / P | Esc / P | Esc / P | Start |
+
+In split screen, controller 1 drives player 1 and controller 2 drives player 2.
 
 Tips:
 - Drive over the glowing striped pads for a **BOOST**.
 - **Steer into the turns.** Corners push you outward, and if you slam the outside rail too fast you fly off the track.
+  Little drivers can switch on **Steering help** in Options.
 - **Hit the jumps fast** and line up your landing. Too slow and you drop into the gap; land beside the track and over the edge you go.
 - Keep your speed up in the loops. Too slow upside down and you fall off. **MAYHEM!**
 
@@ -70,25 +75,45 @@ Whenever you come off the track, the screen fades and you're put back where you 
 
 ## What's in the game
 
-- **Main menu** with a live race in the background, plus Options (laps, difficulty, volume) and How to Play
-- **Garage**: five toy cars on a spinning turntable, each with Top Speed / Acceleration / Handling / Weight stats
-  - Red Rocket · Blue Bolt · Monster Max · Sunny Buggy · Bubblegum Van
-- **Track select**: mini-map of each track (brighter = higher), features, best time, lap count
-- **Race**: intro zoom, start lights with a "3, 2, 1, GO!" voice countdown, laps, places, timer,
-  speedometer, turbo meter, mini-map, pause menu, camera shake, speed lines, sparks on the walls
-- Computer drivers that keep the race close (Easy / Normal / Hard)
-- Real bump physics: cars shove and spin each other depending on where they're hit (heavy cars push light ones
-  around, and a knock in a turn can send someone flying off)
-- Results screen, with best times saved between plays
-- Sound effects and chiptune music (all CC0, see [assets/audio/CREDITS.md](assets/audio/CREDITS.md)), with separate
-  Music and Sound volume sliders:
-  - a "Ready… Set… GO!" voice countdown and soft start beeps
-  - a two-layer engine that revs with speed, brake squeals, and 3D engine sounds on the other cars
-    (you hear them come up behind you and zoom past)
-  - different music for the menu, the garage, races and results
-- **Use your own sounds:** drop files into `assets/audio/local/` (see [its README](assets/audio/local/README.md)).
-  They replace the built-in sounds on your computer only, and that folder is never uploaded to GitHub.
-  That makes it the place for Pixabay sounds, whose license doesn't allow sharing the raw files.
+**Ways to play**
+- **Quick Race:** pick a car and any of the 5 tracks.
+- **Grand Prix:** race all 5 tracks in a row for points (10, 8, 6, 5, 4), then a trophy ceremony on the podium.
+  Gold, silver and bronze trophies are kept on the shelf in the bedroom (one per difficulty).
+- **2 players:** split screen on one PC, with keyboard + controller or two controllers. Works with both modes.
+- **Ghost car:** a see-through replay of your best clean lap on each track drives alongside you.
+
+**Unlockables.** Finish races to earn stars (3 for 1st place, 2 for 2nd, 1 for finishing), plus bonus stars for Grand Prix trophies:
+- **Paint:** Sky Blue, Lime Zest, Midnight, Shiny Gold, Chrome, Galaxy.
+- **Stickers:** Racing Stripes, Flames, Stars, Lightning, Checkers.
+- **Wheels:** Gold Rims, Fat Slicks, Glow Wheels.
+- **The secret car, Rocket Rascal:** win any Grand Prix (or collect 25 stars).
+
+**Looks.**
+- Godot's full renderer: soft shadows, contact shadows, bounce lighting, sunbeams and reflections, with Low, Medium and High settings.
+  Older PCs automatically fall back to a simpler renderer.
+- Tilt-shift blur on the intro and results, so it looks like a photo of real toys.
+- Toy spectators (bears, bunnies, robots, dinosaurs, ducks) cheer beside the track.
+- The rooms have moving extras: swaying curtains, a swishing cat tail, cartoons on the TV, rising bubbles, a toy train and a steaming pot.
+- Cars squash on landings, lean in turns, puff dust and leave skid marks.
+  Headlights come on in the sunset living room.
+- Chevron signs on sharp turns, MAYHEM logos molded into the track, and start lights on the arch.
+
+**Racing.**
+- Start lights with a "Ready… Set… GO!" voice countdown, laps, places, timer, speedometer, turbo meter and a mini-map.
+- Pause menu, camera shake, speed lines, sparks on the walls and controller rumble.
+- A "WRONG WAY!" warning, plus arrows when a car is right behind you.
+- Computer drivers that keep the race close (Easy, Normal, Hard).
+- Real bump physics: cars shove and spin each other depending on where they're hit.
+- Results with best times, stars and new unlocks, and an announcer for the final lap, new records and unlocks.
+
+**Sound.** All CC0 (see [assets/audio/CREDITS.md](assets/audio/CREDITS.md)), with separate Music and Sound volume sliders:
+- A two-layer engine that revs with speed, brake squeals, and 3D engine sounds with a Doppler effect on the other cars.
+- Different music for the menu, the garage, races and results.
+
+**Use your own sounds:** drop files into `assets/audio/local/` (see [its README](assets/audio/local/README.md)).
+They replace the built-in sounds on your computer only, and that folder is never uploaded to GitHub.
+
+**Options:** laps, difficulty, graphics quality, fullscreen, steering help, ghost car, and three volume sliders.
 
 ## Code map (for tinkering)
 
@@ -100,12 +125,16 @@ Whenever you come off the track, the screen fades and you're put back where you 
 | `scripts/car_data.gd` | The cars, their colors and stats. Add a new car here. |
 | `scripts/toy_car_model.gd` | Builds each car's 3D model from simple shapes. |
 | `scripts/racer.gd` | Driving: speed, steering, boosts, jumps, falling off the loop, bumping, and the computer driver. |
-| `scripts/race.gd` | Race flow: intro, countdown, camera, places, pause menu, results. |
+| `scripts/race.gd` | Race flow for 1 or 2 players: intro, countdown, cameras, places, pause menu, results, Grand Prix points. |
+| `scripts/car_audio.gd` | A player's engine and brake sounds. |
+| `scripts/ghost_car.gd` | Records your best lap and replays it as a ghost. |
+| `scripts/skid_marks.gd`, `scripts/spectators.gd` | Skid marks, and the toy crowd. |
+| `scripts/unlocks.gd` | Everything you can unlock and what it costs in stars. |
+| `scripts/podium.gd`, `scripts/trophy.gd` | Grand Prix trophy ceremony and the trophy model. |
 | `scripts/race_hud.gd` | On-screen display and mini-map. |
 | `scripts/rooms/room.gd` | Base class for the rooms: lighting, floor, walls, window, door and shape helpers. |
 | `scripts/rooms/*_room.gd` | One file per room theme (bedroom, playroom, kitchen, bathroom, living room). Each one sets its colours and builds its furniture. |
-| `scripts/main_menu.gd`, `scripts/vehicle_select.gd` | Menu screens. |
+| `scripts/main_menu.gd`, `scripts/vehicle_select.gd` | Main menu, and the garage (car picking and paint jobs). |
 | `scripts/game_state.gd`, `scripts/sfx.gd` | Settings and saving, controls, UI theme, sound effects and music. |
 
-Ideas for next time: an outdoor garden track, unlockable cars,
-a split-screen two-player mode, and a ghost car of your best lap.
+Ideas for next time: an outdoor garden track, a track editor, online leaderboards, and an Android version.

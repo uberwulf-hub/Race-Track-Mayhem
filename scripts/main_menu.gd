@@ -14,6 +14,9 @@ var _main_box: VBoxContainer
 var _options_panel: Control
 var _help_panel: Control
 var _credits_panel: Control
+var _title: Control
+var _players_button: Button
+var _option_buttons: Dictionary = {}
 var _laps_label: Label
 var _diff_button: Button
 var _title_letters: Array[Label] = []
@@ -97,6 +100,7 @@ func _build_ui() -> void:
 
 	# Title
 	var title := VBoxContainer.new()
+	_title = title
 	RaceHud.pin(title, Vector2(0.5, 0), Vector2(-600, 30), Vector2(1200, 260))
 	title.add_theme_constant_override("separation", -20)
 	root.add_child(title)
@@ -105,16 +109,33 @@ func _build_ui() -> void:
 
 	# Main buttons
 	_main_box = VBoxContainer.new()
-	RaceHud.pin(_main_box, Vector2(0.5, 0.5), Vector2(-170, -55), Vector2(340, 300))
-	_main_box.add_theme_constant_override("separation", 14)
+	RaceHud.pin(_main_box, Vector2(0.5, 0.5), Vector2(-280, -62), Vector2(560, 380))
+	_main_box.add_theme_constant_override("separation", 12)
 	root.add_child(_main_box)
-	var play := _button(_main_box, "PLAY!", func(): Game.goto_garage())
-	play.add_theme_font_size_override("font_size", 46)
-	_button(_main_box, "Options", func(): _show_panel(_options_panel))
-	_button(_main_box, "How to Play", func(): _show_panel(_help_panel))
+	var modes := _row(_main_box)
+	var play := _button(modes, "Quick Race", func():
+		Game.end_grand_prix()
+		Game.goto_garage())
+	var cup := _button(modes, "Grand Prix", func():
+		Game.start_grand_prix()
+		Game.goto_garage())
+	for b: Button in [play, cup]:
+		b.add_theme_font_size_override("font_size", 38)
+		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_players_button = _button(_main_box, "", _toggle_players)
+	_update_players_button()
+	var more := _row(_main_box)
+	for b: Button in [_button(more, "Options", func(): _show_panel(_options_panel)), _button(more, "How to Play", func(): _show_panel(_help_panel))]:
+		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	if OS.get_name() != "Web":
 		_button(_main_box, "Quit", func(): get_tree().quit())
 	play.grab_focus.call_deferred()
+
+	var star_label := RaceHud.make_label("★ %d" % Game.stars, 40, Color(1.0, 0.9, 0.3), 12)
+	star_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	star_label.tooltip_text = "Stars: win races to unlock paint, stickers, wheels and more!"
+	RaceHud.pin(star_label, Vector2(1, 0), Vector2(-220, 14), Vector2(200, 56))
+	root.add_child(star_label)
 
 	var best := Game.best_time_for_current()
 	if best > 0.0:
@@ -154,16 +175,33 @@ func _button(parent: Control, text: String, cb: Callable) -> Button:
 	b.text = text
 	b.pressed.connect(func():
 		Sfx.play("select")
-		cb.call())
+		if cb.is_valid():
+			cb.call())
 	b.focus_entered.connect(func(): Sfx.play("click", 1.0, -8.0))
 	parent.add_child(b)
 	return b
 
 
+func _row(parent: Container) -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", 12)
+	parent.add_child(row)
+	return row
+
+
+func _toggle_players() -> void:
+	Game.two_player = not Game.two_player
+	_update_players_button()
+
+
+func _update_players_button() -> void:
+	_players_button.text = "Players:  2  (split screen)" if Game.two_player else "Players:  1"
+
+
 func _panel(root: Control, title_text: String) -> Array:
 	var center := CenterContainer.new()
 	center.set_anchors_preset(Control.PRESET_FULL_RECT)
-	center.offset_top = 200
 	center.visible = false
 	root.add_child(center)
 	var panel := PanelContainer.new()
@@ -180,11 +218,12 @@ func _panel(root: Control, title_text: String) -> Array:
 
 func _show_panel(panel: Control) -> void:
 	_main_box.visible = panel == null
+	_title.visible = panel == null
 	_options_panel.visible = panel == _options_panel
 	_help_panel.visible = panel == _help_panel
 	_credits_panel.visible = panel == _credits_panel
 	if panel == null:
-		(_main_box.get_child(0) as Button).grab_focus()
+		(_main_box.get_child(0).get_child(0) as Button).grab_focus()
 	else:
 		var buttons := panel.find_children("*", "Button", true, false)
 		if buttons.size() > 0:
@@ -194,46 +233,64 @@ func _show_panel(panel: Control) -> void:
 func _build_options(root: Control) -> Control:
 	var parts := _panel(root, "Options")
 	var box: VBoxContainer = parts[1]
+	box.add_theme_constant_override("separation", 8)
+	var grid := GridContainer.new()
+	grid.columns = 2
+	grid.add_theme_constant_override("h_separation", 24)
+	grid.add_theme_constant_override("v_separation", 6)
+	box.add_child(grid)
 
+	grid.add_child(RaceHud.make_label("Laps:", 28))
 	var laps_row := HBoxContainer.new()
-	laps_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	laps_row.add_theme_constant_override("separation", 16)
-	box.add_child(laps_row)
-	laps_row.add_child(RaceHud.make_label("Laps:", 32))
+	laps_row.add_theme_constant_override("separation", 12)
+	grid.add_child(laps_row)
 	_button(laps_row, "-", func(): _change_laps(-1))
-	_laps_label = RaceHud.make_label(str(Game.laps), 40, Color(1.0, 0.9, 0.3))
+	_laps_label = RaceHud.make_label(str(Game.laps), 36, Color(1.0, 0.9, 0.3))
 	_laps_label.custom_minimum_size = Vector2(50, 0)
 	_laps_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	laps_row.add_child(_laps_label)
 	_button(laps_row, "+", func(): _change_laps(1))
 
-	var diff_row := HBoxContainer.new()
-	diff_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	diff_row.add_theme_constant_override("separation", 16)
-	box.add_child(diff_row)
-	diff_row.add_child(RaceHud.make_label("Other cars:", 32))
-	_diff_button = _button(diff_row, Game.DIFFICULTY_NAMES[Game.difficulty], func():
-		Game.difficulty = (Game.difficulty + 1) % 3
-		_diff_button.text = Game.DIFFICULTY_NAMES[Game.difficulty]
-		Game.save_settings())
-	_diff_button.custom_minimum_size = Vector2(200, 0)
+	_choice(grid, "Other cars:", func() -> String: return Game.DIFFICULTY_NAMES[Game.difficulty], func():
+		Game.difficulty = (Game.difficulty + 1) % 3)
+	_choice(grid, "Graphics:", func() -> String: return Game.QUALITY_NAMES[Game.quality] + ("" if Game.fancy_renderer() else " (basic)"), func():
+		Game.quality = (Game.quality + 1) % 3
+		Game.apply_display())
+	_choice(grid, "Fullscreen:", func() -> String: return "On" if Game.fullscreen else "Off", func():
+		Game.fullscreen = not Game.fullscreen
+		Game.apply_display())
+	_choice(grid, "Steering help:", func() -> String: return "On" if Game.steer_assist else "Off", func():
+		Game.steer_assist = not Game.steer_assist)
+	_choice(grid, "Ghost car:", func() -> String: return "On" if Game.ghost_enabled else "Off", func():
+		Game.ghost_enabled = not Game.ghost_enabled)
+	_slider_row(grid, "Volume:", Game.master_volume, func(v: float): Game.set_volume(v))
+	_slider_row(grid, "Music:", Game.music_volume, func(v: float): Game.set_music_volume(v))
+	_slider_row(grid, "Sounds:", Game.sfx_volume, func(v: float): Game.set_sfx_volume(v))
 
-	_slider_row(box, "Volume:", Game.master_volume, func(v: float): Game.set_volume(v))
-	_slider_row(box, "Music:", Game.music_volume, func(v: float): Game.set_music_volume(v))
-	_slider_row(box, "Sounds:", Game.sfx_volume, func(v: float): Game.set_sfx_volume(v))
-
+	var note := RaceHud.make_label("Graphics: Low runs on any PC. High looks amazing but needs a good graphics card.", 18, Color(0.85, 0.9, 1.0), 4)
+	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	note.custom_minimum_size = Vector2(560, 0)
+	note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(note)
 	_button(box, "Back", func(): _show_panel(null))
 	return parts[0]
 
 
+## A label plus a button that cycles through choices.
+func _choice(grid: GridContainer, label: String, current: Callable, next: Callable) -> void:
+	grid.add_child(RaceHud.make_label(label, 28))
+	var b := _button(grid, current.call(), Callable())
+	b.custom_minimum_size = Vector2(240, 0)
+	b.pressed.connect(func():
+		next.call()
+		b.text = current.call()
+		Game.save_settings())
+
+
 func _slider_row(box: Container, label: String, value: float, setter: Callable) -> void:
+	box.add_child(RaceHud.make_label(label, 28))
 	var row := HBoxContainer.new()
-	row.alignment = BoxContainer.ALIGNMENT_CENTER
-	row.add_theme_constant_override("separation", 16)
 	box.add_child(row)
-	var l := RaceHud.make_label(label, 32)
-	l.custom_minimum_size = Vector2(150, 0)
-	row.add_child(l)
 	var slider := HSlider.new()
 	slider.min_value = 0.0
 	slider.max_value = 1.0
@@ -257,21 +314,20 @@ func _build_help(root: Control) -> Control:
 	var parts := _panel(root, "How to Play")
 	var box: VBoxContainer = parts[1]
 	var lines := [
-		"Pick your toy car, then pick one of 5 tracks around the house!",
+		"QUICK RACE: pick a car and one of 5 tracks.   GRAND PRIX: race all 5 for points!",
 		"",
-		"Go:  W  or  Up arrow",
-		"Steer:  A / D  or  Left / Right arrows",
-		"Brake / Reverse:  S  or  Down arrow",
-		"TURBO:  Space  (watch the blue bar!)",
-		"Stuck?  Press  R  to hop back on the track",
-		"Camera:  C        Pause:  Esc",
+		"Go:  W / Up      Steer:  A D / Left Right      Brake:  S / Down",
+		"TURBO:  Space      Back on track:  R      Camera:  C      Pause:  Esc",
 		"",
-		"Drive over the glowing pads for a BOOST.",
-		"Go fast in the loops and on the jumps - too slow and you'll fall off!",
-		"Steer into the turns or you'll fly over the edge!",
+		"2 PLAYERS:  Player 1 uses W A S D + Space (or controller 1).",
+		"Player 2 uses the arrow keys + Enter (or controller 2).",
+		"",
+		"Drive over glowing pads for a BOOST. Steer into turns or you'll fly off!",
+		"Win races to earn STARS and unlock paint, stickers, wheels...",
+		"...and win a Grand Prix to unlock the SECRET car!",
 	]
 	for line in lines:
-		var l := RaceHud.make_label(line, 24, Color.WHITE, 6)
+		var l := RaceHud.make_label(line, 22, Color.WHITE, 6)
 		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		box.add_child(l)
 	_button(box, "Got it!", func(): _show_panel(null))

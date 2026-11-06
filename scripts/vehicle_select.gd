@@ -1,5 +1,7 @@
 extends Node3D
-## The garage: spin through the toy cars on a turntable and pick one.
+## The garage: spin through the toy cars on a turntable, give your car a
+## paint job, stickers and wheels, and pick it. In 2-player mode, player 1
+## picks first, then player 2.
 
 var _index := 0
 var _turntable: Node3D
@@ -12,11 +14,16 @@ var _dots: HBoxContainer
 var _race_button: Button
 var _spin := 0.0
 var _bounce := 0.0
+var _lock_label: Label
+var _custom_rows: Dictionary = {}  # slot -> Label
+var _header: Label
 
 
 func _ready() -> void:
 	Sfx.play_music("garage")
-	_index = Game.selected_car
+	if not Game.two_player:
+		Game.picking = 1
+	_index = Game.selected_car if Game.picking == 1 else Game.p2_car
 	_build_scene()
 	_build_ui()
 	_show_car(false)
@@ -42,7 +49,7 @@ func _input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("ui_cancel"):
 		Sfx.play("back")
-		Game.goto_menu()
+		_go_back()
 
 
 func _change(d: int) -> void:
@@ -53,14 +60,24 @@ func _change(d: int) -> void:
 
 func _show_car(animate: bool) -> void:
 	var car := CarData.get_car(_index)
+	var unlocked := CarData.is_available(_index)
 	if _car_model:
 		_car_model.queue_free()
-	_car_model = ToyCarModel.new().setup(car)
+	_car_model = ToyCarModel.new().setup(car, true, Game.custom_for(car["id"]) if unlocked else {})
+	if not unlocked:
+		_silhouette(_car_model)
+	_lock_label.visible = not unlocked
+	if not unlocked:
+		_lock_label.text = "LOCKED!\n" + Unlocks.requirement_text(Unlocks.get_item(car.get("unlock", "")))
+	_race_button.disabled = not unlocked
+	for slot in _custom_rows:
+		var l: Label = _custom_rows[slot]
+		l.text = Unlocks.get_item(Game.custom_for(car["id"])[slot]).get("name", "") if unlocked else "?"
 	_car_model.scale = Vector3.ONE * 3.0
 	_car_holder.add_child(_car_model)
 	if animate:
 		_bounce = 1.0
-	_name_label.text = car["name"]
+	_name_label.text = car["name"] if unlocked else "???"
 	_name_label.add_theme_color_override("font_color", (car["body"] as Color).lightened(0.25))
 	_blurb_label.text = car["blurb"]
 	for key in _stat_rows:
@@ -83,10 +100,59 @@ func _show_car(animate: bool) -> void:
 
 
 func _choose() -> void:
-	Game.selected_car = _index
+	if not CarData.is_available(_index):
+		return
+	if Game.picking == 1:
+		Game.selected_car = _index
+	else:
+		Game.p2_car = _index
 	Game.save_settings()
 	Sfx.play("go")
-	Game.goto_track_select()
+	if Game.two_player and Game.picking == 1:
+		Game.picking = 2
+		Game.goto_garage()
+		return
+	Game.picking = 1
+	if Game.gp_active:
+		Game.selected_track = 0
+		Game.goto_race()
+	else:
+		Game.goto_track_select()
+
+
+func _go_back() -> void:
+	if Game.two_player and Game.picking == 2:
+		Game.picking = 1
+		Game.goto_garage()
+	else:
+		Game.end_grand_prix()
+		Game.goto_menu()
+
+
+## Shows a locked car as a dark mystery shape.
+func _silhouette(n: Node) -> void:
+	for c in n.get_children():
+		if c is MeshInstance3D:
+			(c as MeshInstance3D).material_override = ToyCarModel.plastic(Color(0.08, 0.06, 0.14), 0.6)
+		elif c is Label3D:
+			c.visible = false
+		_silhouette(c)
+
+
+## Cycles the paint / sticker / wheels for the shown car through what's unlocked.
+func _cycle(slot: String, d: int) -> void:
+	var car := CarData.get_car(_index)
+	if not CarData.is_available(_index):
+		return
+	var options: Array = []
+	for it in Unlocks.of_kind(slot):
+		if Game.is_unlocked(it["id"]):
+			options.append(it["id"])
+	var current: String = Game.custom_for(car["id"])[slot]
+	var i := wrapi(options.find(current) + d, 0, options.size())
+	Game.set_custom(car["id"], slot, options[i])
+	Sfx.play("click", 1.0 + d * 0.1)
+	_show_car(true)
 
 
 # ---------------------------------------------------------------------------
@@ -189,43 +255,76 @@ func _build_ui() -> void:
 	root.theme = Game.ui_theme
 	layer.add_child(root)
 
-	var header := RaceHud.make_label("PICK YOUR CAR!", 64, Color(1.0, 0.85, 0.2), 16)
+	var header_text := "PICK YOUR CAR!"
+	if Game.two_player:
+		header_text = "PLAYER %d: PICK YOUR CAR!" % Game.picking
+	elif Game.gp_active:
+		header_text = "GRAND PRIX: PICK YOUR CAR!"
+	var header := RaceHud.make_label(header_text, 56, Color(1.0, 0.85, 0.2) if Game.picking == 1 else Color(0.5, 0.9, 1.0), 16)
 	header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	RaceHud.pin(header, Vector2(0.5, 0), Vector2(-500, 16), Vector2(1000, 80))
 	root.add_child(header)
 
 	var panel := PanelContainer.new()
-	RaceHud.pin(panel, Vector2(1, 0.5), Vector2(-560, -230), Vector2(520, 440))
+	RaceHud.pin(panel, Vector2(1, 0.5), Vector2(-560, -282), Vector2(540, 520))
 	root.add_child(panel)
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 12)
 	panel.add_child(box)
-	_name_label = RaceHud.make_label("", 52, Color.WHITE, 14)
+	box.add_theme_constant_override("separation", 6)
+	_name_label = RaceHud.make_label("", 44, Color.WHITE, 14)
 	_name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(_name_label)
-	_blurb_label = RaceHud.make_label("", 22, Color(0.95, 0.95, 1.0), 6)
+	_blurb_label = RaceHud.make_label("", 19, Color(0.95, 0.95, 1.0), 6)
 	_blurb_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_blurb_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_blurb_label.custom_minimum_size = Vector2(460, 64)
+	_blurb_label.custom_minimum_size = Vector2(480, 50)
 	box.add_child(_blurb_label)
 
 	var grid := GridContainer.new()
 	grid.columns = 2
 	grid.add_theme_constant_override("h_separation", 18)
-	grid.add_theme_constant_override("v_separation", 12)
+	grid.add_theme_constant_override("v_separation", 6)
 	box.add_child(grid)
 	for key in ["speed", "accel", "handling", "weight"]:
-		grid.add_child(RaceHud.make_label(CarData.STAT_LABELS[key], 26, Color.WHITE, 8))
+		grid.add_child(RaceHud.make_label(CarData.STAT_LABELS[key], 22, Color.WHITE, 8))
 		var pips_box := HBoxContainer.new()
 		pips_box.add_theme_constant_override("separation", 6)
 		var pips: Array = []
 		for i in 5:
 			var pip := Panel.new()
-			pip.custom_minimum_size = Vector2(38, 26)
+			pip.custom_minimum_size = Vector2(36, 20)
 			pips_box.add_child(pip)
 			pips.append(pip)
 		grid.add_child(pips_box)
 		_stat_rows[key] = pips
+
+	# Paint job, stickers and wheels
+	var custom := GridContainer.new()
+	custom.columns = 4
+	custom.add_theme_constant_override("h_separation", 10)
+	custom.add_theme_constant_override("v_separation", 4)
+	box.add_child(custom)
+	for slot in ["paint", "sticker", "wheels"]:
+		custom.add_child(RaceHud.make_label({"paint": "Paint", "sticker": "Stickers", "wheels": "Wheels"}[slot], 22, Color(1.0, 0.9, 0.5), 8))
+		var minus := _make_button(custom, "<", func(): _cycle(slot, -1))
+		var value := RaceHud.make_label("", 22, Color.WHITE, 8)
+		value.custom_minimum_size = Vector2(190, 0)
+		value.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		custom.add_child(value)
+		var plus := _make_button(custom, ">", func(): _cycle(slot, 1))
+		for b: Button in [minus, plus]:
+			b.add_theme_font_size_override("font_size", 20)
+			b.custom_minimum_size = Vector2(44, 34)
+		_custom_rows[slot] = value
+	var hint := RaceHud.make_label("★ %d stars - win races to unlock more!" % Game.stars, 18, Color(1.0, 0.9, 0.3), 6)
+	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(hint)
+
+	_lock_label = RaceHud.make_label("", 34, Color(1.0, 0.75, 0.3), 12)
+	_lock_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	RaceHud.pin(_lock_label, Vector2(0, 0.5), Vector2(40, 140), Vector2(560, 100))
+	root.add_child(_lock_label)
 
 	_dots = HBoxContainer.new()
 	_dots.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -243,9 +342,14 @@ func _build_ui() -> void:
 	bottom.alignment = BoxContainer.ALIGNMENT_CENTER
 	bottom.add_theme_constant_override("separation", 22)
 	root.add_child(bottom)
-	_make_button(bottom, "Back", func(): Game.goto_menu())
+	_make_button(bottom, "Back", _go_back)
 	_make_button(bottom, "  <  ", func(): _change(-1))
-	_race_button = _make_button(bottom, "Pick a Track  >", _choose)
+	var go_text := "Pick a Track  >"
+	if Game.two_player and Game.picking == 1:
+		go_text = "Player 2  >"
+	elif Game.gp_active:
+		go_text = "Start the Cup!"
+	_race_button = _make_button(bottom, go_text, _choose)
 	_race_button.add_theme_font_size_override("font_size", 38)
 	_make_button(bottom, "  >  ", func(): _change(1))
 	_race_button.grab_focus.call_deferred()
@@ -254,7 +358,7 @@ func _build_ui() -> void:
 func _make_button(parent: Container, text: String, cb: Callable) -> Button:
 	var b := Button.new()
 	b.text = text
-	b.focus_mode = Control.FOCUS_ALL if text.begins_with("Pick") or text == "Back" else Control.FOCUS_NONE
+	b.focus_mode = Control.FOCUS_ALL if text.strip_edges().length() > 1 else Control.FOCUS_NONE
 	b.pressed.connect(func():
 		Sfx.play("select")
 		cb.call())

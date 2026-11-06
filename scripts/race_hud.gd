@@ -20,6 +20,7 @@ var _center_label: Label
 var _message_label: Label
 var _title_box: VBoxContainer
 var _hint_label: Label
+var _hint_hidden := false
 var _minimap: Minimap
 var _root: Control
 var _message_tween: Tween
@@ -217,9 +218,18 @@ func _make_bar(fill: Color) -> ProgressBar:
 
 func set_race_ui_visible(v: bool) -> void:
 	for c in _root.get_children():
+		if c == _hint_label and _hint_hidden:
+			continue
 		if c == _center_label or c == _message_label or c == _title_box or c == _speed_lines or c == _fade or c == _wrong_way or c == _tag_label:
 			continue
 		c.visible = v
+
+
+func hide_hint() -> void:
+	_hint_hidden = true
+	if _hint_label:
+		_hint_label.visible = false
+		_hint_label.modulate.a = 0.0
 
 
 func set_wrong_way(on: bool) -> void:

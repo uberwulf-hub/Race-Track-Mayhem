@@ -83,7 +83,15 @@ func _tv() -> void:
 		_box(Vector3(20.0, 8.0, 0.4), Vector3(cx - 11.0 + i * 22.0, 6.0, z + 7.1), _mat(Color(0.58, 0.4, 0.25), 0.6), false)
 	_box(Vector3(44.0, 26.0, 2.0), Vector3(cx, 27.0, z - 1.0), _mat(Color(0.08, 0.08, 0.1), 0.3))
 	# Cartoon on the screen: sky, grass, sun and a smiling car
-	_box(Vector3(41.0, 23.0, 0.2), Vector3(cx, 27.0, z + 0.1), _glow(Color(0.45, 0.75, 1.0), 0.9), false, null, 0.0)
+	var sky_mat := _glow(Color(0.45, 0.75, 1.0), 0.9)
+	_box(Vector3(41.0, 23.0, 0.2), Vector3(cx, 27.0, z + 0.1), sky_mat, false, null, 0.0)
+	# The cartoon changes: day, sunset, night...
+	var skies := [Color(0.45, 0.75, 1.0), Color(1.0, 0.6, 0.4), Color(0.2, 0.2, 0.55), Color(0.6, 0.9, 0.7)]
+	animate(func(t: float, _d: float):
+		var i := int(t / 4.0) % skies.size()
+		var c: Color = skies[i].lerp(skies[(i + 1) % skies.size()], clampf(fmod(t, 4.0) - 3.5, 0.0, 0.5) * 2.0)
+		sky_mat.albedo_color = c
+		sky_mat.emission = c)
 	_box(Vector3(41.0, 6.0, 0.2), Vector3(cx, 18.5, z + 0.2), _glow(Color(0.35, 0.85, 0.35), 0.9), false, null, 0.0)
 	_upright(_cylinder(3.0, 0.2, Vector3(cx + 13.0, 33.0, z + 0.3), _glow(Color(1.0, 0.85, 0.2), 1.2)))
 	_box(Vector3(12.0, 4.0, 0.2), Vector3(cx - 4.0, 23.0, z + 0.3), _glow(Color(0.95, 0.25, 0.2), 1.0), false, null, 0.0)
@@ -185,8 +193,12 @@ func _cat() -> void:
 		ear.rotation.x = side * 0.3
 		_box(Vector3(0.2, 0.25, 1.0), Vector3(-7.6, 5.4, -2.0 + side * 1.1), _mat(Color(0.2, 0.1, 0.05)), false, cat, 0.0)  # closed eyes
 	_sphere(0.4, Vector3(-7.9, 4.5, -2.0), _mat(Color(1.0, 0.55, 0.6)), Vector3.ONE, cat)
-	var tail := _cylinder(1.0, 9.0, Vector3(3.0, 3.0, 4.5), fur, cat)
-	tail.rotation = Vector3(PI * 0.5, 0.6, 0)
+	var tail_pivot := Node3D.new()
+	tail_pivot.position = Vector3(3.0, 3.0, 1.5)
+	cat.add_child(tail_pivot)
+	var tail := _cylinder(1.0, 9.0, Vector3(0, 0, 4.0), fur, tail_pivot)
+	tail.rotation = Vector3(PI * 0.5, 0, 0)
+	animate(func(t: float, _d: float): tail_pivot.rotation.y = 0.6 + sin(t * 1.3) * 0.45)
 	for i in 3:   # stripes
 		_box(Vector3(1.0, 0.3, 7.0), Vector3(-1.0 + i * 2.5, 8.4, 0), _mat(Color(0.8, 0.4, 0.1)), false, cat, 0.0)
 	var zzz := _label("z z Z", Vector3(-6.0, 12.0, -2.0), 64, 0.04, Color(1, 1, 1, 0.9), cat, 8)

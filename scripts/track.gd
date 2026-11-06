@@ -121,6 +121,7 @@ func build() -> void:
 	_build_boost_pads()
 	_build_start_line()
 	_build_road_details()
+	_build_signs()
 	_build_supports()
 	_build_loop_stand()
 
@@ -312,7 +313,7 @@ func _helix(deg: float, radius: float, rise: float, bank: float = 0.0) -> void:
 		var t0 := float(i) / n
 		var t1 := float(i + 1) / n
 		var dy := rise * (smoothstep(0.0, 1.0, t1) - smoothstep(0.0, 1.0, t0))
-		heading = heading.rotated(Vector3.UP, dyaw * 0.5)
+		heading = heading.rotated(Vector3.UP, dyaw * 0.5).normalized()
 		_pos += heading * step + Vector3.UP * dy
 		var f := (heading * step + Vector3.UP * dy).normalized()
 		heading = heading.rotated(Vector3.UP, dyaw * 0.5)
@@ -322,7 +323,7 @@ func _helix(deg: float, radius: float, rise: float, bank: float = 0.0) -> void:
 		_roll = bank * sin(PI * t1)
 		_emit(0)
 	_roll = 0.0
-	_fwd = heading
+	_fwd = heading.normalized()
 	_up = Vector3.UP
 
 
@@ -436,7 +437,7 @@ func _emit(flag: int) -> void:
 	var lift := (HALF_WIDTH + RAIL_THICK) * sin(tilt) + THICKNESS * (1.0 - cos(tilt))
 	_raw_pos.append(_pos + Vector3.UP * lift)
 	_raw_fwd.append(_fwd)
-	_raw_up.append(_up.rotated(_fwd, deg_to_rad(_roll)).normalized())
+	_raw_up.append(_up if _roll == 0.0 else _up.rotated(_fwd.normalized(), deg_to_rad(_roll)).normalized())
 	_raw_flags.append(flag)
 
 
@@ -878,6 +879,64 @@ func _build_start_line() -> void:
 		label.position = Vector3(0.0, 8.4 - BASE_HEIGHT, face * 0.17)
 		label.rotation.y = 0.0 if face > 0.0 else PI
 		arch.add_child(label)
+
+
+## Chevron signs on the outside of sharp turns, and the MAYHEM logo moulded
+## into the road now and then (like a real toy track).
+func _build_signs() -> void:
+	var board_mat := StandardMaterial3D.new()
+	board_mat.albedo_color = Color(0.97, 0.97, 0.97)
+	board_mat.roughness = 0.4
+	var post_mat := StandardMaterial3D.new()
+	post_mat.albedo_color = Color(0.2, 0.55, 1.0)
+	var k := 0
+	while k < count:
+		var c := curvature[k]
+		if absf(c) > 0.045 and (flags[k] & (FLAG_LOOP | FLAG_GAP | FLAG_BOOST)) == 0 and ups[k].y > 0.75:
+			var t := sample(k * spacing)
+			var side := -signf(c)   # outside of the turn
+			var sign_node := Node3D.new()
+			sign_node.transform = Transform3D(t.basis, t.origin + t.basis.x * side * (HALF_WIDTH + RAIL_THICK + 0.6) + t.basis.y * (RAIL_HEIGHT + 1.1))
+			add_child(sign_node)
+			var board := MeshInstance3D.new()
+			board.mesh = MeshKit.rounded_box(Vector3(2.8, 1.1, 0.18), 0.06, 2)
+			board.material_override = board_mat
+			sign_node.add_child(board)
+			var post := MeshInstance3D.new()
+			var pc := CylinderMesh.new()
+			pc.top_radius = 0.1
+			pc.bottom_radius = 0.1
+			pc.height = 1.6
+			post.mesh = pc
+			post.material_override = post_mat
+			post.position = Vector3(0, -1.0, 0)
+			sign_node.add_child(post)
+			var arrows := Label3D.new()
+			arrows.text = ">>>" if c > 0.0 else "<<<"
+			arrows.font_size = 96
+			arrows.pixel_size = 0.012
+			arrows.outline_size = 0
+			arrows.modulate = Color(0.9, 0.1, 0.1)
+			arrows.position = Vector3(0, 0, 0.1)
+			sign_node.add_child(arrows)
+			k += 16
+		else:
+			k += 1
+	# Logos on the road
+	var step := int(90.0 / spacing)
+	for i in range(int(30.0 / spacing), count, step):
+		if (flags[i] & (FLAG_LOOP | FLAG_GAP | FLAG_BOOST | FLAG_START)) != 0 or ups[i].y < 0.9:
+			continue
+		var t := sample(i * spacing)
+		var logo := Label3D.new()
+		logo.text = "MAYHEM"
+		logo.font_size = 128
+		logo.pixel_size = 0.022
+		logo.outline_size = 0
+		logo.modulate = Color(0.75, 0.28, 0.0, 0.55)
+		logo.double_sided = false
+		logo.transform = Transform3D(Basis(-t.basis.z, -t.basis.x, t.basis.y), t.origin + t.basis.y * 0.03)
+		add_child(logo)
 
 
 ## Countdown lights on the start arch: 0 = off, 1..3 = that many red, 4 = all green.

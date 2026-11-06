@@ -254,35 +254,24 @@ func _build_poster() -> void:
 
 
 func _build_shelf() -> void:
+	# A shelf above the bed holding the Grand Prix trophies you've won.
 	var r := room_rect
 	var shelf := Node3D.new()
-	shelf.name = "Shelf"
+	shelf.name = "TrophyShelf"
 	add_child(shelf)
-	shelf.position = Vector3(r.end.x - 3.0, 36.0, r.position.y + 70.0)
-	_box(Vector3(6.0, 0.8, 30.0), Vector3.ZERO, _mat(Color(0.85, 0.6, 0.35), 0.6), true, shelf)
-	var gold := StandardMaterial3D.new()
-	gold.albedo_color = Color(1.0, 0.78, 0.2)
-	gold.metallic = 0.85
-	gold.roughness = 0.25
-	var silver := StandardMaterial3D.new()
-	silver.albedo_color = Color(0.85, 0.87, 0.9)
-	silver.metallic = 0.85
-	silver.roughness = 0.25
-	var cups := [[gold, 1.3, -9.0], [silver, 1.0, 0.0], [gold, 0.9, 8.0]]
-	for cup: Array in cups:
-		var m: StandardMaterial3D = cup[0]
-		var k: float = cup[1]
-		var z: float = cup[2]
-		_box(Vector3(2.4, 1.2, 2.4) * k, Vector3(0, 1.0 * k, z), _mat(Color(0.2, 0.15, 0.1), 0.4), true, shelf)
-		_cylinder(0.35 * k, 2.0 * k, Vector3(0, 2.6 * k, z), m, shelf)
-		var bowl := MeshInstance3D.new()
-		var cm := CylinderMesh.new()
-		cm.top_radius = 1.6 * k
-		cm.bottom_radius = 0.5 * k
-		cm.height = 2.6 * k
-		bowl.mesh = cm
-		bowl.material_override = m
-		bowl.position = Vector3(0, 4.8 * k, z)
-		shelf.add_child(bowl)
-		for side: float in [-1.0, 1.0]:
-			_sphere(0.6 * k, Vector3(0, 5.0 * k, z + side * 1.7 * k), m, Vector3(0.4, 1.0, 0.6), shelf)
+	shelf.position = Vector3(r.end.x - 3.5, 36.0, r.position.y + 72.0)
+	shelf.rotation.y = -PI * 0.5
+	_box(Vector3(32.0, 0.8, 6.0), Vector3.ZERO, _mat(Color(0.85, 0.6, 0.35), 0.6), true, shelf)
+	var title := _label("TROPHIES", Vector3(0, 12.5, 0.3), 96, 0.03, Color(1.0, 0.85, 0.3), shelf, 16)
+	title.name = "ShelfTitle"
+	for d in 3:
+		var x := (d - 1) * 10.0
+		if Game.trophies.has(d):
+			var cup := Trophy.make(int(Game.trophies[d]), Game.DIFFICULTY_NAMES[d])
+			cup.scale = Vector3.ONE * 1.1
+			cup.position = Vector3(x, 0.4, 0)
+			shelf.add_child(cup)
+		else:
+			_box(Vector3(5.0, 6.0, 0.4), Vector3(x, 3.4, 0), _mat(Color(1, 1, 1, 1), 0.9), true, shelf)
+			_label("?", Vector3(x, 4.2, 0.25), 128, 0.03, Color(0.6, 0.6, 0.7), shelf, 0)
+			_label("%s Cup" % Game.DIFFICULTY_NAMES[d], Vector3(x, 1.4, 0.25), 48, 0.025, Color(0.4, 0.4, 0.5), shelf, 0)

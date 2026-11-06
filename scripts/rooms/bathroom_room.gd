@@ -89,6 +89,10 @@ func _giant_duck() -> void:
 		return
 	var holder := _node("GiantDuck", spots[0], _rng.randf() * TAU)
 	_duck(holder, Vector3(0, 7.5, 0), 3.2)
+	var base_rot := holder.rotation.y
+	animate(func(t: float, _d: float):
+		holder.rotation.z = sin(t * 1.4) * 0.06
+		holder.rotation.y = base_rot + sin(t * 0.5) * 0.15)
 
 
 func _toilet() -> void:
@@ -158,3 +162,11 @@ func _bubbles() -> void:
 		var p := Vector3(_rng.randf_range(area.position.x, area.end.x), _rng.randf_range(14.0, 45.0), _rng.randf_range(area.position.y, area.end.y))
 		var b := _sphere(_rng.randf_range(1.5, 4.0), p, bubble)
 		b.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		var speed := _rng.randf_range(1.0, 2.5)
+		var ph := _rng.randf() * TAU
+		var x0 := p.x
+		animate(func(t: float, d: float):
+			b.position.y += speed * d
+			b.position.x = x0 + sin(t * 0.7 + ph) * 2.0
+			if b.position.y > 60.0:
+				b.position.y = 12.0)
