@@ -10,6 +10,20 @@ extends Node
 const RATE := 22050
 const SFX_DIR := "res://assets/audio/sfx/"
 const MUSIC_DIR := "res://assets/audio/music/"
+## Your own private sounds go here and win over the built-in ones
+## (this folder is git-ignored; see assets/audio/local/README.md).
+const LOCAL_SFX_DIR := "res://assets/audio/local/sfx/"
+const LOCAL_MUSIC_DIR := "res://assets/audio/local/music/"
+
+## Default loudness (dB) per sound, so menu clicks stay gentle.
+const LEVELS := {
+	"click": -16.0, "select": -11.0, "back": -12.0,
+	"beep": -6.0, "go": -4.0,
+	"voice_ready": -2.0, "voice_set": -2.0, "voice_go": 0.0, "voice_win": 0.0,
+	"bump": -4.0, "crash": -3.0, "boost": -6.0, "jump": -6.0, "land": -6.0,
+	"skid": -8.0, "whoosh": -6.0, "rev": -4.0,
+	"lap": -4.0, "final_lap": -4.0, "win": -3.0, "finish": -3.0,
+}
 const EXTS := ["ogg", "wav", "mp3"]
 
 var _sounds: Dictionary = {}       # name -> Array[AudioStream] (variations)
@@ -33,10 +47,11 @@ func _ready() -> void:
 	for m in [_music_a, _music_b]:
 		m.bus = "Music"
 		add_child(m)
-	_sounds["beep"] = _tone([[523.25, 0.16]], 0.35, "square")
-	_sounds["go"] = _tone([[1046.5, 0.55]], 0.35, "square")
-	_sounds["click"] = _tone([[880.0, 0.04]], 0.25, "square")
-	_sounds["select"] = _tone([[660.0, 0.06], [990.0, 0.08]], 0.25, "square")
+	# Soft, round start-light beeps (sine with a little warmth, no harsh edges).
+	_sounds["beep"] = _bell(587.33, 0.35, 0.45)
+	_sounds["go"] = _bell(1174.66, 0.8, 0.45)
+	_sounds["click"] = _bell(880.0, 0.06, 0.2)
+	_sounds["select"] = _bell(660.0, 0.12, 0.25)
 	_sounds["lap"] = _tone([[784.0, 0.1], [1046.5, 0.18]], 0.3, "triangle")
 	_sounds["final_lap"] = _tone([[784.0, 0.1], [988.0, 0.1], [1175.0, 0.1], [1568.0, 0.25]], 0.3, "square")
 	_sounds["win"] = _tone([[523.25, 0.12], [659.25, 0.12], [783.99, 0.12], [1046.5, 0.12], [783.99, 0.1], [1046.5, 0.45]], 0.3, "square")
@@ -47,18 +62,37 @@ func _ready() -> void:
 	_sounds["jump"] = _sweep(300.0, 700.0, 0.25, 0.3, 0.0)
 	_sounds["land"] = _noise(0.15, 0.35, 25.0)
 	_sounds["skid"] = _noise(0.3, 0.2, 3.0)
-	_sounds["back"] = _tone([[660.0, 0.05], [440.0, 0.08]], 0.25, "square")
+	_sounds["back"] = _bell(440.0, 0.12, 0.25)
+	_sounds["whoosh"] = _whoosh(0.7, 0.5)
+	_sounds["rev"] = _rev(0.9, 0.4)
 	# Wrap the synthesized ones in arrays, then replace with real files where present.
 	for key in _sounds.keys():
 		_sounds[key] = [_sounds[key]]
+	var real := 0
 	for key in _sounds.keys():
 		var files := _find_files(SFX_DIR, key)
 		if not files.is_empty():
 			_sounds[key] = files
+			real += 1
+	var music := 0
+	for m in ["menu", "garage", "race", "results"]:
+		if not _find_files(MUSIC_DIR, m).is_empty():
+			music += 1
+	print("Race Track Mayhem audio: %d sounds from files (%d synthesized), %d music tracks found." % [real, _sounds.size() - real, music])
 
 
 ## Finds <dir>/<name>.ogg and variations <name>_1.ogg, <name>_2.ogg, ...
+## Files in the private local folder win over the built-in ones.
 func _find_files(dir: String, sound_name: String) -> Array:
+	var local_dir := LOCAL_SFX_DIR if dir == SFX_DIR else (LOCAL_MUSIC_DIR if dir == MUSIC_DIR else "")
+	if local_dir != "":
+		var mine := _scan(local_dir, sound_name)
+		if not mine.is_empty():
+			return mine
+	return _scan(dir, sound_name)
+
+
+func _scan(dir: String, sound_name: String) -> Array:
 	var out: Array = []
 	for ext in EXTS:
 		var single := "%s%s.%s" % [dir, sound_name, ext]
@@ -147,7 +181,7 @@ func play(sound: String, pitch: float = 1.0, volume_db: float = 0.0) -> void:
 	var options: Array = _sounds[sound]
 	p.stream = options[randi() % options.size()]
 	p.pitch_scale = pitch
-	p.volume_db = volume_db
+	p.volume_db = volume_db + float(LEVELS.get(sound, 0.0))
 	p.play()
 
 
@@ -218,4 +252,50 @@ func _noise(seconds: float, vol: float, decay: float) -> AudioStreamWAV:
 		# simple low-pass so it sounds more like a crunch than hiss
 		last = lerpf(last, randf_range(-1.0, 1.0), 0.35)
 		out.append(last * vol * exp(-t * decay) * 1.6)
+	return _make_wav(out)
+
+
+## A soft bell-like tone: sine plus a quiet octave, gentle attack, smooth fade.
+func _bell(freq: float, seconds: float, vol: float) -> AudioStreamWAV:
+	var out := PackedFloat32Array()
+	var count := int(seconds * RATE)
+	for i in count:
+		var t := float(i) / RATE
+		var k := float(i) / count
+		var env := minf(1.0, t * 200.0) * pow(1.0 - k, 2.0)
+		var v := sin(TAU * freq * t) + 0.25 * sin(TAU * freq * 2.0 * t) + 0.08 * sin(TAU * freq * 3.0 * t)
+		out.append(v * vol * env * 0.75)
+	return _make_wav(out)
+
+
+## Air rushing past: filtered noise that swells and fades, with a falling pitch.
+func _whoosh(seconds: float, vol: float) -> AudioStreamWAV:
+	var out := PackedFloat32Array()
+	var count := int(seconds * RATE)
+	var lp := 0.0
+	var lp2 := 0.0
+	for i in count:
+		var k := float(i) / count
+		var cutoff := lerpf(0.35, 0.06, k)       # brighter at first, then duller
+		lp = lerpf(lp, randf_range(-1.0, 1.0), cutoff)
+		lp2 = lerpf(lp2, lp, cutoff)
+		var env := sin(PI * pow(k, 0.7))
+		out.append(lp2 * vol * env * 3.0)
+	return _make_wav(out)
+
+
+## A quick toy-motor rev: a buzzy tone sweeping up.
+func _rev(seconds: float, vol: float) -> AudioStreamWAV:
+	var out := PackedFloat32Array()
+	var count := int(seconds * RATE)
+	var phase := 0.0
+	var phase2 := 0.0
+	for i in count:
+		var k := float(i) / count
+		var freq := lerpf(70.0, 210.0, 1.0 - pow(1.0 - k, 2.0))
+		phase = fmod(phase + freq / RATE, 1.0)
+		phase2 = fmod(phase2 + freq * 0.5 / RATE, 1.0)
+		var v := (phase * 2.0 - 1.0) * 0.5 + (0.3 if phase2 < 0.5 else -0.3)
+		var env := minf(1.0, k * 12.0) * (1.0 - pow(k, 3.0))
+		out.append(v * vol * env)
 	return _make_wav(out)

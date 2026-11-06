@@ -25,6 +25,8 @@ var _root: Control
 var _message_tween: Tween
 var _center_tween: Tween
 var _speed_lines: SpeedLines
+var _fade: ColorRect
+var _fade_tween: Tween
 var speed_effect := 0.0     # 0..1, set by the race camera
 
 
@@ -156,6 +158,13 @@ func setup(p_track: Track, p_racers: Array[Racer], p_player: Racer) -> void:
 	pin(_hint_label, Vector2(0.5, 1), Vector2(-600, -40), Vector2(1200, 30))
 	_root.add_child(_hint_label)
 
+	_fade = ColorRect.new()
+	_fade.color = Color(0.05, 0.02, 0.12, 0.0)
+	_fade.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_fade.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_root.add_child(_fade)
+	_root.move_child(_message_label, -1)   # messages show on top of the fade
+
 	set_race_ui_visible(false)
 
 
@@ -179,9 +188,24 @@ func _make_bar(fill: Color) -> ProgressBar:
 
 func set_race_ui_visible(v: bool) -> void:
 	for c in _root.get_children():
-		if c == _center_label or c == _message_label or c == _title_box or c == _speed_lines:
+		if c == _center_label or c == _message_label or c == _title_box or c == _speed_lines or c == _fade:
 			continue
 		c.visible = v
+
+
+## Fades the screen to dark (used when a car falls off the track).
+func fade_out(time: float = 0.45) -> void:
+	if _fade_tween:
+		_fade_tween.kill()
+	_fade_tween = create_tween()
+	_fade_tween.tween_property(_fade, "color:a", 1.0, time)
+
+
+func fade_in(time: float = 0.5) -> void:
+	if _fade_tween:
+		_fade_tween.kill()
+	_fade_tween = create_tween()
+	_fade_tween.tween_property(_fade, "color:a", 0.0, time)
 
 
 func show_title(v: bool) -> void:

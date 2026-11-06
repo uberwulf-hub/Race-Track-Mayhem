@@ -15,7 +15,7 @@ var _bounce := 0.0
 
 
 func _ready() -> void:
-	Sfx.play_music("menu")
+	Sfx.play_music("garage")
 	_index = Game.selected_car
 	_build_scene()
 	_build_ui()
@@ -242,8 +242,8 @@ func _build_ui() -> void:
 	root.add_child(bottom)
 	_make_button(bottom, "Back", func(): Game.goto_menu())
 	_make_button(bottom, "  <  ", func(): _change(-1))
-	_race_button = _make_button(bottom, "RACE!", _choose)
-	_race_button.add_theme_font_size_override("font_size", 46)
+	_race_button = _make_button(bottom, "Pick a Track  >", _choose)
+	_race_button.add_theme_font_size_override("font_size", 38)
 	_make_button(bottom, "  >  ", func(): _change(1))
 	_race_button.grab_focus.call_deferred()
 
@@ -251,7 +251,7 @@ func _build_ui() -> void:
 func _make_button(parent: Container, text: String, cb: Callable) -> Button:
 	var b := Button.new()
 	b.text = text
-	b.focus_mode = Control.FOCUS_ALL if text == "RACE!" or text == "Back" else Control.FOCUS_NONE
+	b.focus_mode = Control.FOCUS_ALL if text.begins_with("Pick") or text == "Back" else Control.FOCUS_NONE
 	b.pressed.connect(func():
 		Sfx.play("select")
 		cb.call())

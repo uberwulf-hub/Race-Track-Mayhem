@@ -44,8 +44,13 @@ There are no art or sound files. The cars, track, bedroom and sound effects are 
 | Change camera | C | Left bumper |
 | Pause | Esc / P | Start |
 
-Tips: drive over the glowing striped pads for a **BOOST**. Keep your speed up in the loop.
-If you go too slowly upside down, you fall off. **MAYHEM!**
+Tips:
+- Drive over the glowing striped pads for a **BOOST**.
+- **Steer into the turns.** Corners push you outward, and if you slam the outside rail too fast you fly off the track.
+- **Hit the jumps fast** and line up your landing. Too slow and you drop into the gap; land beside the track and over the edge you go.
+- Keep your speed up in the loops. Too slow upside down and you fall off. **MAYHEM!**
+
+Whenever you come off the track, the screen fades and you're put back where you came off, with "Get Back to the Race!".
 
 ## What's in the game
 
@@ -56,10 +61,18 @@ If you go too slowly upside down, you fall off. **MAYHEM!**
 - **Race**: intro zoom, start lights with a "3, 2, 1, GO!" voice countdown, laps, places, timer,
   speedometer, turbo meter, mini-map, pause menu, camera shake, speed lines, sparks on the walls
 - Computer drivers that keep the race close (Easy / Normal / Hard)
-- Bumping between cars, where heavy cars push light ones around
+- Real bump physics: cars shove and spin each other depending on where they're hit (heavy cars push light ones
+  around, and a knock in a turn can send someone flying off)
 - Results screen, with best times saved between plays
-- Real sound effects and chiptune music (all CC0, see [assets/audio/CREDITS.md](assets/audio/CREDITS.md)),
-  with separate Music and Sound volume sliders. If an audio file is missing, the game falls back to its own beeps.
+- Sound effects and chiptune music (all CC0, see [assets/audio/CREDITS.md](assets/audio/CREDITS.md)), with separate
+  Music and Sound volume sliders:
+  - a "Ready… Set… GO!" voice countdown and soft start beeps
+  - a two-layer engine that revs with speed, brake squeals, and 3D engine sounds on the other cars
+    (you hear them come up behind you and zoom past)
+  - different music for the menu, the garage, races and results
+- **Use your own sounds:** drop files into `assets/audio/local/` (see [its README](assets/audio/local/README.md)).
+  They replace the built-in sounds on your computer only, and that folder is never uploaded to GitHub.
+  That makes it the place for Pixabay sounds, whose license doesn't allow sharing the raw files.
 
 ## Code map (for tinkering)
 

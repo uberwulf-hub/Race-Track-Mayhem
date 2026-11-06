@@ -104,7 +104,7 @@ func _build_ui() -> void:
 
 	# Main buttons
 	_main_box = VBoxContainer.new()
-	RaceHud.pin(_main_box, Vector2(0.5, 0.5), Vector2(-170, 20), Vector2(340, 300))
+	RaceHud.pin(_main_box, Vector2(0.5, 0.5), Vector2(-170, -55), Vector2(340, 300))
 	_main_box.add_theme_constant_override("separation", 14)
 	root.add_child(_main_box)
 	var play := _button(_main_box, "PLAY!", func(): Game.goto_garage())
@@ -119,7 +119,7 @@ func _build_ui() -> void:
 	if best > 0.0:
 		var rec := RaceHud.make_label("Best time (%d laps): %s" % [Game.laps, Game.format_time(best)], 24, Color(0.8, 1.0, 0.8), 8)
 		rec.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		RaceHud.pin(rec, Vector2(0.5, 1), Vector2(-300, -50), Vector2(600, 40))
+		RaceHud.pin(rec, Vector2(0.5, 1), Vector2(-300, -44), Vector2(600, 36))
 		root.add_child(rec)
 
 	_options_panel = _build_options(root)
@@ -251,7 +251,7 @@ func _build_help(root: Control) -> Control:
 	var parts := _panel(root, "How to Play")
 	var box: VBoxContainer = parts[1]
 	var lines := [
-		"Pick your toy car, then race 4 other cars around the house!",
+		"Pick your toy car, then pick one of 5 tracks around the house!",
 		"",
 		"Go:  W  or  Up arrow",
 		"Steer:  A / D  or  Left / Right arrows",
@@ -261,7 +261,8 @@ func _build_help(root: Control) -> Control:
 		"Camera:  C        Pause:  Esc",
 		"",
 		"Drive over the glowing pads for a BOOST.",
-		"Go fast in the loop - too slow and you'll fall off!",
+		"Go fast in the loops and on the jumps - too slow and you'll fall off!",
+		"Steer into the turns or you'll fly over the edge!",
 	]
 	for line in lines:
 		var l := RaceHud.make_label(line, 24, Color.WHITE, 6)

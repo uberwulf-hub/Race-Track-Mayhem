@@ -38,6 +38,11 @@ var _engine_phase2 := 0.0
 var _engine_freq := 60.0
 var _shake := 0.0
 var _engine_player: AudioStreamPlayer
+var _engine_high: AudioStreamPlayer
+var _brake_player: AudioStreamPlayer
+var _was_pressing := false
+var _ai_engines: Dictionary = {}     # racer -> AudioStreamPlayer3D
+var _pass_side: Dictionary = {}      # racer -> was it ahead of the player?
 var _skid_timer := 0.0
 
 
@@ -81,6 +86,7 @@ func _ready() -> void:
 		r.process_mode = Node.PROCESS_MODE_PAUSABLE
 	_build_pause_menu()
 	_setup_engine_sound()
+	_setup_ai_engines()
 	Sfx.play_music("race", -9.0)
 	_set_state(State.INTRO)
 
@@ -115,6 +121,7 @@ func _spawn_racers() -> void:
 		r.lap_completed.connect(_on_lap)
 		r.finished.connect(_on_finished)
 		r.crashed.connect(_on_crash)
+		r.respawned.connect(_on_respawned)
 		r.boosted.connect(_on_boost)
 		racers.append(r)
 		_add_flame(r)
@@ -130,7 +137,7 @@ func _add_flame(r: Racer) -> void:
 	p.lifetime = 0.22
 	p.emitting = false
 	p.local_coords = false
-	p.direction = Vector3(0, 0.3, 1)
+	p.direction = Vector3(0, 0.3, 1).normalized()
 	p.spread = 15.0
 	p.initial_velocity_min = 4.0
 	p.initial_velocity_max = 8.0
@@ -183,6 +190,7 @@ func _set_state(s: State) -> void:
 
 func _process(delta: float) -> void:
 	_update_engine_sound()
+	_update_ai_sounds()
 	if get_tree().paused:
 		return
 	_state_time += delta
@@ -191,30 +199,27 @@ func _process(delta: float) -> void:
 			if _state_time > INTRO_HOLD + INTRO_ZOOM:
 				_set_state(State.COUNTDOWN)
 		State.COUNTDOWN:
-			var step := int(floor(_state_time / 0.9))
+			var step := int(floor(_state_time / 1.0))
 			if step != _countdown_step:
 				_countdown_step = step
 				match step:
 					0:
-						hud.show_countdown("3", Color(1.0, 0.3, 0.25))
-						track.set_start_lights(1)
-						Sfx.play("beep")
-						Sfx.play("voice_3")
-					1:
-						hud.show_countdown("2", Color(1.0, 0.75, 0.2))
+						hud.show_countdown("READY", Color(1.0, 0.35, 0.3))
 						track.set_start_lights(2)
 						Sfx.play("beep")
-						Sfx.play("voice_2")
-					2:
-						hud.show_countdown("1", Color(1.0, 0.95, 0.3))
+						Sfx.play("voice_ready")
+					1:
+						hud.show_countdown("SET", Color(1.0, 0.8, 0.25))
 						track.set_start_lights(3)
 						Sfx.play("beep")
-						Sfx.play("voice_1")
-					3:
+						Sfx.play("voice_set")
+					2:
 						hud.show_countdown("GO!", Color(0.35, 1.0, 0.4))
 						track.set_start_lights(4)
 						Sfx.play("voice_go")
 						Sfx.play("go")
+						if player.throttle_input > 0.0 or Input.is_action_pressed("accelerate"):
+							Sfx.play("rev")
 						_set_state(State.RACING)
 		State.FINISHED:
 			if not _results_shown and _state_time > 3.0:
@@ -310,12 +315,32 @@ func _on_finished(r: Racer) -> void:
 	_set_state(State.FINISHED)
 
 
-func _on_crash(r: Racer) -> void:
+const CRASH_MESSAGES := {
+	"loop": "MAYHEM!  Too slow for the loop!",
+	"jump": "WHOOPS!  Missed the jump!",
+	"corner": "WHOA!  Too fast for that turn!",
+}
+
+
+func _on_crash(r: Racer, reason: String) -> void:
 	if r.is_player:
-		hud.flash_message("MAYHEM!  Too slow for the loop!", Color(1.0, 0.45, 0.3), 1.4)
+		hud.flash_message(CRASH_MESSAGES.get(reason, "MAYHEM!"), Color(1.0, 0.45, 0.3), 0.9)
 		Sfx.play("crash")
+		_shake = 0.4
+		# Fade to black while the car tumbles, then back in once it's on the track.
+		get_tree().create_timer(0.8).timeout.connect(func(): hud.fade_out())
 	else:
 		Sfx.play("crash", 1.2, -10.0)
+
+
+func _on_respawned(r: Racer) -> void:
+	if not r.is_player:
+		return
+	var pose := _chase_pose(r)
+	camera.global_position = pose[0]
+	_cam_up = pose[2]
+	hud.fade_in()
+	hud.flash_message("Get Back to the Race!", Color(0.5, 1.0, 0.6), 1.4)
 
 
 func _on_boost(r: Racer) -> void:
@@ -327,7 +352,7 @@ func _on_boost(r: Racer) -> void:
 func _update_flames() -> void:
 	for r: Racer in _flames:
 		var p: CPUParticles3D = _flames[r]
-		p.emitting = (r.boost_timer > 0.0 or r.turbo_on) and r.mode == Racer.Mode.DRIVING
+		p.emitting = (r.boost_timer > 0.0 or r.turbo_on) and r.mode != Racer.Mode.FALLING
 
 
 func _spawn_confetti() -> void:
@@ -437,14 +462,11 @@ func _safe_look_at(target: Vector3, up: Vector3) -> void:
 
 func _setup_engine_sound() -> void:
 	# A recorded engine loop if we have one (pitched up with speed)...
+	_brake_player = _loop_player("brake")
 	var loop := Sfx.loop_stream("engine")
 	if loop:
-		_engine_player = AudioStreamPlayer.new()
-		_engine_player.stream = loop
-		_engine_player.bus = "SFX"
-		_engine_player.volume_db = -40.0
-		add_child(_engine_player)
-		_engine_player.play()
+		_engine_player = _loop_player("engine")
+		_engine_high = _loop_player("engine_high")
 		return
 	# ...otherwise a synthesized buzzy toy motor.
 	var gen := AudioStreamGenerator.new()
@@ -459,14 +481,84 @@ func _setup_engine_sound() -> void:
 	_engine_playback = p.get_stream_playback()
 
 
+## A looping sound player for the player's car (engine layers, brakes).
+## Each computer car hums with its own 3D engine sound, so you hear them
+## coming up behind you and zooming past (with a Doppler pitch drop).
+func _setup_ai_engines() -> void:
+	camera.doppler_tracking = Camera3D.DOPPLER_TRACKING_PHYSICS_STEP
+	for r in racers:
+		if r.is_player:
+			continue
+		var st := Sfx.loop_stream("engine")
+		if st == null:
+			continue
+		var p := AudioStreamPlayer3D.new()
+		p.stream = st
+		p.bus = "SFX"
+		p.unit_size = 6.0
+		p.max_distance = 70.0
+		p.volume_db = -60.0
+		p.doppler_tracking = AudioStreamPlayer3D.DOPPLER_TRACKING_PHYSICS_STEP
+		r.add_child(p)
+		p.play(randf() * 2.0)
+		_ai_engines[r] = p
+		_pass_side[r] = r.total > player.total
+
+
+func _update_ai_sounds() -> void:
+	var live := state == State.RACING or state == State.COUNTDOWN or state == State.FINISHED
+	for r: Racer in _ai_engines:
+		var p: AudioStreamPlayer3D = _ai_engines[r]
+		var rev := absf(r.speed) / 45.0
+		p.pitch_scale = lerpf(p.pitch_scale, 0.8 + rev * 0.75, 0.15)
+		p.volume_db = lerpf(p.volume_db, -8.0 if live and r.mode != Racer.Mode.FALLING else -60.0, 0.1)
+		# Whoosh when a car zooms past you (or you zoom past it).
+		var ahead := r.total > player.total
+		var gap := absf(r.total - player.total)
+		if ahead != _pass_side[r] and gap < 6.0 and absf(r.speed - player.speed) > 3.0 and state == State.RACING:
+			Sfx.play("whoosh", randf_range(0.9, 1.15))
+		_pass_side[r] = ahead
+
+
+func _loop_player(sound_name: String) -> AudioStreamPlayer:
+	var st := Sfx.loop_stream(sound_name)
+	if st == null:
+		return null
+	var p := AudioStreamPlayer.new()
+	p.stream = st
+	p.bus = "SFX"
+	p.volume_db = -60.0
+	add_child(p)
+	p.play()
+	return p
+
+
 func _update_engine_sound() -> void:
+	var quiet := state == State.INTRO or get_tree().paused or player.mode == Racer.Mode.FALLING
+	# Brakes squeal while braking hard.
+	if _brake_player:
+		var want := -9.0 if player.braking and not quiet else -60.0
+		_brake_player.volume_db = lerpf(_brake_player.volume_db, want, 0.25)
+		_brake_player.pitch_scale = 1.25 + clampf(player.speed / 60.0, 0.0, 0.4)
+	# A quick rev when you hit the gas from (nearly) stopped.
+	var pressing := player.throttle_input > 0.5
+	if pressing and not _was_pressing and absf(player.speed) < 8.0 and state == State.RACING:
+		Sfx.play("rev")
+	_was_pressing = pressing
 	if _engine_player:
-		var quiet := state == State.INTRO or get_tree().paused
-		var rev := absf(player.speed) / 45.0 + player.throttle_input * 0.15
+		var rev := absf(player.speed) / 45.0 + player.throttle_input * 0.2
 		if player.turbo_on or player.boost_timer > 0.0:
-			rev += 0.25
-		_engine_player.pitch_scale = lerpf(_engine_player.pitch_scale, clampf(0.7 + rev * 0.9, 0.6, 2.4), 0.15)
-		_engine_player.volume_db = lerpf(_engine_player.volume_db, -40.0 if quiet else -12.0 + minf(rev, 1.0) * 4.0, 0.1)
+			rev += 0.3
+		if player.in_air:
+			rev += 0.35        # wheels spin free in the air
+		rev = clampf(rev, 0.0, 1.6)
+		_engine_player.pitch_scale = lerpf(_engine_player.pitch_scale, 0.75 + rev * 0.8, 0.15)
+		_engine_player.volume_db = lerpf(_engine_player.volume_db, -60.0 if quiet else -7.0 + minf(rev, 1.0) * 3.0, 0.1)
+		if _engine_high:
+			# The screamy high layer fades in as you go faster.
+			var high := clampf((rev - 0.55) / 0.6, 0.0, 1.0)
+			_engine_high.pitch_scale = lerpf(_engine_high.pitch_scale, 0.8 + rev * 0.5, 0.15)
+			_engine_high.volume_db = lerpf(_engine_high.volume_db, -60.0 if quiet or high <= 0.01 else linear_to_db(high) - 9.0, 0.1)
 		return
 	if _engine_playback == null:
 		return

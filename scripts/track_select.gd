@@ -20,7 +20,7 @@ var _maps: Array = []          # cached [points, heights, max_h, rect] per track
 
 
 func _ready() -> void:
-	Sfx.play_music("menu")
+	Sfx.play_music("garage")
 	theme = Game.ui_theme
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	_index = clampi(Game.selected_track, 0, Track.TRACKS.size() - 1)

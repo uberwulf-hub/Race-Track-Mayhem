@@ -4,3 +4,7 @@ export_presets.cfg
 *.translation
 /android/
 build/
+
+# Private sound overrides (see assets/audio/local/README.md)
+assets/audio/local/*
+!assets/audio/local/README.md

@@ -6,16 +6,15 @@ because they deserve it.
 
 | Files | Creator | Source | License |
 |---|---|---|---|
-| `sfx/engine.ogg`, `sfx/bump_1.ogg` | Kenney | [Starter Kit Racing](https://github.com/KenneyNL/Starter-Kit-Racing) | CC0 |
-| `sfx/skid.ogg` | Landeplage | [Starter Kit Racing](https://github.com/KenneyNL/Starter-Kit-Racing) | CC0 |
+| `sfx/engine.ogg`, `sfx/engine_high.ogg`, `sfx/bump_1.ogg` | Kenney | [Starter Kit Racing](https://github.com/KenneyNL/Starter-Kit-Racing) | CC0 |
+| `sfx/skid.ogg`, `sfx/brake.ogg` | Landeplage | [Starter Kit Racing](https://github.com/KenneyNL/Starter-Kit-Racing) | CC0 |
 | `sfx/jump.ogg`, `sfx/land.ogg` | Kenney | [Starter Kit 3D Platformer](https://github.com/KenneyNL/Starter-Kit-3D-Platformer) | CC0 |
 | `sfx/bump_2-3.ogg`, `sfx/crash_*.ogg` | Kenney | [Impact Sounds](https://kenney.nl/assets/impact-sounds) | CC0 |
-| `sfx/boost_*.ogg`, `sfx/beep.ogg`, `sfx/go.ogg` | Kenney | [Digital Audio](https://kenney.nl/assets/digital-audio) | CC0 |
+| `sfx/boost_*.ogg` | Kenney | [Digital Audio](https://kenney.nl/assets/digital-audio) | CC0 |
 | `sfx/voice_*.ogg` | Kenney | [Voiceover Pack](https://kenney.nl/assets/voiceover-pack) | CC0 |
 | `sfx/lap.ogg`, `sfx/final_lap.ogg`, `sfx/win.ogg`, `sfx/finish.ogg` | Kenney | [Music Jingles](https://kenney.nl/assets/music-jingles) | CC0 |
-| `sfx/click.wav` | Kenney | [UI Audio](https://kenney.nl/assets/ui-audio) | CC0 |
-| `sfx/select.wav`, `sfx/back.wav` | Kenney | [Interface Sounds](https://kenney.nl/assets/interface-sounds) | CC0 |
-| `music/menu.ogg`, `music/race_1.ogg`, `music/race_2.ogg`, `music/results.ogg` | Juhani Junkala | [5 Chiptunes (Action)](https://opengameart.org/content/5-chiptunes-action) | CC0 |
+| `sfx/click.wav`, `sfx/select.wav`, `sfx/back.wav` | Kenney | [Interface Sounds](https://kenney.nl/assets/interface-sounds) | CC0 |
+| `music/menu.ogg`, `music/garage.ogg`, `music/race_1.ogg`, `music/race_2.ogg`, `music/results.ogg` | Juhani Junkala | [5 Chiptunes (Action)](https://opengameart.org/content/5-chiptunes-action) | CC0 |
 
 ## Swapping sounds
 
@@ -24,8 +23,11 @@ For random variations, number them: `boost_1.ogg`, `boost_2.ogg` and so on. Musi
 `music/`. With several race tracks (`race_1`, `race_2`), one is picked at random each race.
 If a file is missing, the game falls back to its own synthesized beeps.
 
-Sound names: engine, skid, bump, crash, boost, jump, land, beep, go, voice_3, voice_2, voice_1,
-voice_go, voice_win, lap, final_lap, win, finish, click, select, back.
+The countdown beeps, whoosh and rev sounds are made by the game itself (in `scripts/sfx.gd`).
+To use your own sounds without uploading them, put them in `local/` (see `local/README.md`).
+
+Sound names: engine, engine_high, rev, whoosh, brake, skid, bump, crash, boost, jump, land, beep, go,
+voice_ready, voice_set, voice_go, voice_win, lap, final_lap, win, finish, click, select, back.
 
 ## Other good free sources (checked November 2026)
 

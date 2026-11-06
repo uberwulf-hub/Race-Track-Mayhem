@@ -430,7 +430,11 @@ func _hill() -> void:
 # ---------------------------------------------------------------------------
 
 func _emit(flag: int) -> void:
-	_raw_pos.append(_pos)
+	# A banked road tilts around its middle, so lift it up enough that the
+	# low edge never dips into the floor.
+	var tilt := deg_to_rad(absf(_roll))
+	var lift := (HALF_WIDTH + RAIL_THICK) * sin(tilt) + THICKNESS * (1.0 - cos(tilt))
+	_raw_pos.append(_pos + Vector3.UP * lift)
 	_raw_fwd.append(_fwd)
 	_raw_up.append(_up.rotated(_fwd, deg_to_rad(_roll)).normalized())
 	_raw_flags.append(flag)
