@@ -314,7 +314,7 @@ func _build_help(root: Control) -> Control:
 	var parts := _panel(root, "How to Play")
 	var box: VBoxContainer = parts[1]
 	var lines := [
-		"QUICK RACE: pick a car and one of 5 tracks.   GRAND PRIX: race all 5 for points!",
+		"QUICK RACE: pick a car and one of 6 tracks.   GRAND PRIX: race all 6 for points!",
 		"",
 		"Go:  W / Up      Steer:  A D / Left Right      Brake:  S / Down",
 		"TURBO:  Space      Back on track:  R      Camera:  C      Pause:  Esc",

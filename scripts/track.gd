@@ -78,6 +78,16 @@ const TRACKS: Array[Dictionary] = [
 		"stars": 3,
 		"color": Color(0.75, 0.35, 0.55),
 	},
+	{
+		"id": "backyard_blast",
+		"name": "Backyard Blast",
+		"room": "garden",
+		"room_name": "The Garden",
+		"blurb": "Race outside! Leap the pond, roll over the bumps and loop by the big tree.",
+		"features": ["Giant pond jump", "Bumpy lawn", "Loop-de-loop", "Spiral", "Slalom"],
+		"stars": 2,
+		"color": Color(0.3, 0.7, 0.3),
+	},
 ]
 
 var layout_id := 0
@@ -141,6 +151,8 @@ func _layout(stretch_a: float, stretch_b: float) -> void:
 			_layout_bathroom(stretch_a, stretch_b)
 		4:
 			_layout_living_room(stretch_a, stretch_b)
+		5:
+			_layout_garden(stretch_a, stretch_b)
 		_:
 			_layout_speedway(stretch_a, stretch_b)
 
@@ -300,6 +312,45 @@ func _layout_living_room(stretch_a: float, stretch_b: float) -> void:
 	_straight(6.0)
 	_turn(90.0, 16.0, 22.0)             # -> north
 	_straight(22.0)
+
+
+## Track 6: Backyard Blast, out in the garden. A giant jump over the pond,
+## a bumpy lawn, a loop, a slalom through the flowers and a spiral.
+func _layout_garden(stretch_a: float, stretch_b: float) -> void:
+	_mark("A")
+	_straight(stretch_a)                # north
+	_straight(8.0, FLAG_BOOST)
+	_straight(6.0)
+	_big_jump()                         # over the pond!
+	_straight(12.0)
+	_turn(90.0, 18.0, 22.0)             # -> east
+	_waves(4, 8.0, 24.0)
+	_straight(6.0, FLAG_BOOST)
+	_loop(8.5, 10.0)
+	_straight(10.0)
+	_turn(90.0, 16.0, 22.0)             # -> south
+	_slalom(4, 32.0, 13.0)
+	_straight(6.0)
+	_helix(360.0, 13.0, 7.5, 12.0)      # spiral climb
+	_straight(4.0)
+	_ramp_down(7.5)
+	_straight(14.0)
+	_turn(90.0, 16.0, 22.0)             # -> west
+	_mark("B")
+	_straight(stretch_b)
+	_straight(8.0, FLAG_BOOST)
+	_straight(6.0)
+	_turn(90.0, 17.0, 22.0)             # -> north
+	_straight(22.0)
+
+
+## The biggest jump in the game: a steep ramp and a long gap.
+func _big_jump() -> void:
+	_pitch(20.0, 14.0)
+	_straight(6.0)
+	_pitch(-40.0, 34.0, FLAG_GAP)
+	_straight(6.0)
+	_pitch(20.0, 14.0)
 
 
 ## A spiral: turns `deg` while climbing `rise` (gentle at both ends).

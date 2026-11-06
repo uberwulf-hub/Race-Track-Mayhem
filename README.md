@@ -8,7 +8,7 @@ Pick a toy car and a track, then race four computer cars around an orange plasti
 kid's bedroom floor. Each race starts with the camera looking at the whole bedroom, then it swoops
 down to your car for **3… 2… 1… GO!**
 
-**5 tracks, each in its own room**
+**6 tracks, each in its own room (and one outside!)**
 
 | Track | Room | Trickiness | Highlights |
 |---|---|---|---|
@@ -17,8 +17,11 @@ down to your car for **3… 2… 1… GO!**
 | Kitchen Kerfuffle | Kitchen: checker tiles, fridge, table, giant fruit | ★★☆ | spiral climb, big drop, double jump, S-bends |
 | Bubble Bath Bash | Bathroom: bubbly tub, GIANT rubber duck | ★★☆ | double loop, wavy bumps, zig-zags, jump |
 | Sofa Slalom | Living room at sunset: sofa, TV, sleeping cat | ★★★ | slalom, spiral, corkscrew, loop, jump |
+| Backyard Blast | **Outdoors in the garden:** blue sky, picket fence, big tree with a swing, flowers, gnome, pond with a frog, butterflies | ★★☆ | giant jump over the pond, bumpy lawn, loop, spiral, slalom |
 
 ![The five rooms](docs/screenshot-rooms.png)
+
+![Backyard Blast, out in the garden](docs/screenshot-garden.png)
 
 ![Version 1.1: menu, garage paint jobs, split screen, podium, living room](docs/screenshot-v1.1.png)
 
@@ -76,8 +79,8 @@ Whenever you come off the track, the screen fades and you're put back where you 
 ## What's in the game
 
 **Ways to play**
-- **Quick Race:** pick a car and any of the 5 tracks.
-- **Grand Prix:** race all 5 tracks in a row for points (10, 8, 6, 5, 4), then a trophy ceremony on the podium.
+- **Quick Race:** pick a car and any of the 6 tracks.
+- **Grand Prix:** race all 6 tracks in a row for points (10, 8, 6, 5, 4), then a trophy ceremony on the podium.
   Gold, silver and bronze trophies are kept on the shelf in the bedroom (one per difficulty).
 - **2 players:** split screen on one PC, with keyboard + controller or two controllers. Works with both modes.
 - **Ghost car:** a see-through replay of your best clean lap on each track drives alongside you.
@@ -133,8 +136,8 @@ They replace the built-in sounds on your computer only, and that folder is never
 | `scripts/podium.gd`, `scripts/trophy.gd` | Grand Prix trophy ceremony and the trophy model. |
 | `scripts/race_hud.gd` | On-screen display and mini-map. |
 | `scripts/rooms/room.gd` | Base class for the rooms: lighting, floor, walls, window, door and shape helpers. |
-| `scripts/rooms/*_room.gd` | One file per room theme (bedroom, playroom, kitchen, bathroom, living room). Each one sets its colours and builds its furniture. |
+| `scripts/rooms/*_room.gd` | One file per room theme (bedroom, playroom, kitchen, bathroom, living room, garden). Each one sets its colours and builds its furniture. Set `outdoor = true` for a sky instead of walls. |
 | `scripts/main_menu.gd`, `scripts/vehicle_select.gd` | Main menu, and the garage (car picking and paint jobs). |
 | `scripts/game_state.gd`, `scripts/sfx.gd` | Settings and saving, controls, UI theme, sound effects and music. |
 
-Ideas for next time: an outdoor garden track, a track editor, online leaderboards, and an Android version.
+Ideas for next time: a track editor, online leaderboards, and an Android version.

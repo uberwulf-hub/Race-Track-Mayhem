@@ -36,6 +36,9 @@ var ceiling_color := Color(0.97, 0.97, 0.95)
 var curtain_color := Color(0.95, 0.45, 0.55)
 var door_color := Color(0.98, 0.95, 0.9)
 var has_window := true
+var outdoor := false                  # garden: sky instead of walls and ceiling
+var sky_top := Color(0.25, 0.5, 0.95)
+var sky_horizon := Color(0.75, 0.88, 1.0)
 var evening := false               # cars switch their headlights on
 var window_sky := Color(0.6, 0.85, 1.0)
 var saturation := 1.15
@@ -52,6 +55,8 @@ static func create(theme: String) -> Room:
 			return BathroomRoom.new()
 		"living_room":
 			return LivingRoom.new()
+		"garden":
+			return GardenRoom.new()
 	return BedroomRoom.new()
 
 
@@ -63,9 +68,10 @@ func build(p_track: Track) -> Room:
 	_configure()
 	_build_environment()
 	_build_floor()
-	_build_walls()
-	if has_window:
-		_build_window()
+	if not outdoor:
+		_build_walls()
+		if has_window:
+			_build_window()
 	_build_props()
 	return self
 
@@ -119,6 +125,18 @@ func _build_environment() -> void:
 	var env := Environment.new()
 	env.background_mode = Environment.BG_COLOR
 	env.background_color = background_color
+	if outdoor:
+		# A real sky that also lights the scene.
+		var sky_mat := ProceduralSkyMaterial.new()
+		sky_mat.sky_top_color = sky_top
+		sky_mat.sky_horizon_color = sky_horizon
+		sky_mat.ground_horizon_color = sky_horizon
+		sky_mat.ground_bottom_color = Color(0.3, 0.55, 0.25)
+		sky_mat.sun_angle_max = 20.0
+		var sky := Sky.new()
+		sky.sky_material = sky_mat
+		env.sky = sky
+		env.background_mode = Environment.BG_SKY
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	env.ambient_light_color = ambient_color
 	env.ambient_light_energy = ambient_energy
