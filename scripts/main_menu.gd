@@ -20,6 +20,7 @@ var _time := 0.0
 
 
 func _ready() -> void:
+	Sfx.play_music("menu")
 	track = Track.new()
 	track.layout_id = randi() % Track.TRACKS.size()
 	add_child(track)
@@ -211,25 +212,33 @@ func _build_options(root: Control) -> Control:
 		Game.save_settings())
 	_diff_button.custom_minimum_size = Vector2(200, 0)
 
-	var vol_row := HBoxContainer.new()
-	vol_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	vol_row.add_theme_constant_override("separation", 16)
-	box.add_child(vol_row)
-	vol_row.add_child(RaceHud.make_label("Volume:", 32))
+	_slider_row(box, "Volume:", Game.master_volume, func(v: float): Game.set_volume(v))
+	_slider_row(box, "Music:", Game.music_volume, func(v: float): Game.set_music_volume(v))
+	_slider_row(box, "Sounds:", Game.sfx_volume, func(v: float): Game.set_sfx_volume(v))
+
+	_button(box, "Back", func(): _show_panel(null))
+	return parts[0]
+
+
+func _slider_row(box: Container, label: String, value: float, setter: Callable) -> void:
+	var row := HBoxContainer.new()
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", 16)
+	box.add_child(row)
+	var l := RaceHud.make_label(label, 32)
+	l.custom_minimum_size = Vector2(150, 0)
+	row.add_child(l)
 	var slider := HSlider.new()
 	slider.min_value = 0.0
 	slider.max_value = 1.0
 	slider.step = 0.05
-	slider.value = Game.master_volume
+	slider.value = value
 	slider.custom_minimum_size = Vector2(260, 40)
 	slider.value_changed.connect(func(v: float):
-		Game.set_volume(v)
+		setter.call(v)
 		Sfx.play("click"))
 	slider.drag_ended.connect(func(_c: bool): Game.save_settings())
-	vol_row.add_child(slider)
-
-	_button(box, "Back", func(): _show_panel(null))
-	return parts[0]
+	row.add_child(slider)
 
 
 func _change_laps(d: int) -> void:

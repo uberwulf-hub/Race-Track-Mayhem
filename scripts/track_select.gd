@@ -8,6 +8,7 @@ var _best_labels: Array[Label] = []
 
 
 func _ready() -> void:
+	Sfx.play_music("menu")
 	theme = Game.ui_theme
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 

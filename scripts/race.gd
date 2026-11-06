@@ -37,6 +37,8 @@ var _engine_phase := 0.0
 var _engine_phase2 := 0.0
 var _engine_freq := 60.0
 var _shake := 0.0
+var _engine_player: AudioStreamPlayer
+var _skid_timer := 0.0
 
 
 func _ready() -> void:
@@ -79,6 +81,7 @@ func _ready() -> void:
 		r.process_mode = Node.PROCESS_MODE_PAUSABLE
 	_build_pause_menu()
 	_setup_engine_sound()
+	Sfx.play_music("race", -9.0)
 	_set_state(State.INTRO)
 
 
@@ -215,6 +218,10 @@ func _process(delta: float) -> void:
 			elif _results_shown:
 				_refresh_results()
 	_update_flames()
+	_skid_timer -= delta
+	if player.scraping and _skid_timer <= 0.0:
+		Sfx.play("skid", randf_range(0.9, 1.1), -6.0)
+		_skid_timer = 0.28
 	_update_camera(delta)
 
 
@@ -424,11 +431,23 @@ func _safe_look_at(target: Vector3, up: Vector3) -> void:
 # ---------------------------------------------------------------------------
 
 func _setup_engine_sound() -> void:
+	# A recorded engine loop if we have one (pitched up with speed)...
+	var loop := Sfx.loop_stream("engine")
+	if loop:
+		_engine_player = AudioStreamPlayer.new()
+		_engine_player.stream = loop
+		_engine_player.bus = "SFX"
+		_engine_player.volume_db = -40.0
+		add_child(_engine_player)
+		_engine_player.play()
+		return
+	# ...otherwise a synthesized buzzy toy motor.
 	var gen := AudioStreamGenerator.new()
 	gen.mix_rate = 22050.0
 	gen.buffer_length = 0.15
 	var p := AudioStreamPlayer.new()
 	p.stream = gen
+	p.bus = "SFX"
 	p.volume_db = -16.0
 	add_child(p)
 	p.play()
@@ -436,6 +455,14 @@ func _setup_engine_sound() -> void:
 
 
 func _update_engine_sound() -> void:
+	if _engine_player:
+		var quiet := state == State.INTRO or get_tree().paused
+		var rev := absf(player.speed) / 45.0 + player.throttle_input * 0.15
+		if player.turbo_on or player.boost_timer > 0.0:
+			rev += 0.25
+		_engine_player.pitch_scale = lerpf(_engine_player.pitch_scale, clampf(0.7 + rev * 0.9, 0.6, 2.4), 0.15)
+		_engine_player.volume_db = lerpf(_engine_player.volume_db, -40.0 if quiet else -12.0 + minf(rev, 1.0) * 4.0, 0.1)
+		return
 	if _engine_playback == null:
 		return
 	var target := 55.0 + absf(player.speed) * 3.2 + player.throttle_input * 15.0
@@ -521,6 +548,7 @@ func _add_button(box: Container, text: String, cb: Callable) -> Button:
 
 func _show_results() -> void:
 	_results_shown = true
+	Sfx.play_music("results", -8.0)
 	var layer := CanvasLayer.new()
 	layer.layer = 9
 	add_child(layer)

@@ -10,6 +10,8 @@ var selected_track: int = 0
 var laps: int = 3
 var difficulty: int = 0          # 0 easy, 1 normal, 2 hard
 var master_volume: float = 0.8
+var music_volume: float = 0.6
+var sfx_volume: float = 0.9
 var best_times: Dictionary = {}  # track id -> best race time (seconds)
 var best_laps: Dictionary = {}   # track id -> best single lap (seconds)
 
@@ -19,6 +21,7 @@ var ui_theme: Theme
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_setup_input()
+	_setup_buses()
 	load_settings()
 	ui_theme = _make_theme()
 	get_tree().root.theme = ui_theme
@@ -63,6 +66,8 @@ func load_settings() -> void:
 	laps = int(cfg.get_value("settings", "laps", 3))
 	difficulty = int(cfg.get_value("settings", "difficulty", 0))
 	master_volume = float(cfg.get_value("settings", "volume", 0.8))
+	music_volume = float(cfg.get_value("settings", "music_volume", 0.6))
+	sfx_volume = float(cfg.get_value("settings", "sfx_volume", 0.9))
 	best_times = cfg.get_value("records", "best_times", {})
 	best_laps = cfg.get_value("records", "best_laps", {})
 	selected_car = clampi(selected_car, 0, CarData.count() - 1)
@@ -78,6 +83,8 @@ func save_settings() -> void:
 	cfg.set_value("settings", "laps", laps)
 	cfg.set_value("settings", "difficulty", difficulty)
 	cfg.set_value("settings", "volume", master_volume)
+	cfg.set_value("settings", "music_volume", music_volume)
+	cfg.set_value("settings", "sfx_volume", sfx_volume)
 	cfg.set_value("records", "best_times", best_times)
 	cfg.set_value("records", "best_laps", best_laps)
 	cfg.save(SAVE_PATH)
@@ -88,10 +95,35 @@ func set_volume(v: float) -> void:
 	_apply_volume()
 
 
+func set_music_volume(v: float) -> void:
+	music_volume = clampf(v, 0.0, 1.0)
+	_apply_volume()
+
+
+func set_sfx_volume(v: float) -> void:
+	sfx_volume = clampf(v, 0.0, 1.0)
+	_apply_volume()
+
+
 func _apply_volume() -> void:
-	var bus := AudioServer.get_bus_index("Master")
-	AudioServer.set_bus_mute(bus, master_volume <= 0.001)
-	AudioServer.set_bus_volume_db(bus, linear_to_db(maxf(master_volume, 0.001)))
+	for pair in [["Master", master_volume], ["Music", music_volume], ["SFX", sfx_volume]]:
+		var bus := AudioServer.get_bus_index(pair[0])
+		if bus < 0:
+			continue
+		var v: float = pair[1]
+		AudioServer.set_bus_mute(bus, v <= 0.001)
+		AudioServer.set_bus_volume_db(bus, linear_to_db(maxf(v, 0.001)))
+
+
+## Separate Music and SFX volume channels, both feeding Master.
+func _setup_buses() -> void:
+	for bus_name in ["Music", "SFX"]:
+		if AudioServer.get_bus_index(bus_name) >= 0:
+			continue
+		AudioServer.add_bus()
+		var idx := AudioServer.bus_count - 1
+		AudioServer.set_bus_name(idx, bus_name)
+		AudioServer.set_bus_send(idx, "Master")
 
 
 ## Records a finished race. Returns true if it was a new best race time.

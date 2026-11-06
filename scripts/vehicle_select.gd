@@ -15,6 +15,7 @@ var _bounce := 0.0
 
 
 func _ready() -> void:
+	Sfx.play_music("menu")
 	_index = Game.selected_car
 	_build_scene()
 	_build_ui()
