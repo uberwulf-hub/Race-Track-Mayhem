@@ -54,6 +54,18 @@ const CARS: Array[Dictionary] = [
 		"number": 5,
 		"stats": {"speed": 2, "accel": 4, "handling": 5, "weight": 4},
 	},
+	{
+		"id": "rocket_rascal",
+		"name": "Rocket Rascal",
+		"blurb": "The SECRET car! A tiny rocket on wheels. Super fast AND easy to steer.",
+		"style": "rocket",
+		"body": Color(0.92, 0.92, 0.96),
+		"accent": Color(0.95, 0.2, 0.25),
+		"number": 0,
+		"stats": {"speed": 5, "accel": 5, "handling": 4, "weight": 2},
+		"secret": true,
+		"unlock": "car_rocket",
+	},
 ]
 
 const STAT_LABELS := {
@@ -66,6 +78,12 @@ const STAT_LABELS := {
 
 static func count() -> int:
 	return CARS.size()
+
+
+## Can the player drive this car yet? (The secret car has to be unlocked.)
+static func is_available(index: int) -> bool:
+	var c := get_car(index)
+	return not c.get("secret", false) or Game.is_unlocked(String(c.get("unlock", "")))
 
 
 static func get_car(index: int) -> Dictionary:

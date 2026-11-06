@@ -28,6 +28,15 @@ var _speed_lines: SpeedLines
 var _fade: ColorRect
 var _fade_tween: Tween
 var speed_effect := 0.0     # 0..1, set by the race camera
+var player_tag := "":        # "P1" / "P2" in split screen
+	set(v):
+		player_tag = v
+		if _tag_label:
+			_tag_label.text = v
+			_tag_label.visible = v != ""
+var _tag_label: Label
+var _wrong_way: Label
+var _behind: BehindArrows
 
 
 static func make_label(text: String, size: int, color: Color = Color.WHITE, outline: int = 10) -> Label:
@@ -158,6 +167,26 @@ func setup(p_track: Track, p_racers: Array[Racer], p_player: Racer) -> void:
 	pin(_hint_label, Vector2(0.5, 1), Vector2(-600, -40), Vector2(1200, 30))
 	_root.add_child(_hint_label)
 
+	# --- "cars right behind you" arrows ---
+	_behind = BehindArrows.new()
+	_behind.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	pin(_behind, Vector2(0.5, 1), Vector2(-260, -110), Vector2(520, 60))
+	_root.add_child(_behind)
+
+	# --- wrong way warning ---
+	_wrong_way = make_label("WRONG WAY!", 72, Color(1.0, 0.3, 0.25), 16)
+	_wrong_way.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	pin(_wrong_way, Vector2(0.5, 0.5), Vector2(-400, 40), Vector2(800, 100))
+	_wrong_way.visible = false
+	_root.add_child(_wrong_way)
+
+	# --- player tag (split screen) ---
+	_tag_label = make_label(player_tag, 40, Color(0.5, 0.9, 1.0), 12)
+	pin(_tag_label, Vector2(0.5, 0), Vector2(-60, 8), Vector2(120, 50))
+	_tag_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_tag_label.visible = player_tag != ""
+	_root.add_child(_tag_label)
+
 	_fade = ColorRect.new()
 	_fade.color = Color(0.05, 0.02, 0.12, 0.0)
 	_fade.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -188,9 +217,26 @@ func _make_bar(fill: Color) -> ProgressBar:
 
 func set_race_ui_visible(v: bool) -> void:
 	for c in _root.get_children():
-		if c == _center_label or c == _message_label or c == _title_box or c == _speed_lines or c == _fade:
+		if c == _center_label or c == _message_label or c == _title_box or c == _speed_lines or c == _fade or c == _wrong_way or c == _tag_label:
 			continue
 		c.visible = v
+
+
+func set_wrong_way(on: bool) -> void:
+	if _wrong_way == null or _wrong_way.visible == on:
+		return
+	_wrong_way.visible = on
+	if on:
+		_wrong_way.scale = Vector2(0.5, 0.5)
+		_wrong_way.pivot_offset = Vector2(400, 50)
+		create_tween().tween_property(_wrong_way, "scale", Vector2.ONE, 0.25).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+
+## [[side -1..1, closeness 0..1, colour], ...] for cars just behind.
+func set_nearby(cars: Array) -> void:
+	if _behind:
+		_behind.cars = cars
+		_behind.queue_redraw()
 
 
 ## Fades the screen to dark (used when a car falls off the track).
@@ -333,3 +379,23 @@ class SpeedLines extends Control:
 			var r1 := r0 + radius * 0.18 * sd.z
 			var a := amount * 0.45 * (1.0 - phase)
 			draw_line(c + dir * r0, c + dir * r1, Color(1, 1, 1, a), 3.0 * sd.z, true)
+
+
+## Little coloured arrows at the bottom of the screen when a car is right
+## behind you: left, middle or right depending on where it is.
+class BehindArrows extends Control:
+	var cars: Array = []
+
+	func _draw() -> void:
+		for c in cars:
+			var side: float = c[0]
+			var close: float = c[1]
+			var col: Color = c[2]
+			var x := size.x * 0.5 + side * size.x * 0.42
+			var h := 18.0 + close * 22.0
+			var y := size.y - 6.0
+			var pts := PackedVector2Array([Vector2(x, y - h), Vector2(x - h * 0.8, y), Vector2(x + h * 0.8, y)])
+			var a := 0.45 + close * 0.55
+			draw_colored_polygon(pts, Color(0, 0, 0, a))
+			var inner := PackedVector2Array([Vector2(x, y - h + 6), Vector2(x - h * 0.8 + 7, y - 3), Vector2(x + h * 0.8 - 7, y - 3)])
+			draw_colored_polygon(inner, Color(col.r, col.g, col.b, a))

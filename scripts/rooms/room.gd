@@ -11,6 +11,10 @@ extends Node3D
 const WALL_HEIGHT := 70.0
 
 var room_rect: Rect2          # floor area (x, z)
+var environment: Environment
+var sun_light: DirectionalLight3D
+var _animators: Array[Callable] = []   # little things that move (cat tails, bubbles...)
+var _anim_time := 0.0
 var track: Track
 var _rng := RandomNumberGenerator.new()
 
@@ -32,6 +36,7 @@ var ceiling_color := Color(0.97, 0.97, 0.95)
 var curtain_color := Color(0.95, 0.45, 0.55)
 var door_color := Color(0.98, 0.95, 0.9)
 var has_window := true
+var evening := false               # cars switch their headlights on
 var window_sky := Color(0.6, 0.85, 1.0)
 var saturation := 1.15
 
@@ -63,6 +68,17 @@ func build(p_track: Track) -> Room:
 		_build_window()
 	_build_props()
 	return self
+
+
+## Registers something that moves every frame: f(time: float, delta: float).
+func animate(f: Callable) -> void:
+	_animators.append(f)
+
+
+func _process(delta: float) -> void:
+	_anim_time += delta
+	for f in _animators:
+		f.call(_anim_time, delta)
 
 
 func center() -> Vector3:
@@ -130,6 +146,9 @@ func _build_environment() -> void:
 	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
 	sun.rotation_degrees = sun_rotation
 	add_child(sun)
+	Game.apply_quality(env, sun)
+	environment = env
+	sun_light = sun
 
 	var lamp := OmniLight3D.new()
 	lamp.position = center() + Vector3(0.0, WALL_HEIGHT - 8.0, 0.0)

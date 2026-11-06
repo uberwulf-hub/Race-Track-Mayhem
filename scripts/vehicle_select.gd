@@ -109,6 +109,9 @@ func _build_scene() -> void:
 	key.light_energy = 1.2
 	key.shadow_enabled = true
 	add_child(key)
+	Game.apply_quality(env, key)
+	env.sdfgi_enabled = false
+	env.volumetric_fog_enabled = false
 	var spot := SpotLight3D.new()
 	spot.position = Vector3(0, 30, 6)
 	spot.rotation_degrees = Vector3(-80, 0, 0)

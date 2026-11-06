@@ -96,16 +96,22 @@ var model: ToyCarModel
 var _sparks: CPUParticles3D
 var scraping := false
 var _visual_basis := Basis.IDENTITY
+var player_index := 0           # 0 = computer, 1 = player 1, 2 = player 2
+var input_prefix := ""          # "p1_" / "p2_" in split screen
+var skid_marks: SkidMarks
+var _mark_dist := 0.0
+var _last_speed := 0.0
+var _dust: CPUParticles3D
 
 
-func setup(p_track: Track, car_def: Dictionary, p_is_player: bool, p_name: String) -> Racer:
+func setup(p_track: Track, car_def: Dictionary, p_is_player: bool, p_name: String, look: Dictionary = {}) -> Racer:
 	track = p_track
 	car = car_def
 	stats = CarData.physics_for(car_def)
 	is_player = p_is_player
 	racer_name = p_name
 	name = p_name.replace(" ", "")
-	model = ToyCarModel.new().setup(car_def)
+	model = ToyCarModel.new().setup(car_def, true, look)
 	add_child(model)
 	_sparks = _make_sparks()
 	add_child(_sparks)
@@ -148,10 +154,12 @@ func _physics_process(delta: float) -> void:
 	var want_turbo := false
 	if controls_enabled and not has_finished:
 		if is_player:
-			throttle = Input.get_action_strength("accelerate")
-			brake = Input.get_action_strength("brake")
-			steer = Input.get_action_strength("steer_right") - Input.get_action_strength("steer_left")
-			want_turbo = Input.is_action_pressed("turbo")
+			throttle = Input.get_action_strength(action("accelerate"))
+			brake = Input.get_action_strength(action("brake"))
+			steer = Input.get_action_strength(action("steer_right")) - Input.get_action_strength(action("steer_left"))
+			want_turbo = Input.is_action_pressed(action("turbo"))
+			if Game.steer_assist:
+				steer = clampf(steer + _steer_help(steer), -1.0, 1.0)
 		else:
 			var ai := _ai_inputs()
 			throttle = ai.x
@@ -273,6 +281,55 @@ func _physics_process(delta: float) -> void:
 	_update_transform(delta, false)
 	if model:
 		model.animate(speed, steer, delta)
+		# Lean into turns and nod when speeding up or braking.
+		var accel_now := (speed - _last_speed) / maxf(delta, 0.001)
+		model.set_motion(accel_now, slide + lateral_vel * 0.3, delta)
+	_last_speed = speed
+	_leave_skid_marks(ds, slide, frame)
+
+
+## Name of an input action for this player ("accelerate" or "p2_accelerate").
+func action(action_name: String) -> String:
+	return input_prefix + action_name
+
+
+## Steering help for little drivers: leans against the turn's push and keeps
+## the car away from the rails. The player's own steering always wins.
+func _steer_help(player_steer: float) -> float:
+	var frame := track.sample(s + 3.0)
+	var slide := slide_for(track.curvature_at(s + 3.0), speed, frame.basis.y)
+	var help := -slide / maxf(1.0, float(stats["steer"])) * 0.85
+	if absf(player_steer) < 0.15:
+		var edge := Track.HALF_WIDTH - CAR_HALF_WIDTH - 0.6
+		if absf(lateral) > edge * 0.6:
+			help += -signf(lateral) * 0.35
+	return help
+
+
+## Dark rubber streaks when skidding through turns, braking hard or scraping.
+func _leave_skid_marks(ds: float, slide: float, frame: Transform3D) -> void:
+	if skid_marks == null or in_air or mode != Mode.DRIVING:
+		return
+	var strength := 0.0
+	if scraping:
+		strength = 0.8
+	elif braking and speed > 15.0:
+		strength = 0.7
+	elif absf(slide) > 3.0 and speed > 25.0:
+		strength = clampf((absf(slide) - 3.0) / 4.0, 0.3, 0.9)
+	elif absf(spin) > 0.25:
+		strength = 0.6
+	if strength <= 0.0:
+		_mark_dist = 0.0
+		return
+	_mark_dist += absf(ds)
+	if _mark_dist < 0.45:
+		return
+	_mark_dist = 0.0
+	var b := global_transform.basis
+	for side: float in [-0.55, 0.55]:
+		var p := global_position + b.x * side + b.z * 0.65
+		skid_marks.add_mark(p, Basis(b.x, frame.basis.y, b.z), strength)
 
 
 func _check_laps() -> void:
@@ -394,6 +451,9 @@ func _process_air(delta: float, steer: float) -> void:
 			var impact := absf(_air_vel.dot(surf.basis.y))
 			Sfx.play("land", 1.0, -6.0 if not is_player else 0.0)
 			landed.emit(self, impact * 0.15)
+			if model:
+				model.squash(clampf(impact * 0.04, 0.15, 0.6))
+			_puff_dust()
 			_update_transform(delta, false)
 			return
 		# Landed beside the track - over the edge you go!
@@ -479,6 +539,7 @@ func respawn_at(at: float, start_speed: float = 0.0) -> void:
 		model.shadow.visible = true
 		model.shadow.transform = Transform3D(Basis(), Vector3(0, 0.03, 0))
 	_update_transform(1.0, true)
+	_puff_dust()
 	respawned.emit(self)
 
 
@@ -640,3 +701,38 @@ func _make_sparks() -> CPUParticles3D:
 	mesh.material = mat
 	p.mesh = mesh
 	return p
+
+
+## A little puff of dust (used on landings and respawns).
+func _puff_dust() -> void:
+	if _dust == null:
+		_dust = CPUParticles3D.new()
+		_dust.amount = 16
+		_dust.one_shot = true
+		_dust.explosiveness = 1.0
+		_dust.lifetime = 0.6
+		_dust.local_coords = false
+		_dust.direction = Vector3.UP
+		_dust.spread = 80.0
+		_dust.initial_velocity_min = 2.0
+		_dust.initial_velocity_max = 5.0
+		_dust.gravity = Vector3(0, -3, 0)
+		_dust.scale_amount_min = 0.3
+		_dust.scale_amount_max = 0.6
+		var mesh := SphereMesh.new()
+		mesh.radius = 0.5
+		mesh.height = 1.0
+		mesh.radial_segments = 8
+		mesh.rings = 4
+		var mat := StandardMaterial3D.new()
+		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		mat.vertex_color_use_as_albedo = true
+		mesh.material = mat
+		_dust.mesh = mesh
+		var grad := Gradient.new()
+		grad.set_color(0, Color(1.0, 0.95, 0.85, 0.7))
+		grad.set_color(1, Color(1.0, 0.95, 0.85, 0.0))
+		_dust.color_ramp = grad
+		add_child(_dust)
+	_dust.restart()

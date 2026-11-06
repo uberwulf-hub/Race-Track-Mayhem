@@ -6,6 +6,7 @@ extends Room
 
 
 func _configure() -> void:
+	evening = true
 	background_color = Color(0.95, 0.7, 0.55)
 	ambient_color = Color(1.0, 0.85, 0.7)
 	ambient_energy = 0.38

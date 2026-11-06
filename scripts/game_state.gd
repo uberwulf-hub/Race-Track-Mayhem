@@ -1,9 +1,12 @@
 extends Node
 ## Global game state (autoloaded as `Game`): chosen car, settings, best times,
+## progress (stars, unlocks, trophies), Grand Prix and 2-player state,
 ## controls and the shared UI theme.
 
 const SAVE_PATH := "user://race_track_mayhem.cfg"
 const DIFFICULTY_NAMES := ["Easy", "Normal", "Hard"]
+const QUALITY_NAMES := ["Low", "Medium", "High"]
+const GP_POINTS := [10, 8, 6, 5, 4]
 
 var selected_car: int = 0
 var selected_track: int = 0
@@ -15,6 +18,26 @@ var sfx_volume: float = 0.9
 var best_times: Dictionary = {}  # track id -> best race time (seconds)
 var best_laps: Dictionary = {}   # track id -> best single lap (seconds)
 
+# Settings
+var quality: int = 1             # 0 low, 1 medium, 2 high
+var fullscreen := false
+var steer_assist := true         # gentle steering help for little drivers
+var ghost_enabled := true        # race against your best lap
+
+# Progress
+var stars: int = 0               # earned by finishing races
+var trophies: Dictionary = {}    # difficulty (int) -> best Grand Prix place (1..3)
+var custom: Dictionary = {}      # car id -> {"paint": id, "sticker": id, "wheels": id}
+
+# Game modes
+var two_player := false
+var p2_car: int = 1
+var gp_active := false
+var gp_race := 0                 # which race of the cup (0..4)
+var gp_points: Dictionary = {}   # racer name -> points
+var gp_roster: Array = []        # [{name, car, player (0 = computer, 1 or 2)}], same for the whole cup
+var last_unlocks: Array = []     # unlocks earned by the last race, shown on the results screen
+
 var ui_theme: Theme
 
 
@@ -25,6 +48,7 @@ func _ready() -> void:
 	load_settings()
 	ui_theme = _make_theme()
 	get_tree().root.theme = ui_theme
+	apply_display()
 
 
 # --------------------------------------------------------------------------
@@ -70,7 +94,16 @@ func load_settings() -> void:
 	sfx_volume = float(cfg.get_value("settings", "sfx_volume", 0.9))
 	best_times = cfg.get_value("records", "best_times", {})
 	best_laps = cfg.get_value("records", "best_laps", {})
+	quality = clampi(int(cfg.get_value("settings", "quality", 1)), 0, 2)
+	fullscreen = bool(cfg.get_value("settings", "fullscreen", false))
+	steer_assist = bool(cfg.get_value("settings", "steer_assist", true))
+	ghost_enabled = bool(cfg.get_value("settings", "ghost", true))
+	stars = int(cfg.get_value("progress", "stars", 0))
+	trophies = cfg.get_value("progress", "trophies", {})
+	custom = cfg.get_value("progress", "custom", {})
+	p2_car = int(cfg.get_value("player", "p2_car", 1))
 	selected_car = clampi(selected_car, 0, CarData.count() - 1)
+	p2_car = clampi(p2_car, 0, CarData.count() - 1)
 	laps = clampi(laps, 1, 9)
 	difficulty = clampi(difficulty, 0, 2)
 	_apply_volume()
@@ -87,6 +120,14 @@ func save_settings() -> void:
 	cfg.set_value("settings", "sfx_volume", sfx_volume)
 	cfg.set_value("records", "best_times", best_times)
 	cfg.set_value("records", "best_laps", best_laps)
+	cfg.set_value("settings", "quality", quality)
+	cfg.set_value("settings", "fullscreen", fullscreen)
+	cfg.set_value("settings", "steer_assist", steer_assist)
+	cfg.set_value("settings", "ghost", ghost_enabled)
+	cfg.set_value("progress", "stars", stars)
+	cfg.set_value("progress", "trophies", trophies)
+	cfg.set_value("progress", "custom", custom)
+	cfg.set_value("player", "p2_car", p2_car)
 	cfg.save(SAVE_PATH)
 
 
@@ -124,6 +165,56 @@ func _setup_buses() -> void:
 		var idx := AudioServer.bus_count - 1
 		AudioServer.set_bus_name(idx, bus_name)
 		AudioServer.set_bus_send(idx, "Master")
+
+
+# --------------------------------------------------------------------------
+# Graphics
+# --------------------------------------------------------------------------
+
+## True when running on the full (Forward+) renderer. Old PCs fall back to
+## the simpler OpenGL renderer automatically, and the fancy effects switch off.
+func fancy_renderer() -> bool:
+	return RenderingServer.get_rendering_device() != null
+
+
+func apply_display() -> void:
+	if OS.has_feature("editor") and DisplayServer.get_name() == "headless":
+		return
+	var mode := DisplayServer.WINDOW_MODE_FULLSCREEN if fullscreen else DisplayServer.WINDOW_MODE_WINDOWED
+	if DisplayServer.window_get_mode() != mode:
+		DisplayServer.window_set_mode(mode)
+	var vp := get_tree().root
+	vp.msaa_3d = [Viewport.MSAA_DISABLED, Viewport.MSAA_2X, Viewport.MSAA_4X][quality]
+	vp.screen_space_aa = Viewport.SCREEN_SPACE_AA_FXAA if quality == 0 else Viewport.SCREEN_SPACE_AA_DISABLED
+
+
+## Turns the environment's effects up or down for the chosen quality.
+func apply_quality(env: Environment, sun: DirectionalLight3D = null) -> void:
+	var fancy := fancy_renderer()
+	env.glow_enabled = true
+	env.ssao_enabled = fancy and quality >= 1
+	env.ssao_radius = 2.5
+	env.ssao_intensity = 1.6
+	env.ssao_light_affect = 0.15
+	env.ssil_enabled = fancy and quality >= 2
+	env.ssil_radius = 6.0
+	env.ssr_enabled = fancy and quality >= 2
+	env.ssr_max_steps = 48
+	env.sdfgi_enabled = fancy and quality >= 2
+	env.sdfgi_use_occlusion = true
+	env.sdfgi_cascades = 4
+	env.sdfgi_min_cell_size = 0.6
+	env.sdfgi_energy = 0.6
+	env.volumetric_fog_enabled = fancy and quality >= 2
+	env.volumetric_fog_density = 0.0012
+	env.volumetric_fog_albedo = Color(1.0, 0.97, 0.9)
+	env.volumetric_fog_length = 260.0
+	env.volumetric_fog_ambient_inject = 0.0
+	if sun:
+		sun.shadow_enabled = true
+		sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS if quality >= 1 else DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
+		sun.light_volumetric_fog_energy = 2.5
+	RenderingServer.directional_shadow_atlas_set_size([2048, 4096, 4096][quality], true)
 
 
 ## Records a finished race. Returns true if it was a new best race time.
@@ -185,9 +276,21 @@ func _setup_input() -> void:
 	_add_action("respawn", [KEY_R], [JOY_BUTTON_Y], [])
 	_add_action("camera", [KEY_C], [JOY_BUTTON_LEFT_SHOULDER], [])
 	_add_action("pause", [KEY_ESCAPE, KEY_P], [JOY_BUTTON_START], [])
+	# Two-player split screen: each player gets their own keys and controller.
+	_add_player_actions("p1_", KEY_W, KEY_S, KEY_A, KEY_D, [KEY_SPACE, KEY_SHIFT], KEY_R, 0)
+	_add_player_actions("p2_", KEY_UP, KEY_DOWN, KEY_LEFT, KEY_RIGHT, [KEY_ENTER, KEY_KP_0, KEY_CTRL], KEY_BACKSPACE, 1)
 
 
-func _add_action(action: String, keys: Array, buttons: Array, axes: Array) -> void:
+func _add_player_actions(prefix: String, up: Key, down: Key, left: Key, right: Key, turbo: Array, reset: Key, device: int) -> void:
+	_add_action(prefix + "accelerate", [up], [JOY_BUTTON_A], [[JOY_AXIS_TRIGGER_RIGHT, 1.0]], device)
+	_add_action(prefix + "brake", [down], [JOY_BUTTON_X], [[JOY_AXIS_TRIGGER_LEFT, 1.0]], device)
+	_add_action(prefix + "steer_left", [left], [JOY_BUTTON_DPAD_LEFT], [[JOY_AXIS_LEFT_X, -1.0]], device)
+	_add_action(prefix + "steer_right", [right], [JOY_BUTTON_DPAD_RIGHT], [[JOY_AXIS_LEFT_X, 1.0]], device)
+	_add_action(prefix + "turbo", turbo, [JOY_BUTTON_B, JOY_BUTTON_RIGHT_SHOULDER], [], device)
+	_add_action(prefix + "respawn", [reset], [JOY_BUTTON_Y], [], device)
+
+
+func _add_action(action: String, keys: Array, buttons: Array, axes: Array, device: int = -1) -> void:
 	if InputMap.has_action(action):
 		return
 	InputMap.add_action(action, 0.25)
@@ -197,10 +300,12 @@ func _add_action(action: String, keys: Array, buttons: Array, axes: Array) -> vo
 		InputMap.action_add_event(action, ev)
 	for b in buttons:
 		var jb := InputEventJoypadButton.new()
+		jb.device = device
 		jb.button_index = b
 		InputMap.action_add_event(action, jb)
 	for a in axes:
 		var jm := InputEventJoypadMotion.new()
+		jm.device = device
 		jm.axis = a[0]
 		jm.axis_value = a[1]
 		InputMap.action_add_event(action, jm)
@@ -279,3 +384,83 @@ func _box(bg: Color, border: Color) -> StyleBoxFlat:
 	sb.content_margin_top = 12
 	sb.content_margin_bottom = 14
 	return sb
+
+
+# --------------------------------------------------------------------------
+# Progress: stars, unlocks, trophies, car paint jobs
+# --------------------------------------------------------------------------
+
+## Stars for finishing a race in `place` (everyone who finishes gets one).
+static func stars_for_place(place: int) -> int:
+	return [3, 2, 1, 1, 1, 1][clampi(place - 1, 0, 5)]
+
+
+## Adds stars and returns the unlocks that just became available.
+func award_stars(amount: int) -> Array:
+	var before := Unlocks.available(stars, trophies)
+	stars += amount
+	var after := Unlocks.available(stars, trophies)
+	var fresh: Array = []
+	for u in after:
+		if not before.has(u):
+			fresh.append(u)
+	save_settings()
+	return fresh
+
+
+## Saves a Grand Prix trophy (keeps the best place per difficulty). Returns new unlocks.
+func award_trophy(place: int) -> Array:
+	var before := Unlocks.available(stars, trophies)
+	var key := difficulty
+	if place <= 3 and (not trophies.has(key) or place < int(trophies[key])):
+		trophies[key] = place
+	var after := Unlocks.available(stars, trophies)
+	var fresh: Array = []
+	for u in after:
+		if not before.has(u):
+			fresh.append(u)
+	save_settings()
+	return fresh
+
+
+func is_unlocked(item_id: String) -> bool:
+	return Unlocks.available(stars, trophies).has(item_id)
+
+
+## The paint/sticker/wheels picked for a car (ids), with defaults.
+func custom_for(car_id: String) -> Dictionary:
+	var c: Dictionary = custom.get(car_id, {})
+	return {"paint": c.get("paint", "paint_original"), "sticker": c.get("sticker", "sticker_none"), "wheels": c.get("wheels", "wheels_classic")}
+
+
+func set_custom(car_id: String, slot: String, item_id: String) -> void:
+	var c := custom_for(car_id)
+	c[slot] = item_id
+	custom[car_id] = c
+	save_settings()
+
+
+# --------------------------------------------------------------------------
+# Grand Prix
+# --------------------------------------------------------------------------
+
+func start_grand_prix() -> void:
+	gp_active = true
+	gp_race = 0
+	gp_points.clear()
+	gp_roster.clear()
+	selected_track = 0
+
+
+func end_grand_prix() -> void:
+	gp_active = false
+	gp_roster.clear()
+
+
+## Racers sorted by Grand Prix points (most first).
+func gp_standings() -> Array:
+	var rows: Array = []
+	for r in gp_roster:
+		rows.append({"name": r["name"], "car": r["car"], "player": r["player"], "points": int(gp_points.get(r["name"], 0))})
+	rows.sort_custom(func(a, b): return a["points"] > b["points"])
+	return rows

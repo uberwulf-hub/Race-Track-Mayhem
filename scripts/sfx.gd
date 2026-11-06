@@ -20,6 +20,7 @@ const LEVELS := {
 	"click": -16.0, "select": -11.0, "back": -12.0,
 	"beep": -6.0, "go": -4.0,
 	"voice_ready": -2.0, "voice_set": -2.0, "voice_go": 0.0, "voice_win": 0.0,
+	"voice_final": -2.0, "voice_record": 0.0, "voice_unlock": -2.0, "voice_congrats": 0.0,
 	"bump": -4.0, "crash": -3.0, "boost": -6.0, "jump": -6.0, "land": -6.0,
 	"skid": -8.0, "whoosh": -6.0, "rev": -4.0,
 	"lap": -4.0, "final_lap": -4.0, "win": -3.0, "finish": -3.0,

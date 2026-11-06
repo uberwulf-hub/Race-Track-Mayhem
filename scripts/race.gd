@@ -1,49 +1,62 @@
 extends Node3D
 ## Runs a race: builds the themed room and the track, puts cars on the grid,
-## does the big zoom-in intro and the 3-2-1-GO countdown, then keeps score
+## does the big zoom-in intro and the Ready-Set-GO countdown, then keeps score
 ## until everyone crosses the finish line.
+##
+## Works for one player (full screen) or two players (split screen). Each
+## human player gets a "View": their own camera, HUD, engine sounds and rumble.
+## In a Grand Prix it also hands out points and moves on to the next track.
 
 enum State { INTRO, COUNTDOWN, RACING, FINISHED }
 enum CamMode { CHASE, HIGH, INTRO, ORBIT }
 
 const INTRO_HOLD := 1.6        # seconds looking at the whole room
 const INTRO_ZOOM := 3.6        # seconds zooming down to the car
-const RACER_NAMES := ["You", "Zoomy", "Vroomer", "Speedy", "Turbo Tom"]
+const AI_NAMES := ["Zoomy", "Vroomer", "Speedy", "Turbo Tom", "Rally Rae"]
+const RESULTS_WAIT := 25.0     # 2 players: show results this long after the first finishes
 
 var track: Track
 var room: Room
 var racers: Array[Racer] = []
-var player: Racer
-var hud: RaceHud
-var camera: Camera3D
+var humans: Array[Racer] = []
+var player: Racer               # player 1 (kept for older code and tests)
+var views: Array[View] = []
+var hud: RaceHud                # player 1's HUD
+var camera: Camera3D            # player 1's camera
+var skid_marks: SkidMarks
+var ghost: GhostCar
 
 var state := State.INTRO
-var cam_mode := CamMode.INTRO
 var _state_time := 0.0
 var _race_clock := 0.0
 var _countdown_step := -1
-var _cam_up := Vector3.UP
 var _intro_from := Vector3.ZERO
 var _intro_look := Vector3.ZERO
-var _orbit_angle := 0.0
 var _results_shown := false
+var _first_human_done := -1.0
 var _finish_order: Array[Racer] = []
 
 var _pause_menu: Control
 var _results_panel: Control
-var _flames: Dictionary = {}   # racer -> CPUParticles3D
-var _engine_playback: AudioStreamGeneratorPlayback
-var _engine_phase := 0.0
-var _engine_phase2 := 0.0
-var _engine_freq := 60.0
-var _shake := 0.0
-var _engine_player: AudioStreamPlayer
-var _engine_high: AudioStreamPlayer
-var _brake_player: AudioStreamPlayer
-var _was_pressing := false
+var _flames: Dictionary = {}         # racer -> CPUParticles3D
 var _ai_engines: Dictionary = {}     # racer -> AudioStreamPlayer3D
-var _pass_side: Dictionary = {}      # racer -> was it ahead of the player?
-var _skid_timer := 0.0
+var _pass_side: Dictionary = {}      # racer -> was it ahead of player 1?
+
+
+## Everything that belongs to one human player's half of the screen.
+class View:
+	var racer: Racer
+	var index := 0                    # 0 = player 1, 1 = player 2
+	var camera: Camera3D
+	var hud: RaceHud
+	var viewport: SubViewport         # null when there's only one player
+	var cam_mode := 2                 # CamMode.INTRO
+	var cam_up := Vector3.UP
+	var shake := 0.0
+	var orbit_angle := 0.0
+	var audio: CarAudio
+	var reverse_time := 0.0
+	var dof: CameraAttributesPractical
 
 
 func _ready() -> void:
@@ -55,63 +68,94 @@ func _ready() -> void:
 	track.layout_id = Game.selected_track
 	add_child(track)
 	track.build()
+	skid_marks = SkidMarks.new()
+	track.add_child(skid_marks)
 
 	room = Room.create(Track.TRACKS[Game.selected_track]["room"])
 	room.name = "Room"
 	add_child(room)
 	room.build(track)
+	Spectators.build(room, track)
 
 	_spawn_racers()
-
-	camera = Camera3D.new()
-	camera.fov = 70.0
-	camera.near = 0.1
-	camera.far = 600.0
-	add_child(camera)
-	camera.current = true
 	_intro_from = room.overview_position()
 	var tr := track.get_aabb_xz()
 	_intro_look = Vector3(tr.get_center().x, 0.0, tr.get_center().y)
-	camera.global_position = _intro_from
-	camera.look_at(_intro_look, Vector3.UP)
+	_build_views()
+	player = humans[0]
+	hud = views[0].hud
+	camera = views[0].camera
 
-	hud = RaceHud.new()
-	add_child(hud)
-	hud.setup(track, racers, player)
-	hud.show_title(true)
+	if humans.size() == 1 and Game.ghost_enabled:
+		ghost = GhostCar.new()
+		add_child(ghost)
+		ghost.setup(track, Game.track_id(), player)
 
-	for n: Node in [track, room, camera, hud]:
+	for n: Node in [track, room]:
 		n.process_mode = Node.PROCESS_MODE_PAUSABLE
 	for r in racers:
 		r.process_mode = Node.PROCESS_MODE_PAUSABLE
+		if room.evening:
+			r.model.set_headlights(true)
 	_build_pause_menu()
-	_setup_engine_sound()
 	_setup_ai_engines()
 	Sfx.play_music("race", -9.0)
 	_set_state(State.INTRO)
 
 
-func _spawn_racers() -> void:
-	var player_idx := Game.selected_car
-	var order: Array[int] = []
+# ---------------------------------------------------------------------------
+# Setting up
+# ---------------------------------------------------------------------------
+
+## Who's racing: the humans plus computer cars. In a Grand Prix the same
+## line-up is kept for all five races.
+func _make_roster() -> Array:
+	if Game.gp_active and not Game.gp_roster.is_empty():
+		return Game.gp_roster
+	var roster: Array = []
+	var two := Game.two_player
+	roster.append({"name": "Player 1" if two else "You", "car": Game.selected_car, "player": 1})
+	if two:
+		roster.append({"name": "Player 2", "car": Game.p2_car, "player": 2})
+	var pool: Array[int] = []
 	for i in CarData.count():
-		if i != player_idx:
-			order.append(i)
-	order.shuffle()
-	# The player starts in the middle of the grid.
-	order.insert(mini(2, order.size()), player_idx)
+		if not CarData.get_car(i).get("secret", false) and i != Game.selected_car and not (two and i == Game.p2_car):
+			pool.append(i)
+	pool.shuffle()
+	var names := AI_NAMES.duplicate()
+	names.shuffle()
+	var k := 0
+	while roster.size() < 5:
+		roster.append({"name": names[k % names.size()], "car": pool[k % pool.size()], "player": 0})
+		k += 1
+	if Game.gp_active:
+		Game.gp_roster = roster
+	return roster
+
+
+func _spawn_racers() -> void:
+	var roster := _make_roster()
+	# Shuffle the grid, but keep the humans in the middle so it's fair.
+	var ai: Array = roster.filter(func(e): return int(e["player"]) == 0)
+	var people: Array = roster.filter(func(e): return int(e["player"]) > 0)
+	ai.shuffle()
+	var order: Array = ai.duplicate()
+	for i in people.size():
+		order.insert(mini(1 + i * 2, order.size()), people[i])
 
 	var base_skill: float = [0.85, 0.93, 1.0][Game.difficulty]
-	var ai_count := 0
 	for slot in order.size():
-		var car_idx := order[slot]
-		var is_player := car_idx == player_idx
-		var nm: String = RACER_NAMES[0] if is_player else RACER_NAMES[1 + ai_count]
-		if not is_player:
-			ai_count += 1
+		var entry: Dictionary = order[slot]
+		var pnum := int(entry["player"])
+		var car_def := CarData.get_car(int(entry["car"]))
 		var r := Racer.new()
 		add_child(r)
-		r.setup(track, CarData.get_car(car_idx), is_player, nm)
+		var look := Game.custom_for(car_def["id"]) if pnum > 0 else {}
+		r.setup(track, car_def, pnum > 0, entry["name"], look)
+		r.player_index = pnum
+		if Game.two_player and pnum > 0:
+			r.input_prefix = "p%d_" % pnum
+		r.skid_marks = skid_marks
 		r.laps_to_win = Game.laps
 		r.ai_skill = clampf(base_skill + randf_range(-0.04, 0.04), 0.7, 1.0)
 		r.rubber_band = base_skill
@@ -123,12 +167,70 @@ func _spawn_racers() -> void:
 		r.crashed.connect(_on_crash)
 		r.respawned.connect(_on_respawned)
 		r.boosted.connect(_on_boost)
+		r.landed.connect(_on_landed)
+		r.bumped.connect(_on_bumped)
 		racers.append(r)
 		_add_flame(r)
-		if is_player:
-			player = r
-			r.landed.connect(func(_r: Racer, h: float): _shake = maxf(_shake, clampf(h * 0.12, 0.1, 0.45)))
-			r.bumped.connect(func(_r: Racer, h: float): _shake = maxf(_shake, clampf(h * 0.15, 0.08, 0.3)))
+		if pnum > 0:
+			humans.append(r)
+	humans.sort_custom(func(a: Racer, b: Racer) -> bool: return a.player_index < b.player_index)
+
+
+func _build_views() -> void:
+	var split := humans.size() > 1
+	var container: HBoxContainer
+	if split:
+		var layer := CanvasLayer.new()
+		layer.layer = 0
+		add_child(layer)
+		container = HBoxContainer.new()
+		container.set_anchors_preset(Control.PRESET_FULL_RECT)
+		container.add_theme_constant_override("separation", 4)
+		container.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		layer.add_child(container)
+	for i in humans.size():
+		var v := View.new()
+		v.racer = humans[i]
+		v.index = i
+		var parent: Node = self
+		if split:
+			var svc := SubViewportContainer.new()
+			svc.stretch = true
+			svc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			svc.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			container.add_child(svc)
+			var sv := SubViewport.new()
+			sv.audio_listener_enable_3d = i == 0
+			sv.msaa_3d = get_viewport().msaa_3d
+			sv.size_2d_override_stretch = true
+			svc.add_child(sv)
+			v.viewport = sv
+			parent = sv
+		var cam := Camera3D.new()
+		cam.fov = 64.0
+		cam.near = 0.1
+		cam.far = 700.0
+		cam.doppler_tracking = Camera3D.DOPPLER_TRACKING_PHYSICS_STEP
+		v.dof = CameraAttributesPractical.new()
+		cam.attributes = v.dof
+		parent.add_child(cam)
+		cam.current = true
+		cam.global_position = _intro_from
+		cam.look_at(_intro_look, Vector3.UP)
+		v.camera = cam
+		var h := RaceHud.new()
+		parent.add_child(h)
+		h.setup(track, racers, humans[i])
+		if split:
+			h.player_tag = "P%d" % (i + 1)
+		h.show_title(true)
+		v.hud = h
+		v.audio = CarAudio.new()
+		add_child(v.audio)
+		v.audio.setup(humans[i], -3.0 if split else 0.0)
+		for n: Node in [cam, h]:
+			n.process_mode = Node.PROCESS_MODE_PAUSABLE
+		views.append(v)
 
 
 func _add_flame(r: Racer) -> void:
@@ -165,6 +267,13 @@ func _add_flame(r: Racer) -> void:
 	_flames[r] = p
 
 
+func _view_for(r: Racer) -> View:
+	for v in views:
+		if v.racer == r:
+			return v
+	return null
+
+
 # ---------------------------------------------------------------------------
 # State machine
 # ---------------------------------------------------------------------------
@@ -174,22 +283,32 @@ func _set_state(s: State) -> void:
 	_state_time = 0.0
 	match s:
 		State.INTRO:
-			cam_mode = CamMode.INTRO
+			for v in views:
+				v.cam_mode = CamMode.INTRO
 		State.COUNTDOWN:
-			cam_mode = CamMode.CHASE
 			_countdown_step = -1
-			hud.hide_title()
-			hud.set_race_ui_visible(true)
+			for v in views:
+				v.cam_mode = CamMode.CHASE
+				v.hud.hide_title()
+				v.hud.set_race_ui_visible(true)
 		State.RACING:
 			for r in racers:
 				r.controls_enabled = true
-			hud.fade_hint()
+			for v in views:
+				v.hud.fade_hint()
 		State.FINISHED:
 			pass
 
 
+func _all_huds(f: Callable) -> void:
+	for v in views:
+		f.call(v.hud)
+
+
 func _process(delta: float) -> void:
-	_update_engine_sound()
+	var quiet := state == State.INTRO or get_tree().paused
+	for v in views:
+		v.audio.update(quiet, state == State.RACING)
 	_update_ai_sounds()
 	if get_tree().paused:
 		return
@@ -204,34 +323,37 @@ func _process(delta: float) -> void:
 				_countdown_step = step
 				match step:
 					0:
-						hud.show_countdown("READY", Color(1.0, 0.35, 0.3))
+						_all_huds(func(h: RaceHud): h.show_countdown("READY", Color(1.0, 0.35, 0.3)))
 						track.set_start_lights(2)
 						Sfx.play("beep")
 						Sfx.play("voice_ready")
 					1:
-						hud.show_countdown("SET", Color(1.0, 0.8, 0.25))
+						_all_huds(func(h: RaceHud): h.show_countdown("SET", Color(1.0, 0.8, 0.25)))
 						track.set_start_lights(3)
 						Sfx.play("beep")
 						Sfx.play("voice_set")
 					2:
-						hud.show_countdown("GO!", Color(0.35, 1.0, 0.4))
+						_all_huds(func(h: RaceHud): h.show_countdown("GO!", Color(0.35, 1.0, 0.4)))
 						track.set_start_lights(4)
 						Sfx.play("voice_go")
 						Sfx.play("go")
-						if player.throttle_input > 0.0 or Input.is_action_pressed("accelerate"):
-							Sfx.play("rev")
+						for h in humans:
+							if Input.is_action_pressed(h.action("accelerate")):
+								Sfx.play("rev")
+								break
 						_set_state(State.RACING)
+		State.RACING:
+			if _first_human_done >= 0.0 and _race_clock - _first_human_done > RESULTS_WAIT:
+				_set_state(State.FINISHED)
 		State.FINISHED:
 			if not _results_shown and _state_time > 3.0:
 				_show_results()
 			elif _results_shown:
 				_refresh_results()
 	_update_flames()
-	_skid_timer -= delta
-	if player.scraping and _skid_timer <= 0.0:
-		Sfx.play("skid", randf_range(0.9, 1.1), -6.0)
-		_skid_timer = 0.28
-	_update_camera(delta)
+	for v in views:
+		_update_view_extras(v, delta)
+		_update_camera(v, delta)
 
 
 func _physics_process(delta: float) -> void:
@@ -256,15 +378,20 @@ func _update_places() -> void:
 		(sorted[i] as Racer).place = i + 1
 
 
-## Keeps the computer cars close to the player so races stay exciting.
+## Keeps the computer cars close to the leading human so races stay exciting.
 func _update_rubber_band(delta: float) -> void:
 	var base: float = [0.85, 0.93, 1.0][Game.difficulty]
+	var lead := humans[0]
+	for h in humans:
+		if h.total > lead.total:
+			lead = h
+	var all_done := humans.all(func(h: Racer) -> bool: return h.has_finished)
 	for r in racers:
 		if r.is_player:
 			continue
-		var gap := r.total - player.total
+		var gap := r.total - lead.total
 		var target := base
-		if player.has_finished:
+		if all_done:
 			target = 1.0
 		elif gap > 30.0:
 			target = base - clampf((gap - 30.0) / 150.0, 0.0, 0.18)
@@ -276,43 +403,58 @@ func _update_rubber_band(delta: float) -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("pause") and not _results_shown:
 		_toggle_pause()
-	elif event.is_action_pressed("camera") and (state == State.RACING or state == State.COUNTDOWN):
-		cam_mode = CamMode.HIGH if cam_mode == CamMode.CHASE else CamMode.CHASE
-	elif event.is_action_pressed("respawn") and state == State.RACING and not player.has_finished:
-		player.manual_respawn()
+		return
+	if state != State.RACING and state != State.COUNTDOWN:
+		return
+	if event.is_action_pressed("camera"):
+		for v in views:
+			if v.cam_mode == CamMode.CHASE or v.cam_mode == CamMode.HIGH:
+				v.cam_mode = CamMode.HIGH if v.cam_mode == CamMode.CHASE else CamMode.CHASE
+	for h in humans:
+		if event.is_action_pressed(h.action("respawn")) and not h.has_finished:
+			h.manual_respawn()
 
 
 # ---------------------------------------------------------------------------
 # Events
 # ---------------------------------------------------------------------------
 
-func _on_lap(r: Racer, lap: int, _lap_time: float) -> void:
-	if not r.is_player or r.has_finished or lap >= r.laps_to_win:
+func _on_lap(r: Racer, lap: int, lap_time: float) -> void:
+	if r == player and ghost:
+		ghost.lap_finished(lap_time)
+	var v := _view_for(r)
+	if v == null or r.has_finished or lap >= r.laps_to_win:
 		return
 	if lap == r.laps_to_win - 1:
-		hud.flash_message("FINAL LAP!", Color(1.0, 0.4, 0.3))
+		v.hud.flash_message("FINAL LAP!", Color(1.0, 0.4, 0.3))
 		Sfx.play("final_lap")
+		Sfx.play("voice_final")
 	else:
-		hud.flash_message("LAP %d" % (lap + 1), Color(1.0, 0.95, 0.4))
+		v.hud.flash_message("LAP %d" % (lap + 1), Color(1.0, 0.95, 0.4))
 		Sfx.play("lap")
 
 
 func _on_finished(r: Racer) -> void:
 	_finish_order.append(r)
-	if r != player:
+	var v := _view_for(r)
+	if v == null:
 		return
 	r.controls_enabled = false
 	if r.place == 1:
-		hud.flash_message("YOU WIN!!!", Color(1.0, 0.85, 0.15), 2.5)
+		v.hud.flash_message("YOU WIN!!!" if humans.size() == 1 else "%s WINS!!!" % r.racer_name.to_upper(), Color(1.0, 0.85, 0.15), 2.5)
 		Sfx.play("win")
 		get_tree().create_timer(1.2).timeout.connect(func(): Sfx.play("voice_win"))
-		_spawn_confetti()
+		_spawn_confetti(r)
 	else:
-		hud.flash_message("FINISHED %s!" % Game.ordinal(r.place), Color(0.6, 0.9, 1.0), 2.5)
+		v.hud.flash_message("FINISHED %s!" % Game.ordinal(r.place), Color(0.6, 0.9, 1.0), 2.5)
 		Sfx.play("finish")
-	cam_mode = CamMode.ORBIT
-	_orbit_angle = 0.0
-	_set_state(State.FINISHED)
+	v.cam_mode = CamMode.ORBIT
+	v.orbit_angle = 0.0
+	_rumble(v, 0.3, 0.3, 0.4)
+	if _first_human_done < 0.0:
+		_first_human_done = _race_clock
+	if humans.all(func(h: Racer) -> bool: return h.has_finished):
+		_set_state(State.FINISHED)
 
 
 const CRASH_MESSAGES := {
@@ -323,30 +465,63 @@ const CRASH_MESSAGES := {
 
 
 func _on_crash(r: Racer, reason: String) -> void:
-	if r.is_player:
-		hud.flash_message(CRASH_MESSAGES.get(reason, "MAYHEM!"), Color(1.0, 0.45, 0.3), 0.9)
+	var v := _view_for(r)
+	if v:
+		v.hud.flash_message(CRASH_MESSAGES.get(reason, "MAYHEM!"), Color(1.0, 0.45, 0.3), 0.9)
 		Sfx.play("crash")
-		_shake = 0.4
+		v.shake = 0.4
+		_rumble(v, 0.8, 0.6, 0.5)
+		if r == player and ghost:
+			ghost.lap_spoiled()
 		# Fade to black while the car tumbles, then back in once it's on the track.
-		get_tree().create_timer(0.8).timeout.connect(func(): hud.fade_out())
+		get_tree().create_timer(0.8).timeout.connect(func(): v.hud.fade_out())
 	else:
 		Sfx.play("crash", 1.2, -10.0)
 
 
 func _on_respawned(r: Racer) -> void:
-	if not r.is_player:
+	var v := _view_for(r)
+	if v == null:
 		return
 	var pose := _chase_pose(r)
-	camera.global_position = pose[0]
-	_cam_up = pose[2]
-	hud.fade_in()
-	hud.flash_message("Get Back to the Race!", Color(0.5, 1.0, 0.6), 1.4)
+	v.camera.global_position = pose[0]
+	v.cam_up = pose[2]
+	v.hud.fade_in()
+	v.hud.flash_message("Get Back to the Race!", Color(0.5, 1.0, 0.6), 1.4)
+	if r == player and ghost:
+		ghost.lap_spoiled()
 
 
 func _on_boost(r: Racer) -> void:
-	if r.is_player:
+	var v := _view_for(r)
+	if v:
 		Sfx.play("boost")
-		hud.flash_message("BOOST!", Color(0.4, 1.0, 1.0), 0.5)
+		v.hud.flash_message("BOOST!", Color(0.4, 1.0, 1.0), 0.5)
+		_rumble(v, 0.3, 0.0, 0.25)
+
+
+func _on_landed(r: Racer, h: float) -> void:
+	var v := _view_for(r)
+	if v:
+		v.shake = maxf(v.shake, clampf(h * 0.12, 0.1, 0.45))
+		_rumble(v, 0.2, clampf(h * 0.3, 0.2, 0.8), 0.2)
+
+
+func _on_bumped(r: Racer, h: float) -> void:
+	var v := _view_for(r)
+	if v:
+		v.shake = maxf(v.shake, clampf(h * 0.15, 0.08, 0.3))
+		_rumble(v, clampf(h * 0.5, 0.2, 0.7), 0.1, 0.15)
+
+
+## Controller rumble for a player (their own controller in 2-player mode).
+func _rumble(v: View, weak: float, strong: float, seconds: float) -> void:
+	var pads := Input.get_connected_joypads()
+	if pads.is_empty():
+		return
+	var device: int = pads[0] if humans.size() == 1 else (v.index if pads.has(v.index) else -1)
+	if device >= 0:
+		Input.start_joy_vibration(device, clampf(weak, 0.0, 1.0), clampf(strong, 0.0, 1.0), seconds)
 
 
 func _update_flames() -> void:
@@ -355,7 +530,28 @@ func _update_flames() -> void:
 		p.emitting = (r.boost_timer > 0.0 or r.turbo_on) and r.mode != Racer.Mode.FALLING
 
 
-func _spawn_confetti() -> void:
+## Wrong-way warning and arrows for cars right behind you.
+func _update_view_extras(v: View, delta: float) -> void:
+	var r := v.racer
+	if state == State.RACING and not r.has_finished and r.speed < -2.0 and r.mode == Racer.Mode.DRIVING:
+		v.reverse_time += delta
+	else:
+		v.reverse_time = 0.0
+	v.hud.set_wrong_way(v.reverse_time > 1.2)
+	var near: Array = []
+	if state == State.RACING and not r.has_finished:
+		for o in racers:
+			if o == r or o.mode != Racer.Mode.DRIVING:
+				continue
+			var behind := r.total - o.total
+			if behind > 1.5 and behind < 14.0:
+				near.append([clampf((o.lateral - r.lateral) / Track.HALF_WIDTH, -1.0, 1.0), 1.0 - behind / 14.0, o.car["body"]])
+	v.hud.set_nearby(near)
+	if r == player and ghost:
+		ghost.follow(r.race_time - r.lap_start_time, state == State.RACING and not r.has_finished)
+
+
+func _spawn_confetti(r: Racer) -> void:
 	var p := CPUParticles3D.new()
 	p.amount = 300
 	p.lifetime = 4.0
@@ -383,12 +579,12 @@ func _spawn_confetti() -> void:
 	grad.colors = PackedColorArray([Color.RED, Color.YELLOW, Color(0.2, 1, 0.3), Color(0.2, 0.6, 1), Color.MAGENTA])
 	p.color_initial_ramp = grad
 	add_child(p)
-	p.global_position = player.global_position + Vector3.UP * 1.0
+	p.global_position = r.global_position + Vector3.UP * 1.0
 	p.emitting = true
 
 
 # ---------------------------------------------------------------------------
-# Camera
+# Cameras
 # ---------------------------------------------------------------------------
 
 func _chase_pose(r: Racer) -> Array:
@@ -401,13 +597,13 @@ func _chase_pose(r: Racer) -> Array:
 	return [pos, look, up]
 
 
-func _update_camera(delta: float) -> void:
-	if player == null:
-		return
+func _update_camera(v: View, delta: float) -> void:
+	var r := v.racer
+	var cam := v.camera
 	var k := 1.0 - exp(-delta * 10.0)
-	match cam_mode:
+	match v.cam_mode:
 		CamMode.INTRO:
-			var pose := _chase_pose(player)
+			var pose := _chase_pose(r)
 			var t := clampf((_state_time - INTRO_HOLD) / INTRO_ZOOM, 0.0, 1.0)
 			var e := t * t * (3.0 - 2.0 * t)   # smooth start & stop
 			e = e * e * (3.0 - 2.0 * e)
@@ -416,76 +612,75 @@ func _update_camera(delta: float) -> void:
 			var mid := (_intro_from + goal) * 0.5 + Vector3(0, 18.0, 0)
 			var a := _intro_from.lerp(mid, e)
 			var b := mid.lerp(goal, e)
-			camera.global_position = a.lerp(b, e)
+			cam.global_position = a.lerp(b, e)
 			var look: Vector3 = _intro_look.lerp(pose[1], e)
-			_cam_up = Vector3.UP
-			camera.fov = lerpf(55.0, 64.0, e)
-			camera.look_at(look, _cam_up)
+			v.cam_up = Vector3.UP
+			cam.fov = lerpf(55.0, 64.0, e)
+			cam.look_at(look, v.cam_up)
+			# Tilt-shift blur: everything looks like a tiny model.
+			_set_tilt_shift(v, cam.global_position.distance_to(look), 1.0 - e * 0.85)
 		CamMode.CHASE:
-			var pose := _chase_pose(player)
-			if player.mode == Racer.Mode.FALLING:
-				camera.look_at(player.global_position, _cam_up)
+			_set_tilt_shift(v, 0.0, 0.0)
+			var pose := _chase_pose(r)
+			if r.mode == Racer.Mode.FALLING:
+				_safe_look_at(cam, r.global_position, v.cam_up)
 				return
-			camera.global_position = camera.global_position.lerp(pose[0], k)
-			_cam_up = _cam_up.slerp(pose[2], 1.0 - exp(-delta * 4.0)).normalized()
-			var fov_target := 64.0 + clampf(player.speed - 25.0, 0.0, 30.0) * 0.35
-			camera.fov = lerpf(camera.fov, fov_target, k * 0.5)
-			_safe_look_at(pose[1], _cam_up)
-			if _shake > 0.0:
-				camera.global_position += Vector3(randf_range(-1, 1), randf_range(-1, 1), randf_range(-1, 1)) * _shake
-				_shake = maxf(0.0, _shake - delta * 1.5)
-			hud.speed_effect = clampf((player.speed - 38.0) / 20.0, 0.0, 1.0) if (player.boost_timer > 0.0 or player.turbo_on or player.speed > 45.0) else 0.0
+			cam.global_position = cam.global_position.lerp(pose[0], k)
+			v.cam_up = v.cam_up.slerp(pose[2], 1.0 - exp(-delta * 4.0)).normalized()
+			var fov_target := 64.0 + clampf(r.speed - 25.0, 0.0, 30.0) * 0.35
+			cam.fov = lerpf(cam.fov, fov_target, k * 0.5)
+			_safe_look_at(cam, pose[1], v.cam_up)
+			if v.shake > 0.0:
+				cam.global_position += Vector3(randf_range(-1, 1), randf_range(-1, 1), randf_range(-1, 1)) * v.shake
+				v.shake = maxf(0.0, v.shake - delta * 1.5)
+			v.hud.speed_effect = clampf((r.speed - 38.0) / 20.0, 0.0, 1.0) if (r.boost_timer > 0.0 or r.turbo_on or r.speed > 45.0) else 0.0
 		CamMode.HIGH:
-			var target := player.global_position + Vector3(0, 26.0, 22.0)
-			camera.global_position = camera.global_position.lerp(target, k)
-			_cam_up = _cam_up.slerp(Vector3.UP, k).normalized()
-			camera.fov = lerpf(camera.fov, 60.0, k)
-			_safe_look_at(player.global_position, _cam_up)
+			_set_tilt_shift(v, 30.0, 0.5)
+			var target := r.global_position + Vector3(0, 26.0, 22.0)
+			cam.global_position = cam.global_position.lerp(target, k)
+			v.cam_up = v.cam_up.slerp(Vector3.UP, k).normalized()
+			cam.fov = lerpf(cam.fov, 60.0, k)
+			_safe_look_at(cam, r.global_position, v.cam_up)
 		CamMode.ORBIT:
-			_orbit_angle += delta * 0.4
-			var target := player.global_position + Vector3(sin(_orbit_angle) * 9.0, 4.5, cos(_orbit_angle) * 9.0)
-			camera.global_position = camera.global_position.lerp(target, k * 0.5)
-			_cam_up = _cam_up.slerp(Vector3.UP, k).normalized()
-			_safe_look_at(player.global_position + Vector3.UP * 0.6, _cam_up)
+			v.orbit_angle += delta * 0.4
+			var target := r.global_position + Vector3(sin(v.orbit_angle) * 9.0, 4.5, cos(v.orbit_angle) * 9.0)
+			cam.global_position = cam.global_position.lerp(target, k * 0.5)
+			v.cam_up = v.cam_up.slerp(Vector3.UP, k).normalized()
+			_safe_look_at(cam, r.global_position + Vector3.UP * 0.6, v.cam_up)
+			_set_tilt_shift(v, cam.global_position.distance_to(r.global_position), 1.0)
 
 
-func _safe_look_at(target: Vector3, up: Vector3) -> void:
-	var dir := target - camera.global_position
+## Depth-of-field that keeps `focus` sharp and blurs what's nearer and further,
+## which makes the scene look like a photo of real toys. Needs the full renderer.
+func _set_tilt_shift(v: View, focus: float, amount: float) -> void:
+	var d := v.dof
+	if amount <= 0.01 or not Game.fancy_renderer() or Game.quality == 0:
+		d.dof_blur_far_enabled = false
+		d.dof_blur_near_enabled = false
+		return
+	d.dof_blur_far_enabled = true
+	d.dof_blur_near_enabled = true
+	d.dof_blur_far_distance = focus * 1.45 + 5.0
+	d.dof_blur_far_transition = maxf(6.0, focus * 1.2)
+	d.dof_blur_near_distance = maxf(0.5, focus * 0.45)
+	d.dof_blur_near_transition = maxf(0.5, focus * 0.35)
+	d.dof_blur_amount = 0.05 * amount
+
+
+func _safe_look_at(cam: Camera3D, target: Vector3, up: Vector3) -> void:
+	var dir := target - cam.global_position
 	if dir.length() < 0.01 or absf(dir.normalized().dot(up.normalized())) > 0.999:
 		return
-	camera.look_at(target, up)
+	cam.look_at(target, up)
 
 
 # ---------------------------------------------------------------------------
-# Engine sound (a buzzy toy motor that rises with speed)
+# Computer cars' engine sounds (3D, heard through player 1's camera)
 # ---------------------------------------------------------------------------
 
-func _setup_engine_sound() -> void:
-	# A recorded engine loop if we have one (pitched up with speed)...
-	_brake_player = _loop_player("brake")
-	var loop := Sfx.loop_stream("engine")
-	if loop:
-		_engine_player = _loop_player("engine")
-		_engine_high = _loop_player("engine_high")
-		return
-	# ...otherwise a synthesized buzzy toy motor.
-	var gen := AudioStreamGenerator.new()
-	gen.mix_rate = 22050.0
-	gen.buffer_length = 0.15
-	var p := AudioStreamPlayer.new()
-	p.stream = gen
-	p.bus = "SFX"
-	p.volume_db = -16.0
-	add_child(p)
-	p.play()
-	_engine_playback = p.get_stream_playback()
-
-
-## A looping sound player for the player's car (engine layers, brakes).
 ## Each computer car hums with its own 3D engine sound, so you hear them
 ## coming up behind you and zooming past (with a Doppler pitch drop).
 func _setup_ai_engines() -> void:
-	camera.doppler_tracking = Camera3D.DOPPLER_TRACKING_PHYSICS_STEP
 	for r in racers:
 		if r.is_player:
 			continue
@@ -520,65 +715,6 @@ func _update_ai_sounds() -> void:
 		_pass_side[r] = ahead
 
 
-func _loop_player(sound_name: String) -> AudioStreamPlayer:
-	var st := Sfx.loop_stream(sound_name)
-	if st == null:
-		return null
-	var p := AudioStreamPlayer.new()
-	p.stream = st
-	p.bus = "SFX"
-	p.volume_db = -60.0
-	add_child(p)
-	p.play()
-	return p
-
-
-func _update_engine_sound() -> void:
-	var quiet := state == State.INTRO or get_tree().paused or player.mode == Racer.Mode.FALLING
-	# Brakes squeal while braking hard.
-	if _brake_player:
-		var want := -9.0 if player.braking and not quiet else -60.0
-		_brake_player.volume_db = lerpf(_brake_player.volume_db, want, 0.25)
-		_brake_player.pitch_scale = 1.25 + clampf(player.speed / 60.0, 0.0, 0.4)
-	# A quick rev when you hit the gas from (nearly) stopped.
-	var pressing := player.throttle_input > 0.5
-	if pressing and not _was_pressing and absf(player.speed) < 8.0 and state == State.RACING:
-		Sfx.play("rev")
-	_was_pressing = pressing
-	if _engine_player:
-		var rev := absf(player.speed) / 45.0 + player.throttle_input * 0.2
-		if player.turbo_on or player.boost_timer > 0.0:
-			rev += 0.3
-		if player.in_air:
-			rev += 0.35        # wheels spin free in the air
-		rev = clampf(rev, 0.0, 1.6)
-		_engine_player.pitch_scale = lerpf(_engine_player.pitch_scale, 0.75 + rev * 0.8, 0.15)
-		_engine_player.volume_db = lerpf(_engine_player.volume_db, -60.0 if quiet else -7.0 + minf(rev, 1.0) * 3.0, 0.1)
-		if _engine_high:
-			# The screamy high layer fades in as you go faster.
-			var high := clampf((rev - 0.55) / 0.6, 0.0, 1.0)
-			_engine_high.pitch_scale = lerpf(_engine_high.pitch_scale, 0.8 + rev * 0.5, 0.15)
-			_engine_high.volume_db = lerpf(_engine_high.volume_db, -60.0 if quiet or high <= 0.01 else linear_to_db(high) - 9.0, 0.1)
-		return
-	if _engine_playback == null:
-		return
-	var target := 55.0 + absf(player.speed) * 3.2 + player.throttle_input * 15.0
-	if player.turbo_on or player.boost_timer > 0.0:
-		target += 30.0
-	if state == State.INTRO or get_tree().paused:
-		target = 0.0
-	var frames := _engine_playback.get_frames_available()
-	for i in frames:
-		_engine_freq = lerpf(_engine_freq, target, 0.0008)
-		if _engine_freq < 5.0:
-			_engine_playback.push_frame(Vector2.ZERO)
-			continue
-		_engine_phase = fmod(_engine_phase + _engine_freq / 22050.0, 1.0)
-		_engine_phase2 = fmod(_engine_phase2 + _engine_freq * 0.503 / 22050.0, 1.0)
-		var v := (_engine_phase * 2.0 - 1.0) * 0.35 + (0.25 if _engine_phase2 < 0.5 else -0.25)
-		_engine_playback.push_frame(Vector2(v, v) * 0.5)
-
-
 # ---------------------------------------------------------------------------
 # Pause menu
 # ---------------------------------------------------------------------------
@@ -591,9 +727,16 @@ func _build_pause_menu() -> void:
 	_pause_menu = _centered_panel(layer, "PAUSED")
 	var box: VBoxContainer = _pause_menu.get_meta("box")
 	_add_button(box, "Keep Racing", _toggle_pause)
-	_add_button(box, "Restart Race", func(): Game.goto_race())
-	_add_button(box, "Change Car", func(): Game.goto_garage())
-	_add_button(box, "Main Menu", func(): Game.goto_menu())
+	if not Game.gp_active:
+		_add_button(box, "Restart Race", func(): Game.goto_race())
+		_add_button(box, "Change Car", func(): Game.goto_garage())
+	else:
+		_add_button(box, "Quit Grand Prix", func():
+			Game.end_grand_prix()
+			Game.goto_menu())
+	_add_button(box, "Main Menu", func():
+		Game.end_grand_prix()
+		Game.goto_menu())
 	_pause_menu.visible = false
 
 
@@ -619,10 +762,10 @@ func _centered_panel(parent: Node, title: String) -> Control:
 	var panel := PanelContainer.new()
 	center.add_child(panel)
 	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 14)
+	box.add_theme_constant_override("separation", 12)
 	box.custom_minimum_size = Vector2(420, 0)
 	panel.add_child(box)
-	var t := RaceHud.make_label(title, 60, Color(1.0, 0.85, 0.2), 14)
+	var t := RaceHud.make_label(title, 56, Color(1.0, 0.85, 0.2), 14)
 	t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(t)
 	dim.set_meta("box", box)
@@ -643,47 +786,8 @@ func _add_button(box: Container, text: String, cb: Callable) -> Button:
 # Results
 # ---------------------------------------------------------------------------
 
-func _show_results() -> void:
-	_results_shown = true
-	Sfx.play_music("results", -8.0)
-	var layer := CanvasLayer.new()
-	layer.layer = 9
-	add_child(layer)
-	_results_panel = _centered_panel(layer, "RACE RESULTS")
-	_results_panel.color = Color(0, 0, 0, 0.25)
-	var box: VBoxContainer = _results_panel.get_meta("box")
-	box.custom_minimum_size = Vector2(640, 0)
-	var grid := GridContainer.new()
-	grid.columns = 3
-	grid.add_theme_constant_override("h_separation", 40)
-	grid.add_theme_constant_override("v_separation", 6)
-	box.add_child(grid)
-	_results_panel.set_meta("grid", grid)
-
-	var best := Game.best_time_for_current()
-	var new_record := Game.submit_result(player.finish_time, player.best_lap)
-	var rec_text := "NEW RECORD!  " + Game.format_time(player.finish_time) if new_record else "Record: " + Game.format_time(best)
-	var rec := RaceHud.make_label(rec_text, 30, Color(0.5, 1.0, 0.6) if new_record else Color(0.85, 0.85, 1.0), 8)
-	rec.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	box.add_child(rec)
-
-	var buttons := HBoxContainer.new()
-	buttons.alignment = BoxContainer.ALIGNMENT_CENTER
-	buttons.add_theme_constant_override("separation", 16)
-	box.add_child(buttons)
-	var again := _add_button(buttons, "Race Again!", func(): Game.goto_race())
-	_add_button(buttons, "Change Car", func(): Game.goto_garage())
-	_add_button(buttons, "Menu", func(): Game.goto_menu())
-	again.grab_focus()
-	hud.set_race_ui_visible(false)
-	_refresh_results()
-
-
-func _refresh_results() -> void:
-	if _results_panel == null:
-		return
-	var grid: GridContainer = _results_panel.get_meta("grid")
-	# Finished racers in finishing order, then the rest by how far they got.
+## Finished racers in finishing order, then the rest by how far they got.
+func _final_order() -> Array[Racer]:
 	var rows: Array[Racer] = _finish_order.duplicate()
 	var rest: Array[Racer] = []
 	for r in racers:
@@ -691,17 +795,120 @@ func _refresh_results() -> void:
 			rest.append(r)
 	rest.sort_custom(func(a: Racer, b: Racer) -> bool: return a.total > b.total)
 	rows.append_array(rest)
-	var needed := rows.size() * 3
-	while grid.get_child_count() < needed:
-		grid.add_child(RaceHud.make_label("", 32, Color.WHITE, 8))
+	return rows
+
+
+func _show_results() -> void:
+	_results_shown = true
+	Sfx.play_music("results", -8.0)
+	var order := _final_order()
+	var layer := CanvasLayer.new()
+	layer.layer = 9
+	add_child(layer)
+	var title := "RACE RESULTS"
+	if Game.gp_active:
+		title = "GRAND PRIX  -  RACE %d of %d" % [Game.gp_race + 1, Track.TRACKS.size()]
+	_results_panel = _centered_panel(layer, title)
+	_results_panel.color = Color(0, 0, 0, 0.3)
+	var box: VBoxContainer = _results_panel.get_meta("box")
+	box.custom_minimum_size = Vector2(700, 0)
+	var grid := GridContainer.new()
+	grid.columns = 4 if Game.gp_active else 3
+	grid.add_theme_constant_override("h_separation", 34)
+	grid.add_theme_constant_override("v_separation", 2)
+	box.add_child(grid)
+	_results_panel.set_meta("grid", grid)
+
+	# Grand Prix points for this race.
+	if Game.gp_active:
+		for i in order.size():
+			var nm := order[i].racer_name
+			Game.gp_points[nm] = int(Game.gp_points.get(nm, 0)) + int(Game.GP_POINTS[mini(i, Game.GP_POINTS.size() - 1)])
+
+	# Records and the ghost (single player only).
+	if humans.size() == 1:
+		var best := Game.best_time_for_current()
+		var new_record := player.has_finished and Game.submit_result(player.finish_time, player.best_lap)
+		var rec_text := ("NEW RECORD!  " + Game.format_time(player.finish_time)) if new_record else ("Record: " + Game.format_time(best))
+		var rec := RaceHud.make_label(rec_text, 26, Color(0.5, 1.0, 0.6) if new_record else Color(0.85, 0.85, 1.0), 8)
+		rec.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		box.add_child(rec)
+		if new_record:
+			Sfx.play("voice_record")
+		if ghost:
+			ghost.save_if_better()
+
+	# Stars for every human who finished, and anything that unlocks.
+	var earned := 0
+	for h in humans:
+		if h.has_finished:
+			earned = maxi(earned, Game.stars_for_place(order.find(h) + 1))
+	var fresh := Game.award_stars(earned) if earned > 0 else []
+	var star_line := RaceHud.make_label("+%d ★   (%d stars)" % [earned, Game.stars], 26, Color(1.0, 0.9, 0.3), 8)
+	star_line.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(star_line)
+	_add_unlock_lines(box, fresh)
+
+	var buttons := HBoxContainer.new()
+	buttons.alignment = BoxContainer.ALIGNMENT_CENTER
+	buttons.add_theme_constant_override("separation", 14)
+	box.add_child(buttons)
+	var first: Button
+	if Game.gp_active:
+		if Game.gp_race + 1 < Track.TRACKS.size():
+			first = _add_button(buttons, "Next Race  >", func():
+				Game.gp_race += 1
+				Game.selected_track = Game.gp_race
+				Game.goto_race())
+		else:
+			first = _add_button(buttons, "Trophy Ceremony!", func(): Game.goto("res://scenes/podium.tscn"))
+		_add_button(buttons, "Quit Cup", func():
+			Game.end_grand_prix()
+			Game.goto_menu())
+	else:
+		first = _add_button(buttons, "Race Again!", func(): Game.goto_race())
+		_add_button(buttons, "Change Car", func(): Game.goto_garage())
+		_add_button(buttons, "Menu", func(): Game.goto_menu())
+	first.grab_focus()
+	for v in views:
+		v.hud.set_race_ui_visible(false)
+	_refresh_results()
+
+
+func _add_unlock_lines(box: Container, fresh: Array) -> void:
+	for id in fresh:
+		var it := Unlocks.get_item(id)
+		if it.is_empty():
+			continue
+		var kind: String = {"paint": "paint", "sticker": "sticker", "wheels": "wheels", "car": "SECRET CAR"}.get(it["kind"], "")
+		var l := RaceHud.make_label("NEW!  %s %s unlocked!" % [it["name"], kind], 26, Color(1.0, 0.6, 0.95), 8)
+		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		box.add_child(l)
+		var tw := l.create_tween().set_loops()
+		tw.tween_property(l, "modulate", Color(1, 1, 1, 0.55), 0.5)
+		tw.tween_property(l, "modulate", Color.WHITE, 0.5)
+	if not fresh.is_empty():
+		Sfx.play("voice_unlock")
+
+
+func _refresh_results() -> void:
+	if _results_panel == null:
+		return
+	var grid: GridContainer = _results_panel.get_meta("grid")
+	var rows := _final_order()
+	var cols := grid.columns
+	while grid.get_child_count() < rows.size() * cols:
+		grid.add_child(RaceHud.make_label("", 28, Color.WHITE, 8))
 	for i in rows.size():
 		var r := rows[i]
-		var col := Color(1.0, 0.85, 0.2) if r.is_player else Color.WHITE
-		var a: Label = grid.get_child(i * 3)
-		var b: Label = grid.get_child(i * 3 + 1)
-		var c: Label = grid.get_child(i * 3 + 2)
-		a.text = Game.ordinal(i + 1)
-		b.text = "%s  (%s)" % [r.racer_name, r.car["name"]]
-		c.text = Game.format_time(r.finish_time) if r.has_finished else "racing..."
-		for l: Label in [a, b, c]:
+		var col := Color(1.0, 0.85, 0.2) if r.player_index == 1 else (Color(0.5, 0.9, 1.0) if r.player_index == 2 else Color.WHITE)
+		var cells: Array[Label] = []
+		for c in cols:
+			cells.append(grid.get_child(i * cols + c) as Label)
+		cells[0].text = Game.ordinal(i + 1)
+		cells[1].text = "%s  (%s)" % [r.racer_name, r.car["name"]]
+		cells[2].text = Game.format_time(r.finish_time) if r.has_finished else "racing..."
+		if cols == 4:
+			cells[3].text = "%d pts" % int(Game.gp_points.get(r.racer_name, 0))
+		for l in cells:
 			l.add_theme_color_override("font_color", col)
