@@ -73,14 +73,24 @@ export class RaceRoom {
     }
     if (!this.room || this.room.empty) {
       this.room = new Room(code,
-        (ws, data) => { try { ws.send(data); } catch {} },
+        (ws, data) => { try { ws.send(data); } catch (e) { console.log("send failed", String(e)); } },
         (ws, c, reason) => { try { ws.close(c, reason); } catch {} });
     }
     const [client, server] = Object.values(new WebSocketPair());
     server.accept();
+    // Newer Workers hand binary messages over as Blobs; the relay needs the raw bytes.
+    try { server.binaryType = "arraybuffer"; } catch {}
     const id = action === "host" ? this.room.addHost(server) : this.room.addGuest(server);
     if (id) {
-      server.addEventListener("message", (e) => this.room.onMessage(id, e.data));
+      // Messages are handled one at a time, in order (a Blob needs a moment to read).
+      let queue = Promise.resolve();
+      server.addEventListener("message", (e) => {
+        queue = queue.then(async () => {
+          let data = e.data;
+          if (typeof data !== "string" && typeof data.arrayBuffer === "function") data = await data.arrayBuffer();
+          this.room.onMessage(id, data);
+        }).catch((err) => console.log("message failed", String(err)));
+      });
       const gone = () => this.room && this.room.onLeave(id);
       server.addEventListener("close", gone);
       server.addEventListener("error", gone);

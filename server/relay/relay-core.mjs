@@ -22,6 +22,7 @@ export class Room {
     this.nextId = 2;
     this.send = send;
     this.close = close;
+    this.stats = { binIn: 0, binOut: 0, textIn: 0, last: "" };   // for troubleshooting ({"t":"stats"})
   }
 
   addHost(ws) {
@@ -54,24 +55,33 @@ export class Room {
     if (typeof data === "string") {
       let msg;
       try { msg = JSON.parse(data); } catch { return; }
+      this.stats.textIn++;
+      if (msg.t === "stats") {
+        const ws = this.peers.get(from);
+        if (ws) this.send(ws, JSON.stringify({ t: "stats", ...this.stats, peers: [...this.peers.keys()] }));
+        return;
+      }
       if (msg.t === "kick" && from === 1 && this.peers.has(msg.id)) {
         this.close(this.peers.get(msg.id), 4001, "Removed by the host.");
       }
       return;
     }
-    const bytes = new Uint8Array(data);
+    this.stats.binIn++;
+    this.stats.last = Object.prototype.toString.call(data);
+    const bytes = data instanceof ArrayBuffer ? new Uint8Array(data) : new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
     if (bytes.length < 5) return;
     const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
     const target = view.getInt32(0, true);
-    const out = new Uint8Array(bytes); // copy, then stamp who it's from
-    new DataView(out.buffer).setInt32(0, from, true);
+    // Copy into a fresh ArrayBuffer (what every WebSocket send() accepts), stamped with who it's from.
+    const out = bytes.slice().buffer;
+    new DataView(out).setInt32(0, from, true);
     if (target > 0) {
       const ws = this.peers.get(target);
-      if (ws) this.send(ws, out);
+      if (ws) { this.send(ws, out); this.stats.binOut++; }
     } else {
       // 0 = everyone else, -N = everyone except N (and the sender)
       for (const [pid, ws] of this.peers) {
-        if (pid !== from && pid !== -target) this.send(ws, out);
+        if (pid !== from && pid !== -target) { this.send(ws, out); this.stats.binOut++; }
       }
     }
   }

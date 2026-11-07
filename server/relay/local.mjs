@@ -8,7 +8,7 @@ const port = Number(process.env.PORT || 24690);
 const rooms = new Map();
 const wss = new WebSocketServer({ port });
 
-const send = (ws, data) => { if (ws.readyState === 1) ws.send(data, { binary: typeof data !== "string" }); };
+const send = (ws, data) => { if (ws.readyState === 1) ws.send(typeof data === "string" ? data : Buffer.from(data), { binary: typeof data !== "string" }); };
 const close = (ws, code, reason) => ws.close(code, reason);
 
 wss.on("connection", (ws, req) => {
