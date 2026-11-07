@@ -1,4 +1,4 @@
-# Builds the Windows version and publishes a GitHub release. SauceStore picks
+# Builds the Windows version (and the Android app) and publishes a GitHub release. SauceStore picks
 # the release up automatically. Two ways to start it:
 #   - push a version tag:   git tag v1.0.1 && git push origin v1.0.1
 #   - or on GitHub: Actions > Release > Run workflow, and type the version (v1.0.1)
@@ -88,3 +88,12 @@ jobs:
             --target "$GITHUB_SHA" \
             --title "Race Track Mayhem $VERSION" \
             --generate-notes
+
+  # The Android app, attached to the same release once it's published.
+  android:
+    needs: windows
+    uses: ./.github/workflows/android.yml
+    with:
+      version: ${{ inputs.version || github.ref_name }}
+      release: true
+    secrets: inherit

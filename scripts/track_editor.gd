@@ -58,6 +58,8 @@ var _mode_button: Button
 var _redo_button: Button
 var _hint: Label
 var _insert_mark: Label
+var _press_at := Vector2.ZERO   # where a left click / finger went down
+var _dragging := false          # dragging turns the view instead of picking a piece
 
 
 func _ready() -> void:
@@ -105,8 +107,21 @@ func _process(delta: float) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		_pick_at(event.position)
+	# Tap the track to pick a piece; drag (mouse or one finger) to turn the view.
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		if event.pressed:
+			_press_at = event.position
+			_dragging = false
+		elif not _dragging:
+			_pick_at(event.position)
+		return
+	if event is InputEventMouseMotion and (event.button_mask & MOUSE_BUTTON_MASK_LEFT) != 0:
+		if _dragging or event.position.distance_to(_press_at) > 14.0:
+			_dragging = true
+			_cam_angle -= event.relative.x * 0.008
+		return
+	if event is InputEventMagnifyGesture:   # pinch to zoom on phones and tablets
+		_cam_zoom = clampf(_cam_zoom / event.factor, 0.4, 1.6)
 		return
 	if event is InputEventKey and event.pressed and not event.echo and not _name_edit.has_focus():
 		if _key_shortcut(event as InputEventKey):
@@ -670,7 +685,17 @@ func _build_ui() -> void:
 	_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	RaceHud.pin(_status, Vector2(0.5, 1), Vector2(-280, -224), Vector2(600, 44))
 	root.add_child(_status)
-	_hint = RaceHud.make_label("Click the track where you want to add pieces.   Q / E: turn the view   Wheel: zoom", 16, Color(1, 1, 1, 0.8), 6)
+	_hint = RaceHud.make_label("Tap the track where you want to add pieces.   Drag to turn the view   Pinch or wheel: zoom", 16, Color(1, 1, 1, 0.8), 6)
+	# Zoom buttons (handy on phones).
+	var zoom := HBoxContainer.new()
+	zoom.add_theme_constant_override("separation", 6)
+	RaceHud.pin(zoom, Vector2(1, 1), Vector2(-132, -270), Vector2(120, 50))
+	root.add_child(zoom)
+	for z in [["-", 1.15], ["+", 0.87]]:
+		var factor: float = z[1]
+		var zb := _button(zoom, z[0], func(): _cam_zoom = clampf(_cam_zoom * factor, 0.4, 1.6))
+		zb.custom_minimum_size = Vector2(56, 48)
+		zb.add_theme_font_size_override("font_size", 26)
 	RaceHud.pin(_hint, Vector2(1, 0), Vector2(-830, 74), Vector2(810, 24))
 	_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	root.add_child(_hint)
