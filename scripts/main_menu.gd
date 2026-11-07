@@ -290,7 +290,11 @@ func _show_panel(panel: Control) -> void:
 func _fit_to_screen(center: Control) -> void:
 	var panel := center.get_child(0) as Control
 	panel.scale = Vector2.ONE
+	if not is_inside_tree():
+		return
 	await get_tree().process_frame
+	if not is_inside_tree():
+		return
 	var room := get_viewport().get_visible_rect().size - Vector2(24, 24)
 	var k := minf(1.0, minf(room.y / maxf(1.0, panel.size.y), room.x / maxf(1.0, panel.size.x)))
 	panel.pivot_offset = panel.size * 0.5
