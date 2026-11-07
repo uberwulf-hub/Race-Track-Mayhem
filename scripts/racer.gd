@@ -69,6 +69,12 @@ var _respawn_s := 0.0
 var _respawn_speed := 0.0
 var braking := false           # for brake sounds
 var skipped_ahead := false     # set when a car was helped past a spot it kept falling at
+# Power-ups (see PowerUps)
+var item := ""                 # the power-up this car is holding
+var shield_timer := 0.0        # bubble shield blocks the next hit
+var bubble_timer := 0.0        # trapped in a soap bubble: floats along slowly
+var _shield_mesh: MeshInstance3D
+var _bubble_mesh: MeshInstance3D
 var _same_spot_falls := 0
 var _last_fall_at := -1000.0
 # Bump physics: a sideways shove and a spin that fade away.
@@ -147,6 +153,9 @@ func _physics_process(delta: float) -> void:
 		return
 	_bump_cooldown = maxf(0.0, _bump_cooldown - delta)
 	_invuln = maxf(0.0, _invuln - delta)
+	shield_timer = maxf(0.0, shield_timer - delta)
+	bubble_timer = maxf(0.0, bubble_timer - delta)
+	_update_item_visuals(delta)
 	if mode == Mode.FALLING:
 		_process_falling(delta)
 		return
@@ -213,6 +222,8 @@ func _physics_process(delta: float) -> void:
 		accel -= (speed - top) * 2.5
 	accel -= SLOPE_GRAVITY * fwd.y  # uphill slows, downhill speeds up
 	speed = clampf(speed + accel * delta, -9.0, 80.0)
+	if bubble_timer > 0.0:
+		speed = minf(speed, 9.0)    # floating along in a soap bubble
 
 	# --- boost pads ---
 	if (f & Track.FLAG_BOOST) != 0 and boost_timer <= 0.2:
@@ -786,3 +797,46 @@ func _puff_dust() -> void:
 		_dust.color_ramp = grad
 		add_child(_dust)
 	_dust.restart()
+
+
+## The see-through shield and the soap bubble around the car.
+func _update_item_visuals(delta: float) -> void:
+	if model == null:
+		return
+	if shield_timer > 0.0 and _shield_mesh == null:
+		_shield_mesh = _glass_ball(1.9, Color(0.5, 1.0, 0.7, 0.22))
+	if _shield_mesh:
+		_shield_mesh.visible = shield_timer > 0.0
+		_shield_mesh.rotation.y += delta * 2.0
+	if bubble_timer > 0.0 and _bubble_mesh == null:
+		_bubble_mesh = _glass_ball(1.7, Color(0.75, 0.9, 1.0, 0.3))
+	if _bubble_mesh:
+		_bubble_mesh.visible = bubble_timer > 0.0
+	# Bubbled cars float up and wobble.
+	var lift := 1.4 if bubble_timer > 0.0 else 0.0
+	model.position.y = lerpf(model.position.y, lift, minf(1.0, delta * 6.0))
+	if bubble_timer > 0.0:
+		model.rotation.z = sin(Time.get_ticks_msec() * 0.006) * 0.25
+	else:
+		model.rotation.z = lerpf(model.rotation.z, 0.0, minf(1.0, delta * 8.0))
+
+
+func _glass_ball(radius: float, col: Color) -> MeshInstance3D:
+	var mi := MeshInstance3D.new()
+	var sm := SphereMesh.new()
+	sm.radius = radius
+	sm.height = radius * 2.0
+	mi.mesh = sm
+	var m := StandardMaterial3D.new()
+	m.albedo_color = col
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.rim_enabled = true
+	m.rim = 1.0
+	m.roughness = 0.0
+	m.metallic_specular = 1.0
+	m.cull_mode = BaseMaterial3D.CULL_DISABLED
+	mi.material_override = m
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	mi.position = Vector3(0, 0.7, 0)
+	model.add_child(mi)
+	return mi

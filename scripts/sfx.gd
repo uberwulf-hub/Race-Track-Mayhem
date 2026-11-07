@@ -23,6 +23,7 @@ const LEVELS := {
 	"voice_final": -2.0, "voice_record": 0.0, "voice_unlock": -2.0, "voice_congrats": 0.0,
 	"bump": -4.0, "crash": -3.0, "boost": -6.0, "jump": -6.0, "land": -6.0,
 	"skid": -8.0, "whoosh": -6.0, "rev": -4.0,
+	"pickup": -8.0, "throw": -6.0, "pop": -4.0, "splash": -5.0, "shield": -6.0,
 	"lap": -4.0, "final_lap": -4.0, "win": -3.0, "finish": -3.0,
 }
 const EXTS := ["ogg", "wav", "mp3"]
@@ -66,6 +67,11 @@ func _ready() -> void:
 	_sounds["back"] = _bell(440.0, 0.12, 0.25)
 	_sounds["whoosh"] = _whoosh(0.7, 0.5)
 	_sounds["rev"] = _rev(0.9, 0.4)
+	_sounds["pickup"] = _arpeggio([523.25, 659.25, 783.99, 1046.5], 0.06, 0.3)
+	_sounds["throw"] = _sweep(500.0, 180.0, 0.25, 0.3, 0.6)
+	_sounds["pop"] = _pop()
+	_sounds["splash"] = _noise(0.5, 0.45, 5.0)
+	_sounds["shield"] = _arpeggio([392.0, 587.33, 783.99], 0.09, 0.28)
 	# Wrap the synthesized ones in arrays, then replace with real files where present.
 	for key in _sounds.keys():
 		_sounds[key] = [_sounds[key]]
@@ -299,4 +305,28 @@ func _rev(seconds: float, vol: float) -> AudioStreamWAV:
 		var v := (phase * 2.0 - 1.0) * 0.5 + (0.3 if phase2 < 0.5 else -0.3)
 		var env := minf(1.0, k * 12.0) * (1.0 - pow(k, 3.0))
 		out.append(v * vol * env)
+	return _make_wav(out)
+
+
+## A quick run of soft bell notes (power-up pickup, shield).
+func _arpeggio(freqs: Array, note_len: float, vol: float) -> AudioStreamWAV:
+	var out := PackedFloat32Array()
+	for f in freqs:
+		var n := int(note_len * RATE)
+		for i in n:
+			var t := float(i) / RATE
+			var k := float(i) / n
+			out.append((sin(TAU * float(f) * t) + 0.3 * sin(TAU * float(f) * 2.0 * t)) * vol * minf(1.0, k * 30.0) * (1.0 - k * 0.7))
+	return _make_wav(out)
+
+
+## A bubble popping: a short bright blip that drops in pitch.
+func _pop() -> AudioStreamWAV:
+	var out := PackedFloat32Array()
+	var count := int(0.12 * RATE)
+	var phase := 0.0
+	for i in count:
+		var k := float(i) / count
+		phase += lerpf(1400.0, 300.0, k) / RATE
+		out.append(sin(TAU * phase) * 0.5 * exp(-k * 6.0) + randf_range(-0.15, 0.15) * (1.0 - k))
 	return _make_wav(out)

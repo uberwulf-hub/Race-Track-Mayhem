@@ -63,7 +63,8 @@ There are no art or sound files. The cars, track, bedroom and sound effects are 
 | Steer | A D / ← → | A D | ← → | Left stick / D-pad |
 | Brake / reverse | S / ↓ | S | ↓ | X or left trigger |
 | **Turbo** (blue bar) | Space / Shift | Space / Shift | Enter / Ctrl / Num 0 | B or right bumper |
-| Back on track | R | R | Backspace | Y |
+| Use power-up | E / Q | E / Q | / or Num 1 | Y |
+| Back on track | R | R | Backspace | Back / View |
 | Change camera | C | C | C | Left bumper |
 | Pause | Esc / P | Esc / P | Esc / P | Start |
 
@@ -79,6 +80,15 @@ Tips:
 Whenever you come off the track, the screen fades and you're put back where you came off, with "Get Back to the Race!".
 
 ## What's in the game
+
+**Power-ups.** Drive through the rainbow "?" boxes on the track, then press **E** (or **Y** on a controller) to use what you got:
+- **Bubble Blaster:** shoots a soap bubble that drifts toward the car ahead. Cars it hits float along slowly in a bubble.
+- **Bouncy Ball:** zig-zags off the rails and spins out cars it hits.
+- **Water Balloon:** drops a slippery puddle behind you.
+- **Rocket Boost:** a big burst of speed.
+- **Bubble Shield:** blocks the next hit.
+
+Cars further back get better power-ups, and the computer cars use them too. Switch them off in Options.
 
 **Track Builder.** Build your own tracks from the main menu or the track picker:
 - **Pieces:** Straight, Turn Left/Right, Bend Left/Right, Boost Pad, Loop, Corkscrew, Jump, Big Jump, Hill, Bumps, Spiral and Wiggles.
@@ -128,7 +138,9 @@ Whenever you come off the track, the screen fades and you're put back where you 
 **Use your own sounds:** drop files into `assets/audio/local/` (see [its README](assets/audio/local/README.md)).
 They replace the built-in sounds on your computer only, and that folder is never uploaded to GitHub.
 
-**Options:** laps, difficulty, graphics quality, fullscreen, steering help, ghost car, and three volume sliders.
+**Options:** laps, difficulty, graphics quality, fullscreen, steering help, ghost car, power-ups, and three volume sliders.
+
+The version number is shown faintly in the bottom-right corner of the main menu.
 
 ## Code map (for tinkering)
 
@@ -145,6 +157,7 @@ They replace the built-in sounds on your computer only, and that folder is never
 | `scripts/car_audio.gd` | A player's engine and brake sounds. |
 | `scripts/ghost_car.gd` | Records your best lap and replays it as a ghost. |
 | `scripts/skid_marks.gd`, `scripts/spectators.gd` | Skid marks, and the toy crowd. |
+| `scripts/powerups.gd` | Item boxes, the five power-ups, and how the computer cars use them. |
 | `scripts/unlocks.gd` | Everything you can unlock and what it costs in stars. |
 | `scripts/podium.gd`, `scripts/trophy.gd` | Grand Prix trophy ceremony and the trophy model. |
 | `scripts/race_hud.gd` | On-screen display and mini-map. |

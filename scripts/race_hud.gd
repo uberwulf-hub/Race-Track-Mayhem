@@ -38,6 +38,11 @@ var player_tag := "":        # "P1" / "P2" in split screen
 var _tag_label: Label
 var _wrong_way: Label
 var _behind: BehindArrows
+var _item_panel: PanelContainer
+var _item_style: StyleBoxFlat
+var _item_name: Label
+var _item_hint: Label
+var _item_kind := ""
 
 
 static func make_label(text: String, size: int, color: Color = Color.WHITE, outline: int = 10) -> Label:
@@ -168,6 +173,31 @@ func setup(p_track: Track, p_racers: Array[Racer], p_player: Racer) -> void:
 	pin(_hint_label, Vector2(0.5, 1), Vector2(-600, -40), Vector2(1200, 30))
 	_root.add_child(_hint_label)
 
+	# --- power-up slot ---
+	_item_panel = PanelContainer.new()
+	_item_style = StyleBoxFlat.new()
+	_item_style.set_corner_radius_all(16)
+	_item_style.set_border_width_all(5)
+	_item_style.border_color = Color.WHITE
+	_item_style.set_content_margin_all(8)
+	_item_panel.add_theme_stylebox_override("panel", _item_style)
+	pin(_item_panel, Vector2(0, 0), Vector2(20, 150), Vector2(230, 80))
+	_item_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var ib := VBoxContainer.new()
+	ib.add_theme_constant_override("separation", 0)
+	_item_panel.add_child(ib)
+	_item_name = make_label("", 26, Color.WHITE, 8)
+	_item_name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	ib.add_child(_item_name)
+	var key := "E / Y button"
+	if player and player.input_prefix == "p2_":
+		key = "/ key / Y button"
+	_item_hint = make_label("press " + key, 18, Color(1, 1, 1, 0.9), 6)
+	_item_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	ib.add_child(_item_hint)
+	_item_panel.visible = false
+	_root.add_child(_item_panel)
+
 	# --- "cars right behind you" arrows ---
 	_behind = BehindArrows.new()
 	_behind.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -220,6 +250,9 @@ func set_race_ui_visible(v: bool) -> void:
 	for c in _root.get_children():
 		if c == _hint_label and _hint_hidden:
 			continue
+		if c == _item_panel:
+			c.visible = v and _item_kind != ""
+			continue
 		if c == _center_label or c == _message_label or c == _title_box or c == _speed_lines or c == _fade or c == _wrong_way or c == _tag_label:
 			continue
 		c.visible = v
@@ -243,6 +276,24 @@ func set_wrong_way(on: bool) -> void:
 
 
 ## [[side -1..1, closeness 0..1, colour], ...] for cars just behind.
+## Shows the power-up being held ("" = none). Pops when a new one arrives.
+func set_item(kind: String, shielded: bool) -> void:
+	if _item_panel == null:
+		return
+	if kind == _item_kind:
+		return
+	_item_kind = kind
+	_item_panel.visible = kind != "" and _lap_label.visible
+	if kind == "":
+		return
+	var col: Color = PowerUps.COLORS[kind]
+	_item_style.bg_color = col.darkened(0.25)
+	_item_name.text = PowerUps.NAMES[kind]
+	_item_panel.pivot_offset = Vector2(115, 40)
+	_item_panel.scale = Vector2(1.4, 1.4)
+	create_tween().tween_property(_item_panel, "scale", Vector2.ONE, 0.3).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+
 func set_nearby(cars: Array) -> void:
 	if _behind:
 		_behind.cars = cars

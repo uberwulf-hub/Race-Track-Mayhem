@@ -25,6 +25,7 @@ var hud: RaceHud                # player 1's HUD
 var camera: Camera3D            # player 1's camera
 var skid_marks: SkidMarks
 var ghost: GhostCar
+var powerups: PowerUps
 
 var state := State.INTRO
 var _state_time := 0.0
@@ -89,6 +90,14 @@ func _ready() -> void:
 		ghost = GhostCar.new()
 		add_child(ghost)
 		ghost.setup(track, Game.track_id(), player)
+
+	if Game.powerups_enabled:
+		powerups = PowerUps.new()
+		add_child(powerups)
+		powerups.setup(track, racers)
+		powerups.item_got.connect(_on_item_got)
+		powerups.item_hit.connect(_on_item_hit)
+		powerups.process_mode = Node.PROCESS_MODE_PAUSABLE
 
 	for n: Node in [track, room]:
 		n.process_mode = Node.PROCESS_MODE_PAUSABLE
@@ -370,6 +379,8 @@ func _physics_process(delta: float) -> void:
 			if not r.has_finished:
 				r.race_time = _race_clock
 	_update_rubber_band(delta)
+	if powerups and (state == State.RACING or state == State.FINISHED):
+		powerups.update(delta)
 	for i in racers.size():
 		for j in range(i + 1, racers.size()):
 			racers[i].bump_with(racers[j])
@@ -418,6 +429,12 @@ func _unhandled_input(event: InputEvent) -> void:
 	for h in humans:
 		if event.is_action_pressed(h.action("respawn")) and not h.has_finished:
 			h.manual_respawn()
+		if powerups and state == State.RACING and event.is_action_pressed(h.action("use_item")) and h.item != "":
+			var used := h.item
+			powerups.use_item(h)
+			var v := _view_for(h)
+			if v:
+				v.hud.flash_message(PowerUps.NAMES[used].to_upper() + "!", PowerUps.COLORS[used], 0.6)
 
 
 # ---------------------------------------------------------------------------
@@ -509,6 +526,30 @@ func _on_boost(r: Racer) -> void:
 		_rumble(v, 0.3, 0.0, 0.25)
 
 
+func _on_item_got(r: Racer, kind: String) -> void:
+	if _view_for(r):
+		Sfx.play("pickup")
+
+
+const HIT_MESSAGES := {
+	"bubble": "BUBBLED!",
+	"ball": "BONK!",
+	"balloon": "SPLASH!",
+	"shield": "Your shield saved you!",
+}
+
+
+func _on_item_hit(victim: Racer, kind: String, by: Racer) -> void:
+	var v := _view_for(victim)
+	if v:
+		v.hud.flash_message(HIT_MESSAGES.get(kind, "WHOA!"), Color(0.6, 0.9, 1.0) if kind == "shield" else Color(1.0, 0.5, 0.4), 1.0)
+		v.shake = maxf(v.shake, 0.25)
+		_rumble(v, 0.5, 0.4, 0.3)
+	var a := _view_for(by)
+	if a and by != victim and kind != "shield":
+		a.hud.flash_message("GOT 'EM!", Color(1.0, 0.9, 0.3), 0.8)
+
+
 func _on_landed(r: Racer, h: float) -> void:
 	var v := _view_for(r)
 	if v:
@@ -556,6 +597,7 @@ func _update_view_extras(v: View, delta: float) -> void:
 			if behind > 1.5 and behind < 14.0:
 				near.append([clampf((o.lateral - r.lateral) / Track.HALF_WIDTH, -1.0, 1.0), 1.0 - behind / 14.0, o.car["body"]])
 	v.hud.set_nearby(near)
+	v.hud.set_item(r.item if powerups else "", r.shield_timer > 0.0)
 	if r == player and ghost:
 		ghost.follow(r.race_time - r.lap_start_time, state == State.RACING and not r.has_finished)
 

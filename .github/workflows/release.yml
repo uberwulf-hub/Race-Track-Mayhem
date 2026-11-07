@@ -51,6 +51,14 @@ jobs:
             rm /tmp/templates.tpz
           fi
 
+      - name: Stamp the version number
+        env:
+          VERSION: ${{ inputs.version || github.ref_name }}
+        run: |
+          V="${VERSION#v}"
+          sed -i "s/^config\/version=.*/config\/version=\"$V\"/" project.godot
+          grep config/version project.godot
+
       - name: Export the game
         run: |
           set -e

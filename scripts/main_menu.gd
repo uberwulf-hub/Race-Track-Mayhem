@@ -150,6 +150,12 @@ func _build_ui() -> void:
 		RaceHud.pin(rec, Vector2(0.5, 1), Vector2(-300, -44), Vector2(600, 36))
 		root.add_child(rec)
 
+	# The version number, quietly in the corner (handy for checking you're up to date).
+	var ver := RaceHud.make_label("v" + str(ProjectSettings.get_setting("application/config/version", "?")), 16, Color(1, 1, 1, 0.45), 4)
+	ver.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	RaceHud.pin(ver, Vector2(1, 1), Vector2(-150, -30), Vector2(140, 24))
+	root.add_child(ver)
+
 	_options_panel = _build_options(root)
 	_help_panel = _build_help(root)
 	_credits_panel = _build_credits(root)
@@ -269,6 +275,8 @@ func _build_options(root: Control) -> Control:
 		Game.steer_assist = not Game.steer_assist)
 	_choice(grid, "Ghost car:", func() -> String: return "On" if Game.ghost_enabled else "Off", func():
 		Game.ghost_enabled = not Game.ghost_enabled)
+	_choice(grid, "Power-ups:", func() -> String: return "On" if Game.powerups_enabled else "Off", func():
+		Game.powerups_enabled = not Game.powerups_enabled)
 	_slider_row(grid, "Volume:", Game.master_volume, func(v: float): Game.set_volume(v))
 	_slider_row(grid, "Music:", Game.music_volume, func(v: float): Game.set_music_volume(v))
 	_slider_row(grid, "Sounds:", Game.sfx_volume, func(v: float): Game.set_sfx_volume(v))
@@ -332,6 +340,7 @@ func _build_help(root: Control) -> Control:
 		"Win races to earn STARS and unlock paint, stickers, wheels...",
 		"...and win a Grand Prix to unlock the SECRET car!",
 		"TRACK BUILDER: snap pieces together to build and race your own tracks!",
+		"POWER-UPS: drive through ? boxes, then press E (or Y) to use them!",
 	]
 	for line in lines:
 		var l := RaceHud.make_label(line, 22, Color.WHITE, 6)

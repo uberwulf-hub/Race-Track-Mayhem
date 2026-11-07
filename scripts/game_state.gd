@@ -23,6 +23,7 @@ var quality: int = 1             # 0 low, 1 medium, 2 high
 var fullscreen := false
 var steer_assist := true         # gentle steering help for little drivers
 var ghost_enabled := true        # race against your best lap
+var powerups_enabled := true     # item boxes on the track
 
 # Progress
 var stars: int = 0               # earned by finishing races
@@ -112,6 +113,7 @@ func load_settings() -> void:
 	fullscreen = bool(cfg.get_value("settings", "fullscreen", false))
 	steer_assist = bool(cfg.get_value("settings", "steer_assist", true))
 	ghost_enabled = bool(cfg.get_value("settings", "ghost", true))
+	powerups_enabled = bool(cfg.get_value("settings", "powerups", true))
 	stars = int(cfg.get_value("progress", "stars", 0))
 	trophies = cfg.get_value("progress", "trophies", {})
 	custom = cfg.get_value("progress", "custom", {})
@@ -138,6 +140,7 @@ func save_settings() -> void:
 	cfg.set_value("settings", "fullscreen", fullscreen)
 	cfg.set_value("settings", "steer_assist", steer_assist)
 	cfg.set_value("settings", "ghost", ghost_enabled)
+	cfg.set_value("settings", "powerups", powerups_enabled)
 	cfg.set_value("progress", "stars", stars)
 	cfg.set_value("progress", "trophies", trophies)
 	cfg.set_value("progress", "custom", custom)
@@ -288,21 +291,23 @@ func _setup_input() -> void:
 	_add_action("steer_left", [KEY_A, KEY_LEFT], [JOY_BUTTON_DPAD_LEFT], [[JOY_AXIS_LEFT_X, -1.0]])
 	_add_action("steer_right", [KEY_D, KEY_RIGHT], [JOY_BUTTON_DPAD_RIGHT], [[JOY_AXIS_LEFT_X, 1.0]])
 	_add_action("turbo", [KEY_SPACE, KEY_SHIFT], [JOY_BUTTON_B, JOY_BUTTON_RIGHT_SHOULDER], [])
-	_add_action("respawn", [KEY_R], [JOY_BUTTON_Y], [])
+	_add_action("respawn", [KEY_R], [JOY_BUTTON_BACK], [])
+	_add_action("use_item", [KEY_E, KEY_Q], [JOY_BUTTON_Y], [])
 	_add_action("camera", [KEY_C], [JOY_BUTTON_LEFT_SHOULDER], [])
 	_add_action("pause", [KEY_ESCAPE, KEY_P], [JOY_BUTTON_START], [])
 	# Two-player split screen: each player gets their own keys and controller.
-	_add_player_actions("p1_", KEY_W, KEY_S, KEY_A, KEY_D, [KEY_SPACE, KEY_SHIFT], KEY_R, 0)
-	_add_player_actions("p2_", KEY_UP, KEY_DOWN, KEY_LEFT, KEY_RIGHT, [KEY_ENTER, KEY_KP_0, KEY_CTRL], KEY_BACKSPACE, 1)
+	_add_player_actions("p1_", KEY_W, KEY_S, KEY_A, KEY_D, [KEY_SPACE, KEY_SHIFT], KEY_R, 0, [KEY_E, KEY_Q])
+	_add_player_actions("p2_", KEY_UP, KEY_DOWN, KEY_LEFT, KEY_RIGHT, [KEY_ENTER, KEY_KP_0, KEY_CTRL], KEY_BACKSPACE, 1, [KEY_SLASH, KEY_KP_1])
 
 
-func _add_player_actions(prefix: String, up: Key, down: Key, left: Key, right: Key, turbo: Array, reset: Key, device: int) -> void:
+func _add_player_actions(prefix: String, up: Key, down: Key, left: Key, right: Key, turbo: Array, reset: Key, device: int, item_keys: Array) -> void:
 	_add_action(prefix + "accelerate", [up], [JOY_BUTTON_A], [[JOY_AXIS_TRIGGER_RIGHT, 1.0]], device)
 	_add_action(prefix + "brake", [down], [JOY_BUTTON_X], [[JOY_AXIS_TRIGGER_LEFT, 1.0]], device)
 	_add_action(prefix + "steer_left", [left], [JOY_BUTTON_DPAD_LEFT], [[JOY_AXIS_LEFT_X, -1.0]], device)
 	_add_action(prefix + "steer_right", [right], [JOY_BUTTON_DPAD_RIGHT], [[JOY_AXIS_LEFT_X, 1.0]], device)
 	_add_action(prefix + "turbo", turbo, [JOY_BUTTON_B, JOY_BUTTON_RIGHT_SHOULDER], [], device)
-	_add_action(prefix + "respawn", [reset], [JOY_BUTTON_Y], [], device)
+	_add_action(prefix + "respawn", [reset], [JOY_BUTTON_BACK], [], device)
+	_add_action(prefix + "use_item", item_keys, [JOY_BUTTON_Y], [], device)
 
 
 func _add_action(action: String, keys: Array, buttons: Array, axes: Array, device: int = -1) -> void:
