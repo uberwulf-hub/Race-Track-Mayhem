@@ -123,7 +123,10 @@ func _make_roster() -> Array:
 		return Game.gp_roster
 	var roster: Array = []
 	var two := Game.two_player
-	roster.append({"name": "Player 1" if two else "You", "car": Game.selected_car, "player": 1})
+	var me := Game.player_name
+	if me == "":
+		me = "Player 1" if two else "You"
+	roster.append({"name": me, "car": Game.selected_car, "player": 1})
 	if two:
 		roster.append({"name": "Player 2", "car": Game.p2_car, "player": 2})
 	var pool: Array[int] = []
@@ -131,7 +134,7 @@ func _make_roster() -> Array:
 		if not CarData.get_car(i).get("secret", false) and i != Game.selected_car and not (two and i == Game.p2_car):
 			pool.append(i)
 	pool.shuffle()
-	var names := AI_NAMES.duplicate()
+	var names := AI_NAMES.filter(func(n): return String(n).to_lower() != me.to_lower() and n != "Player 2")
 	names.shuffle()
 	var k := 0
 	while roster.size() < 5:

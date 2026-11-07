@@ -3,7 +3,12 @@ extends Node
 ## progress (stars, unlocks, trophies), Grand Prix and 2-player state,
 ## controls and the shared UI theme.
 
+## Settings for this computer (volume, graphics) and which player went last.
 const SAVE_PATH := "user://race_track_mayhem.cfg"
+## Each player's own save slot: name, progress, records, cars and preferences.
+const PLAYER_PATH := "user://player_%d.cfg"
+const MAX_PLAYERS := 6
+const NAME_LENGTH := 12
 const DIFFICULTY_NAMES := ["Easy", "Normal", "Hard"]
 const QUALITY_NAMES := ["Low", "Medium", "High"]
 const GP_POINTS := [10, 8, 6, 5, 4]
@@ -48,6 +53,11 @@ var editing_slot := -1           # which custom track the builder is editing (-1
 var skip_track_select := false   # "Race It!" in the builder goes straight to the race
 
 var ui_theme: Theme
+
+## Save slots (one per player). player_slot is -1 until someone is picked.
+var player_slot := -1
+var player_name := ""
+var player_chosen := false        # picked on the "Who's racing?" screen this time
 
 
 func _ready() -> void:
@@ -96,57 +106,165 @@ func goto_race() -> void:
 
 func load_settings() -> void:
 	var cfg := ConfigFile.new()
-	if cfg.load(SAVE_PATH) != OK:
-		_apply_volume()
-		return
-	selected_car = int(cfg.get_value("player", "car", 0))
-	custom_tracks = cfg.get_value("builder", "tracks", [])
-	selected_track = clampi(int(cfg.get_value("player", "track", 0)), 0, track_count() - 1)
-	laps = int(cfg.get_value("settings", "laps", 3))
-	difficulty = int(cfg.get_value("settings", "difficulty", 0))
+	var has_file := cfg.load(SAVE_PATH) == OK
 	master_volume = float(cfg.get_value("settings", "volume", 0.8))
 	music_volume = float(cfg.get_value("settings", "music_volume", 0.6))
 	sfx_volume = float(cfg.get_value("settings", "sfx_volume", 0.9))
-	best_times = cfg.get_value("records", "best_times", {})
-	best_laps = cfg.get_value("records", "best_laps", {})
 	quality = clampi(int(cfg.get_value("settings", "quality", 1)), 0, 2)
 	fullscreen = bool(cfg.get_value("settings", "fullscreen", false))
-	steer_assist = bool(cfg.get_value("settings", "steer_assist", true))
-	ghost_enabled = bool(cfg.get_value("settings", "ghost", true))
-	powerups_enabled = bool(cfg.get_value("settings", "powerups", true))
-	stars = int(cfg.get_value("progress", "stars", 0))
-	trophies = cfg.get_value("progress", "trophies", {})
-	custom = cfg.get_value("progress", "custom", {})
-	p2_car = int(cfg.get_value("player", "p2_car", 1))
-	selected_car = clampi(selected_car, 0, CarData.count() - 1)
-	p2_car = clampi(p2_car, 0, CarData.count() - 1)
-	laps = clampi(laps, 1, 9)
-	difficulty = clampi(difficulty, 0, 2)
 	_apply_volume()
+	if has_file and not cfg.has_section_key("players", "last") and _list_slots().is_empty():
+		# A save from before save slots: keep everything as the first player.
+		if cfg.has_section("progress") or cfg.has_section("records") or cfg.has_section("builder"):
+			_read_player(cfg)
+			player_slot = 0
+			player_name = "Player 1"
+			_write_player()
+	var last := int(cfg.get_value("players", "last", 0 if player_slot == 0 else -1))
+	if last >= 0 and FileAccess.file_exists(PLAYER_PATH % last):
+		select_player(last)
+	elif not _list_slots().is_empty():
+		select_player(_list_slots()[0])
 
 
 func save_settings() -> void:
 	var cfg := ConfigFile.new()
-	cfg.set_value("player", "car", selected_car)
-	cfg.set_value("player", "track", selected_track)
-	cfg.set_value("settings", "laps", laps)
-	cfg.set_value("settings", "difficulty", difficulty)
 	cfg.set_value("settings", "volume", master_volume)
 	cfg.set_value("settings", "music_volume", music_volume)
 	cfg.set_value("settings", "sfx_volume", sfx_volume)
-	cfg.set_value("records", "best_times", best_times)
-	cfg.set_value("records", "best_laps", best_laps)
 	cfg.set_value("settings", "quality", quality)
 	cfg.set_value("settings", "fullscreen", fullscreen)
+	cfg.set_value("players", "last", player_slot)
+	cfg.save(SAVE_PATH)
+	_write_player()
+
+
+# --------------------------------------------------------------------------
+# Players (save slots)
+# --------------------------------------------------------------------------
+
+## Everyone with a save slot: [{slot, name, stars, difficulty, trophies}].
+func list_players() -> Array:
+	var out: Array = []
+	for slot in _list_slots():
+		var cfg := ConfigFile.new()
+		if cfg.load(PLAYER_PATH % slot) != OK:
+			continue
+		out.append({
+			"slot": slot,
+			"name": String(cfg.get_value("player", "name", "Player %d" % (slot + 1))),
+			"stars": int(cfg.get_value("progress", "stars", 0)),
+			"difficulty": clampi(int(cfg.get_value("settings", "difficulty", 0)), 0, 2),
+			"trophies": (cfg.get_value("progress", "trophies", {}) as Dictionary).size(),
+		})
+	return out
+
+
+func _list_slots() -> Array:
+	var out: Array = []
+	for slot in MAX_PLAYERS:
+		if FileAccess.file_exists(PLAYER_PATH % slot):
+			out.append(slot)
+	return out
+
+
+## Makes a new player and switches to them. Returns the slot, or -1 if full.
+func create_player(new_name: String, diff: int, steer_help: bool) -> int:
+	var slot := -1
+	for i in MAX_PLAYERS:
+		if not FileAccess.file_exists(PLAYER_PATH % i):
+			slot = i
+			break
+	if slot < 0:
+		return -1
+	_read_player(ConfigFile.new())   # a fresh start
+	player_slot = slot
+	player_name = clean_name(new_name)
+	difficulty = clampi(diff, 0, 2)
+	steer_assist = steer_help
+	player_chosen = true
+	save_settings()
+	return slot
+
+
+func select_player(slot: int) -> void:
+	var cfg := ConfigFile.new()
+	if cfg.load(PLAYER_PATH % slot) != OK:
+		return
+	_read_player(cfg)
+	player_slot = slot
+	player_name = String(cfg.get_value("player", "name", "Player %d" % (slot + 1)))
+
+
+func rename_player(new_name: String) -> void:
+	player_name = clean_name(new_name)
+	save_settings()
+
+
+func delete_player(slot: int) -> void:
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(PLAYER_PATH % slot))
+	# Their ghost laps go too, so a new player in this slot starts fresh.
+	var ghosts: String = GhostCar.DIR if slot == 0 else "%sp%d/" % [GhostCar.DIR, slot]
+	for f in DirAccess.get_files_at(ghosts):
+		if f.ends_with(".cfg"):
+			DirAccess.remove_absolute(ProjectSettings.globalize_path(ghosts + f))
+	if slot == player_slot:
+		player_slot = -1
+		player_name = ""
+		_read_player(ConfigFile.new())
+		var left := _list_slots()
+		if not left.is_empty():
+			select_player(left[0])
+		save_settings()
+
+
+static func clean_name(n: String) -> String:
+	n = n.strip_edges().replace("\n", " ")
+	if n.length() > NAME_LENGTH:
+		n = n.substr(0, NAME_LENGTH)
+	return n if n != "" else "Racer"
+
+
+## Loads one player's slot (an empty ConfigFile gives a fresh start).
+func _read_player(cfg: ConfigFile) -> void:
+	selected_car = int(cfg.get_value("player", "car", 0))
+	p2_car = int(cfg.get_value("player", "p2_car", 1))
+	custom_tracks = cfg.get_value("builder", "tracks", [])
+	selected_track = clampi(int(cfg.get_value("player", "track", 0)), 0, track_count() - 1)
+	laps = clampi(int(cfg.get_value("settings", "laps", 3)), 1, 9)
+	difficulty = clampi(int(cfg.get_value("settings", "difficulty", 0)), 0, 2)
+	steer_assist = bool(cfg.get_value("settings", "steer_assist", true))
+	ghost_enabled = bool(cfg.get_value("settings", "ghost", true))
+	powerups_enabled = bool(cfg.get_value("settings", "powerups", true))
+	best_times = cfg.get_value("records", "best_times", {})
+	best_laps = cfg.get_value("records", "best_laps", {})
+	stars = int(cfg.get_value("progress", "stars", 0))
+	trophies = cfg.get_value("progress", "trophies", {})
+	custom = cfg.get_value("progress", "custom", {})
+	selected_car = clampi(selected_car, 0, CarData.count() - 1)
+	p2_car = clampi(p2_car, 0, CarData.count() - 1)
+
+
+func _write_player() -> void:
+	if player_slot < 0:
+		return
+	var cfg := ConfigFile.new()
+	cfg.set_value("player", "name", player_name)
+	cfg.set_value("player", "car", selected_car)
+	cfg.set_value("player", "p2_car", p2_car)
+	cfg.set_value("player", "track", selected_track)
+	cfg.set_value("settings", "laps", laps)
+	cfg.set_value("settings", "difficulty", difficulty)
 	cfg.set_value("settings", "steer_assist", steer_assist)
 	cfg.set_value("settings", "ghost", ghost_enabled)
 	cfg.set_value("settings", "powerups", powerups_enabled)
+	cfg.set_value("records", "best_times", best_times)
+	cfg.set_value("records", "best_laps", best_laps)
 	cfg.set_value("progress", "stars", stars)
 	cfg.set_value("progress", "trophies", trophies)
 	cfg.set_value("progress", "custom", custom)
-	cfg.set_value("player", "p2_car", p2_car)
 	cfg.set_value("builder", "tracks", custom_tracks)
-	cfg.save(SAVE_PATH)
+	cfg.save(PLAYER_PATH % player_slot)
 
 
 func set_volume(v: float) -> void:

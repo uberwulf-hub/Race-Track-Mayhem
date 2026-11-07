@@ -103,18 +103,24 @@ func lap_spoiled() -> void:
 func save_if_better() -> void:
 	if _pending_time <= 0.0 or (_best_time > 0.0 and _pending_time >= _best_time):
 		return
-	DirAccess.make_dir_recursive_absolute(DIR)
+	DirAccess.make_dir_recursive_absolute(_dir())
 	var cfg := ConfigFile.new()
 	cfg.set_value("ghost", "lap_time", _pending_time)
 	cfg.set_value("ghost", "data", _pending)
-	cfg.save(DIR + track_id + ".cfg")
+	cfg.save(_dir() + track_id + ".cfg")
 	_best = _pending
 	_best_time = _pending_time
 
 
 func _load() -> void:
 	var cfg := ConfigFile.new()
-	if cfg.load(DIR + track_id + ".cfg") != OK:
+	if cfg.load(_dir() + track_id + ".cfg") != OK:
 		return
 	_best_time = float(cfg.get_value("ghost", "lap_time", -1.0))
 	_best = cfg.get_value("ghost", "data", PackedFloat32Array())
+
+
+## Each player races their own ghost (the first player keeps the old folder).
+static func _dir() -> String:
+	var slot: int = Engine.get_main_loop().root.get_node("Game").player_slot
+	return DIR if slot <= 0 else "%sp%d/" % [DIR, slot]

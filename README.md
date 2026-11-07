@@ -90,6 +90,11 @@ Whenever you come off the track, the screen fades and you're put back where you 
 
 Cars further back get better power-ups, and the computer cars use them too. Switch them off in Options.
 
+**Players.** Up to 6 players each get their own save slot. The game asks "Who's racing?" when it starts:
+pick your name, or make a new player (type a name, or use the on-screen letters with a controller) and choose
+how tough the other cars are. Each player keeps their own stars, unlocks, trophies, best times, ghost laps,
+tracks and settings (difficulty, laps, steering help). Switch players any time from the button at the top-left of the menu.
+
 **Track Builder.** Build your own tracks from the main menu or the track picker:
 - **Pieces:** Straight, Turn Left/Right, Bend Left/Right, Boost Pad, Loop, Corkscrew, Jump, Big Jump, Hill, Bumps, Spiral and Wiggles.
 - **Live preview:** a toy car drives your track while you build. A bouncing arrow shows where the next piece goes.

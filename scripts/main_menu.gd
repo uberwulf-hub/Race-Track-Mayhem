@@ -22,6 +22,22 @@ var _diff_button: Button
 var _title_letters: Array[Label] = []
 var _time := 0.0
 
+# Save slots ("Who's racing?")
+var _who_panel: Control
+var _who_list: VBoxContainer
+var _new_panel: Control
+var _name_edit: LineEdit
+var _new_diff := 0
+var _new_steer := true
+var _removing := false
+var _renaming := false
+var _new_title: Label
+var _go_button: Button
+var _remove_armed := -1
+
+const FUN_NAMES := ["Zippy", "Rocket", "Flash", "Sparky", "Dash", "Bolt", "Nitro", "Comet",
+	"Blaze", "Whizz", "Champ", "Ace", "Skipper", "Bumble", "Pickle", "Noodle"]
+
 
 func _ready() -> void:
 	Sfx.play_music("menu")
@@ -137,6 +153,14 @@ func _build_ui() -> void:
 		_button(_main_box, "Quit", func(): get_tree().quit())
 	play.grab_focus.call_deferred()
 
+	# Who's playing (their own save slot); press to switch.
+	var who := _button(root, _player_text(), _open_who)
+	who.add_theme_font_size_override("font_size", 24)
+	who.tooltip_text = "Switch player"
+	RaceHud.pin(who, Vector2(0, 0), Vector2(16, 14), Vector2(320, 56))
+	who.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	who.clip_text = true
+
 	var star_label := RaceHud.make_label("★ %d" % Game.stars, 40, Color(1.0, 0.9, 0.3), 12)
 	star_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	star_label.tooltip_text = "Stars: win races to unlock paint, stickers, wheels and more!"
@@ -159,9 +183,15 @@ func _build_ui() -> void:
 	_options_panel = _build_options(root)
 	_help_panel = _build_help(root)
 	_credits_panel = _build_credits(root)
+	_who_panel = _build_who(root)
+	_new_panel = _build_new_player(root)
 	var credits_btn := _button(root, "Credits", func(): _show_panel(_credits_panel))
 	credits_btn.add_theme_font_size_override("font_size", 20)
 	RaceHud.pin(credits_btn, Vector2(0, 1), Vector2(16, -64), Vector2(130, 48))
+
+	# First time in this session (or nobody saved yet): ask who's racing.
+	if Game.player_slot < 0 or not Game.player_chosen:
+		_open_who.call_deferred()
 
 
 func _title_row(text: String, size: int, colors: Array) -> HBoxContainer:
@@ -234,6 +264,8 @@ func _show_panel(panel: Control) -> void:
 	_options_panel.visible = panel == _options_panel
 	_help_panel.visible = panel == _help_panel
 	_credits_panel.visible = panel == _credits_panel
+	_who_panel.visible = panel == _who_panel
+	_new_panel.visible = panel == _new_panel
 	if panel == null:
 		(_main_box.get_child(0).get_child(0) as Button).grab_focus()
 	else:
@@ -360,7 +392,7 @@ func _build_credits(root: Control) -> Control:
 		"Godot is (c) Juan Linietsky, Ariel Manzur and contributors, MIT license",
 		"",
 		"Sound effects: Kenney (kenney.nl) and Landeplage, CC0",
-		"Music: Juhani Junkala, \"5 Chiptunes (Action)\", CC0",
+		"Music: the Mesa Mayhem soundtrack by Andrew Saulls, made with Suno",
 		"",
 		"Full license texts are in the licenses folder.",
 	]
@@ -375,4 +407,219 @@ func _build_credits(root: Control) -> Control:
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("ui_cancel") and not _main_box.visible:
 		Sfx.play("back")
-		_show_panel(null)
+		if _new_panel.visible and not _renaming:
+			_open_who()
+		elif _who_panel.visible and Game.player_slot < 0:
+			return   # someone has to pick a player first
+		else:
+			_show_panel(null)
+
+
+# ---------------------------------------------------------------------------
+# Players: "Who's racing?" and "New Player"
+# ---------------------------------------------------------------------------
+
+func _player_text() -> String:
+	return "Racer: " + (Game.player_name if Game.player_name != "" else "?")
+
+
+func _build_who(root: Control) -> Control:
+	var parts := _panel(root, "Who's racing?")
+	_who_list = parts[1]
+	return parts[0]
+
+
+func _open_who() -> void:
+	_removing = false
+	_remove_armed = -1
+	_fill_who()
+	_show_panel(_who_panel)
+	# Start on whoever played last.
+	for b in _who_list.find_children("*", "Button", true, false):
+		if b.has_meta("slot") and int(b.get_meta("slot")) == Game.player_slot:
+			(b as Button).grab_focus()
+			break
+
+
+func _fill_who() -> void:
+	for i in range(_who_list.get_child_count() - 1, 0, -1):   # keep the title
+		_who_list.get_child(i).queue_free()
+	var players := Game.list_players()
+	if players.is_empty():
+		var hi := RaceHud.make_label("Hi! Make a player so the game can save your stars, trophies, tracks and best times.", 22, Color.WHITE, 6)
+		hi.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		hi.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		hi.custom_minimum_size = Vector2(560, 0)
+		_who_list.add_child(hi)
+	elif _removing:
+		var warn := RaceHud.make_label("Pick a player to remove (press twice). Their save is gone for good!", 20, Color(1.0, 0.75, 0.6), 6)
+		warn.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_who_list.add_child(warn)
+	for p: Dictionary in players:
+		var slot: int = p["slot"]
+		var text := "%s      ★ %d   %s" % [p["name"], p["stars"], Game.DIFFICULTY_NAMES[p["difficulty"]]]
+		if _removing:
+			text = ("Really remove %s?" % p["name"]) if _remove_armed == slot else ("Remove " + String(p["name"]))
+		var b := _button(_who_list, text, func(): _pick_player(slot))
+		b.set_meta("slot", slot)
+		b.add_theme_font_size_override("font_size", 30)
+		if _removing:
+			b.modulate = Color(1.0, 0.7, 0.65)
+	if not _removing and players.size() < Game.MAX_PLAYERS:
+		var add := _button(_who_list, "+ New Player", _open_new_player)
+		add.add_theme_font_size_override("font_size", 30)
+		add.modulate = Color(0.75, 1.0, 0.75)
+	var row := _row(_who_list)
+	if not players.is_empty():
+		_button(row, "Done" if _removing else "Remove a Player", func():
+			_removing = not _removing
+			_remove_armed = -1
+			_fill_who()
+			_focus_first(_who_list))
+	if Game.player_slot >= 0 and Game.player_chosen and not _removing:
+		_button(row, "Change " + Game.player_name, func(): _open_new_player(true))
+		_button(row, "Back", func(): _show_panel(null))
+
+
+func _focus_first(box: Control) -> void:
+	var buttons := box.find_children("*", "Button", true, false)
+	if buttons.size() > 0:
+		(buttons[0] as Button).grab_focus.call_deferred()
+
+
+func _pick_player(slot: int) -> void:
+	if _removing:
+		if _remove_armed != slot:
+			_remove_armed = slot
+			_fill_who()
+			for b in _who_list.find_children("*", "Button", true, false):
+				if b.has_meta("slot") and int(b.get_meta("slot")) == slot:
+					(b as Button).grab_focus.call_deferred()
+			return
+		Game.delete_player(slot)
+		Sfx.play("crash")
+		_removing = Game.list_players().size() > 0
+		_remove_armed = -1
+		if Game.list_players().is_empty():
+			Game.player_chosen = false
+		_fill_who()
+		_focus_first(_who_list)
+		return
+	Game.select_player(slot)
+	Game.player_chosen = true
+	Game.save_settings()
+	Game.goto_menu()   # reload so stars, best times and options are theirs
+
+
+func _build_new_player(root: Control) -> Control:
+	var parts := _panel(root, "New Player")
+	var box: VBoxContainer = parts[1]
+	_new_title = box.get_child(0) as Label
+	box.add_theme_constant_override("separation", 10)
+	box.add_child(RaceHud.make_label("What's your name?", 28))
+	var name_row := HBoxContainer.new()
+	name_row.add_theme_constant_override("separation", 10)
+	box.add_child(name_row)
+	_name_edit = LineEdit.new()
+	_name_edit.max_length = Game.NAME_LENGTH
+	_name_edit.placeholder_text = "Type your name"
+	_name_edit.add_theme_font_size_override("font_size", 34)
+	_name_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_name_edit.text_submitted.connect(func(_t: String): _finish_new_player())
+	name_row.add_child(_name_edit)
+	_button(name_row, "Surprise me!", func():
+		_name_edit.text = FUN_NAMES[randi() % FUN_NAMES.size()])
+
+	# Letters for controller players (keyboard players can just type).
+	var keys := GridContainer.new()
+	keys.columns = 10
+	keys.add_theme_constant_override("h_separation", 4)
+	keys.add_theme_constant_override("v_separation", 4)
+	box.add_child(keys)
+	for ch in "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
+		var letter: String = ch
+		var k := _button(keys, letter, func(): _type(letter))
+		k.custom_minimum_size = Vector2(52, 48)
+		k.add_theme_font_size_override("font_size", 22)
+	var edit_row := _row(box)
+	var space := _button(edit_row, "Space", func(): _type(" "))
+	var del := _button(edit_row, "Delete", func():
+		_name_edit.text = _name_edit.text.substr(0, maxi(0, _name_edit.text.length() - 1)))
+	for k: Button in [space, del]:
+		k.custom_minimum_size = Vector2(160, 48)
+		k.add_theme_font_size_override("font_size", 20)
+
+	var grid := GridContainer.new()
+	grid.columns = 2
+	grid.add_theme_constant_override("h_separation", 24)
+	box.add_child(grid)
+	grid.add_child(RaceHud.make_label("Other cars:", 28))
+	var diff_btn := _button(grid, "", Callable())
+	diff_btn.custom_minimum_size = Vector2(240, 0)
+	grid.add_child(RaceHud.make_label("Steering help:", 28))
+	var steer_btn := _button(grid, "", Callable())
+	var hint := RaceHud.make_label("", 18, Color(0.85, 0.9, 1.0), 4)
+	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(hint)
+	var refresh := func():
+		diff_btn.text = Game.DIFFICULTY_NAMES[_new_diff]
+		steer_btn.text = "On" if _new_steer else "Off"
+		hint.text = ["Easy: great for little racers.", "Normal: a fair race.", "Hard: the computer cars are fast!"][_new_diff] \
+			+ "  You can change this any time in Options."
+	diff_btn.pressed.connect(func():
+		_new_diff = (_new_diff + 1) % 3
+		refresh.call())
+	steer_btn.pressed.connect(func():
+		_new_steer = not _new_steer
+		refresh.call())
+	_name_edit.set_meta("refresh", refresh)
+
+	var row := _row(box)
+	var go := _button(row, "Let's Race!", _finish_new_player)
+	go.add_theme_font_size_override("font_size", 32)
+	_go_button = go
+	_button(row, "Back", func():
+		if _renaming:
+			_show_panel(null)
+		else:
+			_open_who())
+	return parts[0]
+
+
+func _type(ch: String) -> void:
+	if _name_edit.text.length() < Game.NAME_LENGTH:
+		var t := _name_edit.text
+		# Capital first letter, small letters after (unless after a space).
+		if t != "" and not t.ends_with(" ") and ch != " ":
+			ch = ch.to_lower()
+		_name_edit.text = t + ch
+
+
+func _open_new_player(rename := false) -> void:
+	_renaming = rename
+	_new_title.text = "Change Player" if rename else "New Player"
+	_go_button.text = "Save" if rename else "Let's Race!"
+	_name_edit.text = Game.player_name if rename else ""
+	_new_diff = Game.difficulty if rename else 0
+	_new_steer = Game.steer_assist if rename else true
+	(_name_edit.get_meta("refresh") as Callable).call()
+	_show_panel(_new_panel)
+	_name_edit.grab_focus.call_deferred()
+
+
+func _finish_new_player() -> void:
+	if _name_edit.text.strip_edges() == "":
+		_name_edit.placeholder_text = "Type a name first!"
+		_name_edit.grab_focus()
+		Sfx.play("back")
+		return
+	if _renaming:
+		Game.difficulty = _new_diff
+		Game.steer_assist = _new_steer
+		Game.rename_player(_name_edit.text)
+		Game.goto_menu()
+		return
+	if Game.create_player(_name_edit.text, _new_diff, _new_steer) < 0:
+		return
+	Sfx.play("voice_go")
+	Game.goto_menu()
