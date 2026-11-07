@@ -131,9 +131,9 @@ Cars further back get better power-ups, and the computer cars use them too. Swit
 - Real bump physics: cars shove and spin each other depending on where they're hit.
 - Results with best times, stars and new unlocks, and an announcer for the final lap, new records and unlocks.
 
-**Sound.** All CC0 (see [assets/audio/CREDITS.md](assets/audio/CREDITS.md)), with separate Music and Sound volume sliders:
+**Sound.** CC0 sound effects plus our own Mesa Mayhem soundtrack (see [assets/audio/CREDITS.md](assets/audio/CREDITS.md)), with separate Music and Sound volume sliders:
 - A two-layer engine that revs with speed, brake squeals, and 3D engine sounds with a Doppler effect on the other cars.
-- Different music for the menu, the garage, races and results.
+- The Mesa Mayhem theme on the menu and pickers, five race songs (one picked at random each race) and a victory fanfare.
 
 **Use your own sounds:** drop files into `assets/audio/local/` (see [its README](assets/audio/local/README.md)).
 They replace the built-in sounds on your computer only, and that folder is never uploaded to GitHub.

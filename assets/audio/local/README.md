@@ -30,7 +30,7 @@ When a name exists here, the game uses your version instead of the built-in one.
 | Music name | Where it plays |
 |---|---|
 | `menu` | Main menu (the theme song) |
-| `garage` | Car picker and track picker |
+| `garage` | Car picker and track picker (if missing, the menu song keeps playing) |
 | `race` (or `race_1`, `race_2`...) | During races (one is picked at random) |
 | `results` | Results screen |
 

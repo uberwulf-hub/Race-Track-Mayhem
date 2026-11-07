@@ -1,8 +1,10 @@
 # Audio credits
 
-Every sound and music file in this folder is **CC0 (public domain)**, so you can use,
-change and share them freely, and no attribution is required. We credit the creators anyway
-because they deserve it.
+The sound effects are **CC0 (public domain)**, so you can use, change and share them freely,
+and no attribution is required. We credit the creators anyway because they deserve it.
+
+The **music is not CC0**: it's our own Mesa Mayhem soundtrack (see below). Please don't reuse it
+outside this game.
 
 | Files | Creator | Source | License |
 |---|---|---|---|
@@ -14,13 +16,29 @@ because they deserve it.
 | `sfx/voice_*.ogg` | Kenney | [Voiceover Pack](https://kenney.nl/assets/voiceover-pack) | CC0 |
 | `sfx/lap.ogg`, `sfx/final_lap.ogg`, `sfx/win.ogg`, `sfx/finish.ogg` | Kenney | [Music Jingles](https://kenney.nl/assets/music-jingles) | CC0 |
 | `sfx/click.wav`, `sfx/select.wav`, `sfx/back.wav` | Kenney | [Interface Sounds](https://kenney.nl/assets/interface-sounds) | CC0 |
-| `music/menu.ogg`, `music/garage.ogg`, `music/race_1.ogg`, `music/race_2.ogg`, `music/results.ogg` | Juhani Junkala | [5 Chiptunes (Action)](https://opengameart.org/content/5-chiptunes-action) | CC0 |
+
+## Music: the Mesa Mayhem soundtrack
+
+Made by Andrew Saulls with Suno. All rights reserved; included here for Race Track Mayhem only.
+
+| File | Song | Where it plays |
+|---|---|---|
+| `music/menu.ogg` | Game Menu (Mesa Mayhem) | Main menu, car picker, track picker and Track Builder |
+| `music/race_1.ogg` | Sonoran Mesa | Races (one of the five is picked at random) |
+| `music/race_2.ogg` | Copper Pit | Races |
+| `music/race_3.ogg` | Server Room | Races |
+| `music/race_4.ogg` | Pebblemoon | Races |
+| `music/race_5.ogg` | The Lab | Races |
+| `music/results.ogg` | Triumphant Fanfare | Results and podium (plays once, then the menu song returns) |
+
+The songs were converted from MP3 to Ogg Vorbis and their loudness was evened out (-16 LUFS).
 
 ## Swapping sounds
 
 Drop a file named after the sound into `sfx/` (`.ogg`, `.wav` or `.mp3`), for example `boost.ogg`.
 For random variations, number them: `boost_1.ogg`, `boost_2.ogg` and so on. Music files go in
-`music/`. With several race tracks (`race_1`, `race_2`), one is picked at random each race.
+`music/`. With several race songs (`race_1`, `race_2`...), one is picked at random each race.
+If there's no `garage` song, the pickers keep the menu song playing.
 If a file is missing, the game falls back to its own synthesized beeps.
 
 The countdown beeps, whoosh and rev sounds are made by the game itself (in `scripts/sfx.gd`).

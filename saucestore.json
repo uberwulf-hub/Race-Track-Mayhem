@@ -15,6 +15,6 @@
     { "asset": "Godot Engine (game engine, bundled in the .exe)", "author": "Juan Linietsky, Ariel Manzur and Godot Engine contributors", "license": "MIT", "source": "https://godotengine.org/license" },
     { "asset": "Sound effects, voices, jingles and UI sounds", "author": "Kenney (www.kenney.nl)", "license": "CC0 1.0", "source": "https://kenney.nl/assets" },
     { "asset": "Tire skid and brake sound", "author": "Landeplage", "license": "CC0 1.0", "source": "https://github.com/KenneyNL/Starter-Kit-Racing" },
-    { "asset": "Music: 5 Chiptunes (Action)", "author": "Juhani Junkala", "license": "CC0 1.0", "source": "https://opengameart.org/content/5-chiptunes-action" }
+    { "asset": "Music: the Mesa Mayhem soundtrack (menu, race songs and fanfare), made with Suno", "author": "Andrew Saulls", "license": "All rights reserved; used in this game with the owner's permission", "source": "https://github.com/uberwulf-hub/Race-Track-Mayhem/blob/HEAD/assets/audio/CREDITS.md" }
   ]
 }

@@ -134,27 +134,56 @@ func _set_loop(st: AudioStream) -> void:
 			w.loop_end = int(w.get_length() * w.mix_rate)
 
 
+func _set_no_loop(st: AudioStream) -> void:
+	if st is AudioStreamOggVorbis:
+		(st as AudioStreamOggVorbis).loop = false
+	elif st is AudioStreamMP3:
+		(st as AudioStreamMP3).loop = false
+	elif st is AudioStreamWAV:
+		(st as AudioStreamWAV).loop_mode = AudioStreamWAV.LOOP_DISABLED
+
+
 # ---------------------------------------------------------------------------
 # Music
 # ---------------------------------------------------------------------------
 
 ## Plays a music track by name ("menu", "race", ...), cross-fading from the
 ## current one. Several files like race_1.ogg, race_2.ogg = pick one at random.
+## Tracks that play once instead of looping, then hand over to another track.
+const PLAY_ONCE := {"results": "menu"}
+## A screen with no song of its own borrows another (the pickers keep the menu
+## song going without restarting it).
+const FALLBACK := {"garage": "menu"}
+
+
 func play_music(track_name: String, volume_db: float = -6.0) -> void:
+	var files := _find_files(MUSIC_DIR, track_name)
+	if files.is_empty() and FALLBACK.has(track_name):
+		track_name = FALLBACK[track_name]
+		files = _find_files(MUSIC_DIR, track_name)
 	if track_name == _music_name and (_music_a.playing or _music_b.playing):
 		return
-	var files := _find_files(MUSIC_DIR, track_name)
 	_music_name = track_name
 	if files.is_empty():
 		stop_music()
 		return
 	var st: AudioStream = files[randi() % files.size()]
-	_set_loop(st)
+	if PLAY_ONCE.has(track_name):
+		_set_no_loop(st)
+	else:
+		_set_loop(st)
 	var old := _music_a if _music_a.playing else _music_b
 	var fresh := _music_b if old == _music_a else _music_a
 	fresh.stream = st
 	fresh.volume_db = -40.0
 	fresh.play()
+	if PLAY_ONCE.has(track_name):
+		var next_track: String = PLAY_ONCE[track_name]
+		var this_stream := st
+		fresh.finished.connect(func():
+			# Only if nothing else started meanwhile.
+			if _music_name == track_name and fresh.stream == this_stream:
+				play_music(next_track, volume_db), CONNECT_ONE_SHOT)
 	if _music_tween:
 		_music_tween.kill()
 	_music_tween = create_tween().set_parallel(true)
