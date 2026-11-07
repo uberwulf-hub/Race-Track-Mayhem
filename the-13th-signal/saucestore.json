@@ -1,0 +1,19 @@
+{
+  "name": "The 13th Signal",
+  "category": "Game",
+  "description": "A first-person horror escape game you win with your ears and your brain, not a gun. Wake up alone in an underground research facility and escape Sector 1: solve escape-room puzzles, flip the breakers in the right order and crack the elevator's colour code. The Listener is blind but hears everything, and it learns your habits. The Replacement only moves when you can't see it. And the facility AI is not always telling the truth. Three modes: Explorer (no jump scares, the default every time the game starts), plus Survivor and Nightmare behind a Parent PIN. No blood or gore. Keyboard and mouse or game controller.",
+  "icon": "store/icon.png",
+  "assets": { "windows": "The13thSignal-windows.zip" },
+  "requirements": [
+    "Windows 10 or 11 (64-bit)",
+    "About 100 MB of disk space",
+    "Graphics that support OpenGL 3.3 or Vulkan",
+    "Keyboard and mouse, or an Xbox-style game controller",
+    "Headphones recommended"
+  ],
+  "rightsConfirmed": true,
+  "credits": [
+    { "asset": "Godot Engine (game engine, bundled in the .exe)", "author": "Juan Linietsky, Ariel Manzur and Godot Engine contributors", "license": "MIT", "source": "https://godotengine.org/license" },
+    { "asset": "All sounds (synthesized in code when the game starts)", "author": "uberwulf", "license": "Part of the game", "source": "scripts/sound.gd" }
+  ]
+}
