@@ -336,6 +336,8 @@ func _build_options(root: Control) -> Control:
 		Game.powerups_enabled = not Game.powerups_enabled)
 	_choice(grid, "Touch buttons:", func() -> String: return Game.TOUCH_NAMES[Game.touch_mode], func():
 		Game.touch_mode = (Game.touch_mode + 1) % 3)
+	_choice(grid, "Online times:", func() -> String: return "On" if Game.online_times else "Off", func():
+		Game.online_times = not Game.online_times)
 	_slider_row(grid, "Volume:", Game.master_volume, func(v: float): Game.set_volume(v))
 	_slider_row(grid, "Music:", Game.music_volume, func(v: float): Game.set_music_volume(v))
 	_slider_row(grid, "Sounds:", Game.sfx_volume, func(v: float): Game.set_sfx_volume(v))

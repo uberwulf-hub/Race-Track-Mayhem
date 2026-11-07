@@ -33,6 +33,7 @@ var fullscreen := false
 var steer_assist := true         # gentle steering help for little drivers
 var ghost_enabled := true        # race against your best lap
 var powerups_enabled := true     # item boxes on the track
+var online_times := true         # send best times to the online top-10 lists
 
 # Progress
 var stars: int = 0               # earned by finishing races
@@ -142,6 +143,7 @@ func load_settings() -> void:
 	# Phones and tablets start on Low graphics so the game runs smoothly.
 	quality = clampi(int(cfg.get_value("settings", "quality", 0 if is_mobile() else 1)), 0, 2)
 	touch_mode = clampi(int(cfg.get_value("settings", "touch", 0)), 0, 2)
+	online_times = bool(cfg.get_value("settings", "online_times", true))
 	fullscreen = bool(cfg.get_value("settings", "fullscreen", false))
 	_apply_volume()
 	if has_file and not cfg.has_section_key("players", "last") and _list_slots().is_empty():
@@ -166,6 +168,7 @@ func save_settings() -> void:
 	cfg.set_value("settings", "quality", quality)
 	cfg.set_value("settings", "fullscreen", fullscreen)
 	cfg.set_value("settings", "touch", touch_mode)
+	cfg.set_value("settings", "online_times", online_times)
 	cfg.set_value("players", "last", player_slot)
 	cfg.save(SAVE_PATH)
 	_write_player()
@@ -433,6 +436,20 @@ func best_time_for_current() -> float:
 func best_time_for(track_index: int) -> float:
 	var key := "%s_%d" % [track_info(track_index)["id"], laps]
 	return float(best_times.get(key, -1.0))
+
+
+## Which online top-10 list a track uses. Built-in tracks go by name; Track
+## Builder tracks go by their pieces, so everyone with the same (shared) track
+## races on the same list. One list per number of laps.
+func board_key(index: int, lap_count: int) -> String:
+	if index < Track.TRACKS.size():
+		return "%s_%d" % [Track.TRACKS[index]["id"], lap_count]
+	var pieces: Array = []
+	if index == ONLINE_TRACK:
+		pieces = Net.race_config.get("custom", {}).get("pieces", [])
+	elif index - Track.TRACKS.size() < custom_tracks.size():
+		pieces = custom_tracks[index - Track.TRACKS.size()].get("pieces", [])
+	return "c%s_%d" % [JSON.stringify(pieces).md5_text().substr(0, 10), lap_count]
 
 
 func track_id() -> String:

@@ -157,6 +157,17 @@ func _web(method: String, path: String, body: String) -> Dictionary:
 	return data
 
 
+## Sends a finished race time to a track's online top 10.
+## Returns {"rank": N (0 = not in the top 10), "top": [...]} or {"error": "..."}.
+func submit_time(board: String, racer: String, time: float, car: String) -> Dictionary:
+	return await _web("POST", "/times/" + board, JSON.stringify({"name": racer, "time": time, "car": car}))
+
+
+## A track's online top 10: {"top": [{"name", "time", "car", "date"}, ...]} or {"error": "..."}.
+func get_times(board: String) -> Dictionary:
+	return await _web("GET", "/times/" + board, "")
+
+
 ## Opens an internet race. The room code arrives a moment later (lobby_changed).
 func host_internet() -> void:
 	leave("", false)

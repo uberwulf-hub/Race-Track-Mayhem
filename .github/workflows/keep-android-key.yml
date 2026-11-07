@@ -1,0 +1,29 @@
+# The Android signing key lives in this repository's Actions cache. GitHub
+# clears cache entries nobody has used for 7 days, and a lost key would mean
+# phones have to uninstall the game (losing their saves) before updating.
+# This touches the key every few days so it never sits unused. Nothing leaves GitHub.
+name: Keep the Android key
+
+on:
+  schedule:
+    - cron: "17 6 */3 * *"   # every 3 days
+  workflow_dispatch:
+
+jobs:
+  touch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Touch the signing key in the cache
+        id: key
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/android-key
+          key: android-signing-key-v1
+      - name: Check it's there
+        run: |
+          if [ "${{ steps.key.outputs.cache-hit }}" = "true" ] && [ -f ~/android-key/release.keystore ]; then
+            echo "Signing key is safe."
+          else
+            echo "::error::The Android signing key is missing from the cache!"
+            exit 1
+          fi

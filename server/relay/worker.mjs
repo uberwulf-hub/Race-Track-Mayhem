@@ -5,6 +5,8 @@
 //   wss://<your-worker>.workers.dev/join/ZOOM?v=1   join room ZOOM
 import { Room, newCode, PROTOCOL } from "./relay-core.mjs";
 export { TrackShelf } from "./tracks.mjs";
+export { TimesBoard } from "./times.mjs";
+import { boardName } from "./times.mjs";
 
 export default {
   async fetch(request, env) {
@@ -13,6 +15,12 @@ export default {
     if (url.pathname === "/tracks" || url.pathname.startsWith("/tracks/")) {
       const shelf = env.TRACKS.get(env.TRACKS.idFromName("shelf"));
       return shelf.fetch(request);
+    }
+    // Online best times: one little object per track board.
+    if (url.pathname.startsWith("/times/")) {
+      const board = boardName(url.pathname.slice(7));
+      if (!board) return new Response("Not found", { status: 404 });
+      return env.TIMES.get(env.TIMES.idFromName(board)).fetch(request);
     }
     if (request.headers.get("Upgrade") !== "websocket") {
       return new Response("Race Track Mayhem race server is running.", { status: 200 });

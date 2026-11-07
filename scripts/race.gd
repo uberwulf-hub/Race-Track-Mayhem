@@ -995,6 +995,7 @@ func _show_results() -> void:
 	star_line.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(star_line)
 	_add_unlock_lines(box, fresh)
+	_online_times(box)
 
 	var buttons := HBoxContainer.new()
 	buttons.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -1032,6 +1033,37 @@ func _show_results() -> void:
 	for v in views:
 		v.hud.set_race_ui_visible(false)
 	_refresh_results()
+
+
+## Sends your time to the track's online top 10 and shows where you placed.
+func _online_times(box: Container) -> void:
+	if not Game.online_times or humans.size() != 1 or not player.has_finished or player.finish_time < 5.0:
+		return
+	var line := RaceHud.make_label("Checking the online top 10...", 22, Color(0.7, 0.9, 1.0), 6)
+	line.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(line)   # the buttons are added after this, so it sits above them
+	var board := Game.board_key(Game.selected_track, Game.laps)
+	var res: Dictionary = await Net.submit_time(board, player.racer_name, player.finish_time, String(player.car.get("name", "")))
+	if not is_instance_valid(line):
+		return
+	if res.has("error") or not res.has("top"):
+		line.text = "(Couldn't reach the online top 10.)"
+		line.modulate.a = 0.6
+		return
+	var rank := int(res.get("rank", 0))
+	var top: Array = res["top"]
+	var leader := ""
+	if not top.is_empty():
+		leader = "   Record: %s %s" % [top[0]["name"], Game.format_time(float(top[0]["time"]))]
+	if rank == 1:
+		line.text = "ONLINE RECORD! You're #1 in the world!"
+		line.add_theme_color_override("font_color", Color(1.0, 0.85, 0.2))
+		Sfx.play("voice_record")
+	elif rank > 0:
+		line.text = "Online top 10: you're #%d!%s" % [rank, leader]
+		line.add_theme_color_override("font_color", Color(0.6, 1.0, 0.7))
+	else:
+		line.text = "Online top 10: not this time.%s" % leader
 
 
 func _add_unlock_lines(box: Container, fresh: Array) -> void:

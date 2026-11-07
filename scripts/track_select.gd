@@ -24,6 +24,8 @@ var _header: Label
 var _badge: PanelContainer
 var _badge_label: Label
 var _time := 0.0
+var _online_cache: Dictionary = {}   # board -> text for the online record line
+var _online_label: Label
 var _popup: Control             # the "share" / "get a track" box
 var _popup_box: VBoxContainer
 
@@ -85,6 +87,8 @@ func _ready() -> void:
 	info.add_child(_blurb_label)
 	_best_label = RaceHud.make_label("", 22, Color(0.7, 1.0, 0.75), 6)
 	info.add_child(_best_label)
+	_online_label = RaceHud.make_label("", 20, Color(0.6, 0.9, 1.0), 6)
+	info.add_child(_online_label)
 	# Your own tracks can be changed or thrown away.
 	_custom_row = HBoxContainer.new()
 	_custom_row.add_theme_constant_override("separation", 10)
@@ -416,6 +420,30 @@ func _popup_row() -> HBoxContainer:
 func _update_best() -> void:
 	var t := Game.best_time_for(_index)
 	_best_label.text = ("Best (%d laps): %s" % [Game.laps, Game.format_time(t)]) if t > 0.0 else "No record yet - set one!"
+	_update_online()
+
+
+## The online record for this track, fetched once per track and number of laps.
+func _update_online() -> void:
+	_online_label.visible = Game.online_times
+	if not Game.online_times:
+		return
+	var board := Game.board_key(_index, Game.laps)
+	if _online_cache.has(board):
+		_online_label.text = _online_cache[board]
+		return
+	_online_label.text = "Online record: ..."
+	var res: Dictionary = await Net.get_times(board)
+	if not is_inside_tree():
+		return
+	var text := ""
+	if res.has("top"):
+		var top: Array = res["top"]
+		text = ("Online record: %s %s" % [top[0]["name"], Game.format_time(float(top[0]["time"]))]) if not top.is_empty() \
+			else "Online record: nobody yet!"
+	_online_cache[board] = text
+	if Game.board_key(_index, Game.laps) == board:
+		_online_label.text = text
 
 
 func _change_laps(d: int) -> void:

@@ -132,6 +132,11 @@ Click the track (or a chip) where you want to build: new pieces go right after i
 
 Your own tracks stand out in the track picker with a blueprint card and a "YOUR TRACK" ribbon.
 
+**Online best times.** Every track has an online top 10 (one per number of laps). Finish a race and your
+time is sent in: the results say if you made the list ("ONLINE RECORD!" for #1), and each track card shows the
+current online record. Shared Track Builder tracks share one list, so friends race the same board. One spot per
+racer name (your best). Switch it off in Options > Online times.
+
 **Share tracks with a code.** On one of your tracks in the track picker, tap **Share**: you get a 5-letter code
 (like `KXQRM`) to send to friends. They tap **Get a Track** (top-left of the track picker), type the code, and the
 track is added to their own tracks, marked "Built by" whoever made it. Tracks are kept on the same Cloudflare
