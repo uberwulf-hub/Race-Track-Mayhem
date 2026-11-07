@@ -4,10 +4,16 @@
 //   wss://<your-worker>.workers.dev/host?v=1        open a new room (you're the host)
 //   wss://<your-worker>.workers.dev/join/ZOOM?v=1   join room ZOOM
 import { Room, newCode, PROTOCOL } from "./relay-core.mjs";
+export { TrackShelf } from "./tracks.mjs";
 
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    // Shared tracks live on one "shelf".
+    if (url.pathname === "/tracks" || url.pathname.startsWith("/tracks/")) {
+      const shelf = env.TRACKS.get(env.TRACKS.idFromName("shelf"));
+      return shelf.fetch(request);
+    }
     if (request.headers.get("Upgrade") !== "websocket") {
       return new Response("Race Track Mayhem race server is running.", { status: 200 });
     }

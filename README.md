@@ -132,6 +132,11 @@ Click the track (or a chip) where you want to build: new pieces go right after i
 
 Your own tracks stand out in the track picker with a blueprint card and a "YOUR TRACK" ribbon.
 
+**Share tracks with a code.** On one of your tracks in the track picker, tap **Share**: you get a 5-letter code
+(like `KXQRM`) to send to friends. They tap **Get a Track** (top-left of the track picker), type the code, and the
+track is added to their own tracks, marked "Built by" whoever made it. Tracks are kept on the same Cloudflare
+server as internet races (`server/relay/tracks.mjs`).
+
 - **Pieces:** Straight, Turn Left/Right, Bend Left/Right, Boost Pad, Loop, Corkscrew, Jump, Big Jump, Hill, Bumps, Spiral and Wiggles.
 - **Live preview:** a toy car drives your track while you build. A bouncing arrow shows where the next piece goes.
 - **Always a working circuit:** the road back to the start line is drawn for you, so any combination of pieces makes a working track.

@@ -395,7 +395,7 @@ func _build_help(root: Control) -> Control:
 		"Drive over glowing pads for a BOOST. Slow down for turns or you'll spin out!",
 		"Win races to earn STARS and unlock paint, stickers, wheels...",
 		"...and win a Grand Prix to unlock the SECRET car!",
-		"TRACK BUILDER: snap pieces together to build and race your own tracks!",
+		"TRACK BUILDER: snap pieces together, then Share your track with a code!",
 		"POWER-UPS: drive through ? boxes, then press E (or Y) to use them!",
 		"RACE ONLINE: one computer taps Host a Race, the others find it and join!",
 	]

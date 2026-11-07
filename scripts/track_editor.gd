@@ -514,6 +514,8 @@ func _save() -> bool:
 		_say("Add some pieces first!", Color(1.0, 0.7, 0.3))
 		return false
 	var data := {"name": _clean_name(), "room": _room_theme, "pieces": _pieces.duplicate()}
+	if _slot >= 0 and Game.custom_tracks[_slot].has("by"):
+		data["by"] = Game.custom_tracks[_slot]["by"]   # still the friend's track you got
 	if _slot < 0:
 		if Game.custom_tracks.size() >= Game.MAX_CUSTOM_TRACKS:
 			_say("You have %d tracks already! Delete one in the track picker." % Game.MAX_CUSTOM_TRACKS, Color(1.0, 0.7, 0.3))

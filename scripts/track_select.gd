@@ -24,6 +24,8 @@ var _header: Label
 var _badge: PanelContainer
 var _badge_label: Label
 var _time := 0.0
+var _popup: Control             # the "share" / "get a track" box
+var _popup_box: VBoxContainer
 
 
 func _ready() -> void:
@@ -88,8 +90,10 @@ func _ready() -> void:
 	_custom_row.add_theme_constant_override("separation", 10)
 	info.add_child(_custom_row)
 	var edit := _button(_custom_row, "Edit", func(): Game.goto_editor(_index - Track.TRACKS.size()))
+	var share := _button(_custom_row, "Share", _share)
+	share.tooltip_text = "Get a code so friends can race this track"
 	_delete_button = _button(_custom_row, "Delete", _delete_custom)
-	for b: Button in [edit, _delete_button]:
+	for b: Button in [edit, share, _delete_button]:
 		b.add_theme_font_size_override("font_size", 20)
 
 	# A "MY TRACK" ribbon on the corner of your own tracks, so they stand out.
@@ -143,6 +147,11 @@ func _ready() -> void:
 	add_child(bottom)
 	_button(bottom, "Back", _go_back)
 	var build := _button(bottom, "Build a Track!", func(): Game.goto_editor(-1))
+	# Top-left, so the bottom row still fits on small screens.
+	var get_track := _button(self, "Get a Track", _open_get)
+	get_track.tooltip_text = "Type a friend's track code"
+	get_track.add_theme_font_size_override("font_size", 22)
+	RaceHud.pin(get_track, Vector2(0, 0), Vector2(16, 16), Vector2(210, 52))
 	build.add_theme_font_size_override("font_size", 24)
 	bottom.add_child(RaceHud.make_label("   Laps:", 30))
 	var minus := _button(bottom, "-", func(): _change_laps(-1))
@@ -161,6 +170,8 @@ func _ready() -> void:
 
 
 func _input(event: InputEvent) -> void:
+	if _popup and _popup.visible:
+		return
 	if event.is_action_pressed("ui_left") or event.is_action_pressed("steer_left"):
 		_change(-1)
 		get_viewport().set_input_as_handled()
@@ -170,6 +181,9 @@ func _input(event: InputEvent) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if event.is_action_pressed("ui_cancel") and _popup and _popup.visible:
+		_close_popup()
+		return
 	if event.is_action_pressed("ui_cancel"):
 		_go_back()
 
@@ -218,7 +232,8 @@ func _show() -> void:
 		_card_style.border_color = Color(1.0, 0.85, 0.2)
 	_map.blueprint = mine
 	_badge.visible = mine
-	_badge_label.text = "MY TRACK!" if Game.player_name == "" else "%s'S TRACK!" % Game.player_name.to_upper()
+	var owner: String = info.get("by", "") if info.get("by", "") != "" else Game.player_name
+	_badge_label.text = "MY TRACK!" if owner == "" else "%s'S TRACK!" % owner.to_upper()
 	_badge.custom_minimum_size = Vector2(0, 0)
 	_header.text = "YOUR OWN TRACKS!" if mine else "PICK A TRACK!"
 	_header.add_theme_color_override("font_color", Color(0.55, 1.0, 1.0) if mine else Color(1.0, 0.85, 0.2))
@@ -227,7 +242,8 @@ func _show() -> void:
 	var stars := int(info["stars"])
 	_stars_label.text = "Trickiness  " + "★".repeat(stars) + "☆".repeat(3 - stars)
 	if info.get("custom", false):
-		_stars_label.text = "Built by %s!" % (Game.player_name if Game.player_name != "" else "YOU")
+		var by: String = info.get("by", "")
+		_stars_label.text = "Built by %s!" % (by if by != "" else (Game.player_name if Game.player_name != "" else "YOU"))
 	var lines := PackedStringArray()
 	for f: String in info["features"]:
 		lines.append("*  " + f)
@@ -260,6 +276,141 @@ func _process(delta: float) -> void:
 		_badge.pivot_offset = _badge.size * 0.5
 		var pulse := 1.0 + sin(_time * 4.0) * 0.05
 		_badge.scale = Vector2(pulse, pulse)
+
+
+# ---------------------------------------------------------------------------
+# Sharing tracks with a code
+# ---------------------------------------------------------------------------
+
+func _share() -> void:
+	var slot := _index - Track.TRACKS.size()
+	if slot < 0 or slot >= Game.custom_tracks.size():
+		return
+	var t: Dictionary = Game.custom_tracks[slot].duplicate()
+	if not t.has("by"):
+		t["by"] = Game.player_name if Game.player_name != "" else "a friend"
+	_show_popup("Share This Track")
+	_popup_text("Getting a code...", 26, Color.WHITE)
+	var res: Dictionary = await Net.share_track(t)
+	if not is_inside_tree():
+		return
+	_clear_popup()
+	if res.has("code"):
+		var code := String(res["code"])
+		_popup_text("Tell your friends this code:", 24, Color.WHITE)
+		_popup_text(code, 72, Color(1.0, 0.9, 0.3))
+		_popup_text("They tap Get a Track and type it in.", 20, Color(0.8, 0.9, 1.0))
+		var row := _popup_row()
+		_button(row, "Copy Code", func():
+			DisplayServer.clipboard_set(code)
+			Sfx.play("select"))
+		_button(row, "Done", _close_popup).grab_focus()
+		Sfx.play("voice_unlock")
+	else:
+		_popup_text(String(res.get("error", "Something went wrong.")), 22, Color(1.0, 0.7, 0.5))
+		_button(_popup_row(), "OK", _close_popup).grab_focus()
+
+
+func _open_get() -> void:
+	_show_popup("Get a Track")
+	_popup_text("Type your friend's track code:", 24, Color.WHITE)
+	var edit := LineEdit.new()
+	edit.max_length = 5
+	edit.placeholder_text = "ABCDE"
+	edit.alignment = HORIZONTAL_ALIGNMENT_CENTER
+	edit.custom_minimum_size = Vector2(300, 70)
+	edit.add_theme_font_size_override("font_size", 44)
+	edit.text_changed.connect(func(t: String):
+		if t.to_upper() != t:
+			var c := edit.caret_column
+			edit.text = t.to_upper()
+			edit.caret_column = c)
+	_popup_box.add_child(edit)
+	var status := _popup_text("", 20, Color(1.0, 0.75, 0.5))
+	var row := _popup_row()
+	var get_it := _button(row, "Get It!", func(): _fetch(edit, status))
+	edit.text_submitted.connect(func(_t: String): _fetch(edit, status))
+	_button(row, "Cancel", _close_popup)
+	get_it.add_theme_font_size_override("font_size", 30)
+	edit.grab_focus.call_deferred()
+
+
+func _fetch(edit: LineEdit, status: Label) -> void:
+	if Game.custom_tracks.size() >= Game.MAX_CUSTOM_TRACKS:
+		status.text = "You have %d tracks already! Delete one first." % Game.MAX_CUSTOM_TRACKS
+		return
+	status.text = "Getting the track..."
+	status.add_theme_color_override("font_color", Color.WHITE)
+	var res: Dictionary = await Net.fetch_track(edit.text)
+	if not is_inside_tree():
+		return
+	if not res.has("pieces"):
+		status.text = String(res.get("error", "Couldn't get that track."))
+		status.add_theme_color_override("font_color", Color(1.0, 0.75, 0.5))
+		Sfx.play("back")
+		return
+	var pieces: Array = []
+	for p in res["pieces"]:
+		if not Track.piece_info(String(p)).is_empty():
+			pieces.append(String(p))
+	Game.custom_tracks.append({"name": String(res.get("name", "Shared Track")).substr(0, 24),
+		"room": String(res.get("room", "bedroom")), "pieces": pieces,
+		"by": String(res.get("by", "a friend")).substr(0, Game.NAME_LENGTH)})
+	Game.selected_track = Game.track_count() - 1
+	Game.save_settings()
+	Sfx.play("voice_unlock")
+	Game.goto_track_select()   # reload, showing the new track
+
+
+func _show_popup(title: String) -> void:
+	if _popup == null:
+		var dim := ColorRect.new()
+		dim.color = Color(0, 0, 0, 0.55)
+		dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+		add_child(dim)
+		var center := CenterContainer.new()
+		center.set_anchors_preset(Control.PRESET_FULL_RECT)
+		dim.add_child(center)
+		var panel := PanelContainer.new()
+		center.add_child(panel)
+		_popup_box = VBoxContainer.new()
+		_popup_box.add_theme_constant_override("separation", 12)
+		_popup_box.custom_minimum_size = Vector2(560, 0)
+		panel.add_child(_popup_box)
+		_popup = dim
+	_clear_popup(true)
+	var t := RaceHud.make_label(title, 44, Color(0.55, 1.0, 1.0), 12)
+	t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_popup_box.add_child(t)
+	_popup.visible = true
+
+
+func _clear_popup(all := false) -> void:
+	for i in range(_popup_box.get_child_count() - 1, 0 if not all else -1, -1):
+		var c := _popup_box.get_child(i)
+		_popup_box.remove_child(c)
+		c.queue_free()
+
+
+func _close_popup() -> void:
+	_popup.visible = false
+	_race_button.grab_focus()
+
+
+func _popup_text(text: String, size: int, col: Color) -> Label:
+	var l := RaceHud.make_label(text, size, col, 8)
+	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_popup_box.add_child(l)
+	return l
+
+
+func _popup_row() -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", 14)
+	_popup_box.add_child(row)
+	return row
 
 
 func _update_best() -> void:

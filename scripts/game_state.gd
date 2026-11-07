@@ -693,8 +693,9 @@ func track_info(index: int) -> Dictionary:
 	if slot >= custom_tracks.size():
 		return Track.TRACKS[0]
 	var t: Dictionary = custom_tracks[slot]
-	return custom_track_info(t, "custom_%d_%s" % [slot, String(t.get("name", "")).to_snake_case()],
-		"A track YOU built! %d pieces." % (t.get("pieces", []) as Array).size())
+	var n := (t.get("pieces", []) as Array).size()
+	var blurb := ("Shared by %s! %d pieces." % [t["by"], n]) if t.has("by") else ("A track YOU built! %d pieces." % n)
+	return custom_track_info(t, "custom_%d_%s" % [slot, String(t.get("name", "")).to_snake_case()], blurb)
 
 
 static func custom_track_info(t: Dictionary, track_key: String, blurb: String) -> Dictionary:
@@ -716,4 +717,5 @@ static func custom_track_info(t: Dictionary, track_key: String, blurb: String) -
 		"stars": 0,
 		"color": Color(0.95, 0.55, 0.15),
 		"custom": true,
+		"by": String(t.get("by", "")),
 	}

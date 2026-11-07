@@ -115,6 +115,48 @@ static func relay_url() -> String:
 	return custom if custom != "" else DEFAULT_RELAY
 
 
+# ---------------------------------------------------------------------------
+# Sharing tracks (saved on the same server under a short code)
+# ---------------------------------------------------------------------------
+
+static func web_url() -> String:
+	return relay_url().replace("wss://", "https://").replace("ws://", "http://")
+
+
+## Saves a Track Builder track on the server. Returns {"code": "KXQRM"} or {"error": "..."}.
+func share_track(track: Dictionary) -> Dictionary:
+	var body := JSON.stringify({"name": track.get("name", "My Track"), "room": track.get("room", "bedroom"),
+		"pieces": track.get("pieces", []), "by": track.get("by", Game.player_name)})
+	return await _web("POST", "/tracks", body)
+
+
+## Gets a shared track by its code. Returns the track or {"error": "..."}.
+func fetch_track(code: String) -> Dictionary:
+	code = code.strip_edges().to_upper()
+	if code.length() < 5:
+		return {"error": "Track codes have 5 letters."}
+	return await _web("GET", "/tracks/" + code.uri_encode(), "")
+
+
+func _web(method: String, path: String, body: String) -> Dictionary:
+	var req := HTTPRequest.new()
+	req.timeout = 12.0
+	add_child(req)
+	var m := HTTPClient.METHOD_POST if method == "POST" else HTTPClient.METHOD_GET
+	var err := req.request(web_url() + path, ["Content-Type: application/json"], m, body)
+	if err != OK:
+		req.queue_free()
+		return {"error": "Couldn't reach the track server."}
+	var res: Array = await req.request_completed
+	req.queue_free()
+	if int(res[0]) != HTTPRequest.RESULT_SUCCESS:
+		return {"error": "Couldn't reach the track server. Are you on the internet?"}
+	var data = JSON.parse_string((res[3] as PackedByteArray).get_string_from_utf8())
+	if not (data is Dictionary):
+		return {"error": "The track server sent something odd. Try again!"}
+	return data
+
+
 ## Opens an internet race. The room code arrives a moment later (lobby_changed).
 func host_internet() -> void:
 	leave("", false)

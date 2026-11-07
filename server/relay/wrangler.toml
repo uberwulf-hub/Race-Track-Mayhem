@@ -7,6 +7,14 @@ compatibility_date = "2026-10-01"
 name = "ROOMS"
 class_name = "RaceRoom"
 
+[[durable_objects.bindings]]
+name = "TRACKS"
+class_name = "TrackShelf"
+
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["RaceRoom"]
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["TrackShelf"]
