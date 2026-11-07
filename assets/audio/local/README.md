@@ -31,7 +31,8 @@ When a name exists here, the game uses your version instead of the built-in one.
 |---|---|
 | `menu` | Main menu (the theme song) |
 | `garage` | Car picker and track picker (if missing, the menu song keeps playing) |
-| `race` (or `race_1`, `race_2`...) | During races (one is picked at random) |
+| `race_bedroom`, `race_playroom`, `race_kitchen`, `race_bathroom`, `race_living_room`, `race_garden` | During races in that room |
+| `race` (or `race_1`, `race_2`...) | Races in a room with no song of its own (one is picked at random) |
 | `results` | Results screen |
 
 After adding files, open the project in Godot once so it imports them.

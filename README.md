@@ -133,7 +133,7 @@ Cars further back get better power-ups, and the computer cars use them too. Swit
 
 **Sound.** CC0 sound effects plus our own Mesa Mayhem soundtrack (see [assets/audio/CREDITS.md](assets/audio/CREDITS.md)), with separate Music and Sound volume sliders:
 - A two-layer engine that revs with speed, brake squeals, and 3D engine sounds with a Doppler effect on the other cars.
-- The Mesa Mayhem theme on the menu and pickers, five race songs (one picked at random each race) and a victory fanfare.
+- The Mesa Mayhem theme on the menu and pickers, its own race song for each room and a victory fanfare.
 
 **Use your own sounds:** drop files into `assets/audio/local/` (see [its README](assets/audio/local/README.md)).
 They replace the built-in sounds on your computer only, and that folder is never uploaded to GitHub.

@@ -24,11 +24,12 @@ Made by Andrew Saulls with Suno. All rights reserved; included here for Race Tra
 | File | Song | Where it plays |
 |---|---|---|
 | `music/menu.ogg` | Game Menu (Mesa Mayhem) | Main menu, car picker, track picker and Track Builder |
-| `music/race_1.ogg` | Sonoran Mesa | Races (one of the five is picked at random) |
-| `music/race_2.ogg` | Copper Pit | Races |
-| `music/race_3.ogg` | Server Room | Races |
-| `music/race_4.ogg` | Pebblemoon | Races |
-| `music/race_5.ogg` | The Lab | Races |
+| `music/race_bedroom.ogg` | Pebblemoon | Bedroom Speedway (and Track Builder tracks in the bedroom) |
+| `music/race_playroom.ogg` | The Lab | Toy Box Twister (and builder tracks in the playroom) |
+| `music/race_kitchen.ogg` | Copper Pit | Kitchen Kerfuffle (and builder tracks in the kitchen) |
+| `music/race_bathroom.ogg` | Pebblemoon (second take) | Bubble Bath Bash (and builder tracks in the bathroom) |
+| `music/race_living_room.ogg` | Server Room | Sofa Slalom (and builder tracks in the living room) |
+| `music/race_garden.ogg` | Sonoran Mesa | Backyard Blast (and builder tracks in the garden) |
 | `music/results.ogg` | Triumphant Fanfare | Results and podium (plays once, then the menu song returns) |
 
 The songs were converted from MP3 to Ogg Vorbis and their loudness was evened out (-16 LUFS).
@@ -37,7 +38,8 @@ The songs were converted from MP3 to Ogg Vorbis and their loudness was evened ou
 
 Drop a file named after the sound into `sfx/` (`.ogg`, `.wav` or `.mp3`), for example `boost.ogg`.
 For random variations, number them: `boost_1.ogg`, `boost_2.ogg` and so on. Music files go in
-`music/`. With several race songs (`race_1`, `race_2`...), one is picked at random each race.
+`music/`. Each room has its own race song, `race_<room>` (bedroom, playroom, kitchen, bathroom,
+living_room, garden). Without one, the game uses `race` (or `race_1`, `race_2`... picked at random).
 If there's no `garage` song, the pickers keep the menu song playing.
 If a file is missing, the game falls back to its own synthesized beeps.
 

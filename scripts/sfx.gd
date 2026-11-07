@@ -161,6 +161,12 @@ func play_music(track_name: String, volume_db: float = -6.0) -> void:
 	if files.is_empty() and FALLBACK.has(track_name):
 		track_name = FALLBACK[track_name]
 		files = _find_files(MUSIC_DIR, track_name)
+	elif files.is_empty() and track_name.begins_with("race_"):
+		track_name = "race"   # no song for this room: any race song
+		files = _find_files(MUSIC_DIR, track_name)
+		if files.is_empty():
+			track_name = "race_bedroom"
+			files = _find_files(MUSIC_DIR, track_name)
 	if track_name == _music_name and (_music_a.playing or _music_b.playing):
 		return
 	_music_name = track_name

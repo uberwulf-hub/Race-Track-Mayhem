@@ -107,7 +107,8 @@ func _ready() -> void:
 			r.model.set_headlights(true)
 	_build_pause_menu()
 	_setup_ai_engines()
-	Sfx.play_music("race", -9.0)
+	# Each room has its own race song (custom tracks use their room's song).
+	Sfx.play_music("race_" + String(Game.track_info(Game.selected_track)["room"]), -9.0)
 	_set_state(State.INTRO)
 
 
