@@ -6,7 +6,7 @@ config_version=5
 [application]
 
 config/name="Race Track Mayhem"
-config/version="1.10.0"
+config/version="1.10.1"
 config/description="Pick a toy car and race around the bedroom speedway!"
 run/main_scene="res://scenes/main_menu.tscn"
 config/features=PackedStringArray("4.3", "Forward Plus")
