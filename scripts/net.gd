@@ -24,7 +24,7 @@ const PROTOCOL := 1             # bump when messages change, so old copies can't
 const SEND_RATE := 1.0 / 20.0
 const GAME_TAG := "RaceTrackMayhem"
 ## The internet race server (see server/relay). Set RACE_RELAY_URL to use another one.
-const DEFAULT_RELAY := "wss://race-track-mayhem-relay.uberwulf.workers.dev"
+const DEFAULT_RELAY := "wss://race-track-mayhem-relay.andrewsaulls.workers.dev"
 
 signal lobby_changed                       # players or settings changed
 signal games_found_changed                 # LAN games list changed

@@ -9,6 +9,8 @@ connects *out* to this relay, which passes the game's messages along inside a
 - `worker.mjs` + `wrangler.toml` - the Cloudflare Workers version (free plan).
 - `local.mjs` - the same relay for testing on one computer: `npm install && node local.mjs`.
 
+**Live server:** `wss://race-track-mayhem-relay.andrewsaulls.workers.dev` (the game's `Net.DEFAULT_RELAY`).
+
 ## Putting it online (Cloudflare, free)
 
 1. Make a free Cloudflare account.
