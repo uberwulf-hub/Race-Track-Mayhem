@@ -107,6 +107,9 @@ on the phone, download the .apk and open it (allow "install unknown apps" when A
   shots appear on every screen, and hits count on the computer of the car that got hit.
 - The first time you host, Windows may ask whether to let the game use the network: choose **Allow**
   (tick "Private networks").
+- **Fix Firewall** (Windows, on the Race Online screen): if races don't show up or joining fails, tap it on BOTH
+  computers and choose Yes on the Windows prompt. It removes any block rule (from clicking "Cancel" on the first
+  network prompt) and lets the game through. Or just use Host on the Internet, which needs no firewall changes.
 - If a race shows up but joining never works, the HOST computer's firewall is blocking it (usually because
   "Cancel" was clicked on the Windows prompt): Windows Security > Firewall & network protection > Allow an app
   through firewall > Change settings > tick Race Track Mayhem for Private. The game now says this after 10 seconds.

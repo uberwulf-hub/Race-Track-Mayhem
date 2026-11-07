@@ -117,7 +117,17 @@ func _build_browse() -> void:
 	code_row.add_child(_code)
 	var join_code := _button(code_row, "Join Internet Race", _join_code)
 	join_code.add_theme_font_size_override("font_size", 24)
-	_browse.add_child(RaceHud.make_label("Races on your Wi-Fi:", 26, Color(1.0, 0.9, 0.5), 8))
+	var wifi_row := HBoxContainer.new()
+	wifi_row.add_theme_constant_override("separation", 12)
+	_browse.add_child(wifi_row)
+	var wifi_label := RaceHud.make_label("Races on your Wi-Fi:", 26, Color(1.0, 0.9, 0.5), 8)
+	wifi_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	wifi_row.add_child(wifi_label)
+	if OS.get_name() == "Windows":
+		# Windows Firewall often blocks home races (especially after "Cancel" on its prompt).
+		var fw := _button(wifi_row, "Fix Firewall", _fix_firewall)
+		fw.tooltip_text = "Let Race Track Mayhem through Windows Firewall (do this on BOTH computers)"
+		fw.add_theme_font_size_override("font_size", 20)
 	var panel := PanelContainer.new()
 	panel.custom_minimum_size = Vector2(0, 130)
 	_browse.add_child(panel)
@@ -153,7 +163,10 @@ func _refresh_games() -> void:
 		_games_box.remove_child(c)
 		c.queue_free()
 	if Net.found.is_empty():
-		var l := RaceHud.make_label("Looking for races...  (the other computer taps \"Host at Home\")", 20, Color(1, 1, 1, 0.7), 4)
+		var hint := "Looking for races...  (the other computer taps \"Host at Home\")"
+		if OS.get_name() == "Windows":
+			hint += "\nNot showing up? Tap Fix Firewall on both computers, or use Host on the Internet."
+		var l := RaceHud.make_label(hint, 20, Color(1, 1, 1, 0.7), 4)
 		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		_games_box.add_child(l)
 		return
@@ -176,6 +189,13 @@ func _host() -> void:
 		return
 	_say("")
 	_show_lobby()
+
+
+func _fix_firewall() -> void:
+	if Net.fix_firewall():
+		_say("Windows will ask \"Allow this app to make changes?\" - choose Yes. Do this on BOTH computers, then host or look for races again.")
+	else:
+		_say("Couldn't open the Windows firewall settings. Try Host on the Internet instead - it needs no firewall changes.")
 
 
 func _host_internet() -> void:

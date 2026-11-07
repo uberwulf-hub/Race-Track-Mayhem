@@ -271,9 +271,8 @@ func _watch_join(seconds: float) -> void:
 	if internet:
 		_fail("Couldn't join that race. Check the code, and that the host is still in the lobby.")
 	else:
-		_fail("Couldn't connect to that race. On the HOST computer: if Windows asked about the network, choose Allow. "
-			+ "If it didn't, open Windows Security > Firewall > Allow an app, and tick Race Track Mayhem for Private networks. "
-			+ "Both devices must be on the same Wi-Fi.")
+		_fail("Couldn't connect to that race. On the HOST computer, tap Fix Firewall and choose Yes. "
+			+ "Both devices must be on the same Wi-Fi. (Or use Host on the Internet: it needs no firewall changes.)")
 
 
 func _fail(reason: String) -> void:
@@ -580,6 +579,21 @@ func _poll_listen() -> void:
 
 
 ## This computer's address on the home network, for joining by hand.
+## Windows only: asks Windows (the "allow changes?" prompt) to let the game
+## through the firewall. Removes any rule that blocks it (made when someone
+## clicked Cancel on the first-time network prompt), then allows it on every
+## network type. Returns false if this isn't Windows or it couldn't start.
+static func fix_firewall() -> bool:
+	if OS.get_name() != "Windows":
+		return false
+	var exe := OS.get_executable_path().replace("/", "\\")
+	var rules := ('netsh advfirewall firewall delete rule name=all program="%s" & '
+		+ 'netsh advfirewall firewall add rule name="Race Track Mayhem" dir=in action=allow program="%s" enable=yes profile=any & '
+		+ 'netsh advfirewall firewall add rule name="Race Track Mayhem" dir=out action=allow program="%s" enable=yes profile=any') % [exe, exe, exe]
+	var ps := "Start-Process -FilePath cmd.exe -Verb RunAs -WindowStyle Hidden -ArgumentList '/c %s'" % rules.replace("'", "''")
+	return OS.create_process("powershell.exe", ["-NoProfile", "-WindowStyle", "Hidden", "-Command", ps]) > 0
+
+
 static func local_address() -> String:
 	for a in IP.get_local_addresses():
 		if a.begins_with("192.168.") or a.begins_with("10.") or (a.begins_with("172.") and a.split(".").size() == 4 and int(a.split(".")[1]) >= 16 and int(a.split(".")[1]) <= 31):
