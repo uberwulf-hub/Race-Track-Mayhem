@@ -107,7 +107,14 @@ on the phone, download the .apk and open it (allow "install unknown apps" when A
   shots appear on every screen, and hits count on the computer of the car that got hit.
 - The first time you host, Windows may ask whether to let the game use the network: choose **Allow**
   (tick "Private networks").
-- Racing over the internet (with cousins in another house) is planned next; it builds on the same code.
+- If a race shows up but joining never works, the HOST computer's firewall is blocking it (usually because
+  "Cancel" was clicked on the Windows prompt): Windows Security > Firewall & network protection > Allow an app
+  through firewall > Change settings > tick Race Track Mayhem for Private. The game now says this after 10 seconds.
+
+**Race over the internet (cousins in another house).** Tap **Race Online! > Host on the Internet** and the lobby
+shows a 4-letter **race code**. The others tap **Race Online!**, type the code and **Join Internet Race**.
+Everyone connects out to a small relay server (`server/relay`, runs free on Cloudflare), so no router or
+firewall setup is needed. Everything else works like the home version.
 
 **Players.** Up to 6 players each get their own save slot. The game asks "Who's racing?" when it starts:
 pick your name, or make a new player (type a name, or use the on-screen letters with a controller) and choose

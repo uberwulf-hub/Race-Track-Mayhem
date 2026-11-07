@@ -1,0 +1,8 @@
+{
+  "name": "race-track-mayhem-relay",
+  "private": true,
+  "type": "module",
+  "scripts": { "local": "node local.mjs", "deploy": "wrangler deploy" },
+  "dependencies": { "ws": "^8.18.0" },
+  "devDependencies": { "wrangler": "^3.90.0" }
+}

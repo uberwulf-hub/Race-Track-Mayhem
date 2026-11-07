@@ -23,6 +23,8 @@ const MAX_RACERS := 6
 const PROTOCOL := 1             # bump when messages change, so old copies can't join
 const SEND_RATE := 1.0 / 20.0
 const GAME_TAG := "RaceTrackMayhem"
+## The internet race server (see server/relay). Set RACE_RELAY_URL to use another one.
+const DEFAULT_RELAY := "wss://race-track-mayhem-relay.uberwulf.workers.dev"
 
 signal lobby_changed                       # players or settings changed
 signal games_found_changed                 # LAN games list changed
@@ -44,7 +46,9 @@ var race_config := {}      # {"roster": [...], "track", "custom", "laps", "diffi
 var found := {}            # ip -> {"name", "players", "open", "seen"}
 var end_reason := ""       # shown on the menu after a session ends
 
-var _peer: ENetMultiplayerPeer
+var _peer: MultiplayerPeer
+var internet := false      # this session goes through the internet relay
+var room_code := ""        # internet races: the code others type to join
 var _shout: PacketPeerUDP
 var _listen: PacketPeerUDP
 var _shout_timer := 0.0
@@ -87,8 +91,9 @@ func my_info() -> Dictionary:
 
 func host() -> String:
 	leave("", false)
-	_peer = ENetMultiplayerPeer.new()
-	var err := _peer.create_server(PORT, MAX_CLIENTS)
+	var enet := ENetMultiplayerPeer.new()
+	var err := enet.create_server(PORT, MAX_CLIENTS)
+	_peer = enet
 	if err != OK:
 		_peer = null
 		return "Couldn't start a race here (is another one already running on this computer?)."
@@ -105,14 +110,67 @@ func host() -> String:
 	return ""
 
 
+static func relay_url() -> String:
+	var custom := OS.get_environment("RACE_RELAY_URL")
+	return custom if custom != "" else DEFAULT_RELAY
+
+
+## Opens an internet race. The room code arrives a moment later (lobby_changed).
+func host_internet() -> void:
+	leave("", false)
+	var relay := RelayPeer.new()
+	relay.room_ready.connect(func(c: String):
+		room_code = c
+		lobby_changed.emit())
+	relay.relay_error.connect(func(m: String): _fail(m))
+	var err := relay.create_room(relay_url(), PROTOCOL)
+	if err != OK:
+		_fail("Couldn't reach the internet race server.")
+		return
+	_peer = relay
+	multiplayer.multiplayer_peer = relay
+	active = true
+	is_host = true
+	internet = true
+	in_race = false
+	room_code = ""
+	players = {1: my_info()}
+	lobby_changed.emit()
+
+
+## Joins an internet race by its room code.
+func join_internet(code: String) -> void:
+	leave("", false)
+	code = code.strip_edges().to_upper()
+	if code.length() < 4:
+		_fail("Type the 4-letter race code first.")
+		return
+	var relay := RelayPeer.new()
+	relay.relay_error.connect(func(m: String): _fail(m))
+	var err := relay.join_room(relay_url(), code, PROTOCOL)
+	if err != OK:
+		_fail("Couldn't reach the internet race server.")
+		return
+	_peer = relay
+	multiplayer.multiplayer_peer = relay
+	active = true
+	is_host = false
+	internet = true
+	in_race = false
+	room_code = code
+	players = {}
+	_watch_join(15.0)
+
+
 func join(address: String) -> void:
 	leave("", false)
 	address = address.strip_edges()
 	if address == "":
 		_fail("Type the host's address first.")
 		return
-	_peer = ENetMultiplayerPeer.new()
-	var err := _peer.create_client(address, PORT)
+	var enet := ENetMultiplayerPeer.new()
+	var err := enet.create_client(address, PORT)
+	_peer = enet
 	if err != OK:
 		_peer = null
 		_fail("That address doesn't look right.")
@@ -122,6 +180,7 @@ func join(address: String) -> void:
 	is_host = false
 	in_race = false
 	players = {}
+	_watch_join(10.0)
 
 
 ## Leaves the lobby or race. `reason` is shown on the menu afterwards.
@@ -134,6 +193,8 @@ func leave(reason: String = "", announce: bool = true) -> void:
 	active = false
 	is_host = false
 	in_race = false
+	internet = false
+	room_code = ""
 	players = {}
 	race_config = {}
 	_loaded = {}
@@ -144,6 +205,22 @@ func leave(reason: String = "", announce: bool = true) -> void:
 		session_ended.emit(reason)
 		if reason != "":
 			Game.goto_menu.call_deferred()
+
+
+## Gives up on joining if the host hasn't answered within a few seconds,
+## and says what usually fixes it (instead of "Joining..." forever).
+func _watch_join(seconds: float) -> void:
+	var started := Time.get_ticks_msec()
+	while Time.get_ticks_msec() - started < int(seconds * 1000.0):
+		await get_tree().create_timer(0.5).timeout
+		if not active or is_host or not players.is_empty():
+			return
+	if internet:
+		_fail("Couldn't join that race. Check the code, and that the host is still in the lobby.")
+	else:
+		_fail("Couldn't connect to that race. On the HOST computer: if Windows asked about the network, choose Allow. "
+			+ "If it didn't, open Windows Security > Firewall > Allow an app, and tick Race Track Mayhem for Private networks. "
+			+ "Both devices must be on the same Wi-Fi.")
 
 
 func _fail(reason: String) -> void:

@@ -14,6 +14,8 @@ var _address_label: Label
 var _car_label: Label
 var _start_button: Button
 var _wait_label: Label
+var _lobby_cols: Control
+var _code: LineEdit
 
 
 func _ready() -> void:
@@ -33,10 +35,10 @@ func _ready() -> void:
 	RaceHud.pin(header, Vector2(0.5, 0), Vector2(-500, 10), Vector2(1000, 76))
 	add_child(header)
 
-	_message = RaceHud.make_label("", 22, Color(1.0, 0.75, 0.5), 8)
+	_message = RaceHud.make_label("", 19, Color(1.0, 0.75, 0.5), 8)
 	_message.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_message.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	RaceHud.pin(_message, Vector2(0.5, 1), Vector2(-500, -70), Vector2(1000, 56))
+	RaceHud.pin(_message, Vector2(0.5, 1), Vector2(-560, -96), Vector2(1120, 90))
 	add_child(_message)
 
 	_build_browse()
@@ -84,12 +86,40 @@ func _build_browse() -> void:
 	_browse.add_theme_constant_override("separation", 14)
 	RaceHud.pin(_browse, Vector2(0.5, 0), Vector2(-380, 100), Vector2(760, 520))
 	add_child(_browse)
-	var host := _button(_browse, "Host a Race", _host)
-	host.add_theme_font_size_override("font_size", 40)
-	host.custom_minimum_size = Vector2(0, 80)
-	_browse.add_child(RaceHud.make_label("Races on your network:", 28, Color(1.0, 0.9, 0.5), 8))
+	var hosts := HBoxContainer.new()
+	hosts.add_theme_constant_override("separation", 12)
+	_browse.add_child(hosts)
+	var host := _button(hosts, "Host at Home", _host)
+	host.tooltip_text = "Race people on the same Wi-Fi"
+	var host_net := _button(hosts, "Host on the Internet", _host_internet)
+	host_net.tooltip_text = "Race people in other houses: you get a code to give them"
+	host_net.add_theme_color_override("font_color", Color(0.75, 1.0, 1.0))
+	for b: Button in [host, host_net]:
+		b.add_theme_font_size_override("font_size", 30)
+		b.custom_minimum_size = Vector2(0, 76)
+		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var code_row := HBoxContainer.new()
+	code_row.add_theme_constant_override("separation", 10)
+	_browse.add_child(code_row)
+	code_row.add_child(RaceHud.make_label("Got a race code?", 26, Color(0.75, 1.0, 1.0), 8))
+	_code = LineEdit.new()
+	_code.placeholder_text = "ABCD"
+	_code.max_length = 4
+	_code.custom_minimum_size = Vector2(150, 56)
+	_code.add_theme_font_size_override("font_size", 32)
+	_code.text_changed.connect(func(t: String):
+		var up := t.to_upper()
+		if up != t:
+			var caret := _code.caret_column
+			_code.text = up
+			_code.caret_column = caret)
+	_code.text_submitted.connect(func(_t: String): _join_code())
+	code_row.add_child(_code)
+	var join_code := _button(code_row, "Join Internet Race", _join_code)
+	join_code.add_theme_font_size_override("font_size", 24)
+	_browse.add_child(RaceHud.make_label("Races on your Wi-Fi:", 26, Color(1.0, 0.9, 0.5), 8))
 	var panel := PanelContainer.new()
-	panel.custom_minimum_size = Vector2(0, 180)
+	panel.custom_minimum_size = Vector2(0, 130)
 	_browse.add_child(panel)
 	_games_box = VBoxContainer.new()
 	_games_box.add_theme_constant_override("separation", 8)
@@ -97,7 +127,7 @@ func _build_browse() -> void:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 10)
 	_browse.add_child(row)
-	row.add_child(RaceHud.make_label("Or join by address:", 24))
+	row.add_child(RaceHud.make_label("Or join at home by address:", 22))
 	_address = LineEdit.new()
 	_address.placeholder_text = "like 192.168.1.20"
 	_address.custom_minimum_size = Vector2(260, 52)
@@ -113,7 +143,7 @@ func _show_browse() -> void:
 	_lobby.visible = false
 	Net.start_looking()
 	_refresh_games()
-	(_browse.get_child(0) as Button).grab_focus.call_deferred()
+	(_browse.get_child(0).get_child(0) as Button).grab_focus.call_deferred()
 
 
 func _refresh_games() -> void:
@@ -123,7 +153,7 @@ func _refresh_games() -> void:
 		_games_box.remove_child(c)
 		c.queue_free()
 	if Net.found.is_empty():
-		var l := RaceHud.make_label("Looking for races...  (the other computer taps \"Host a Race\")", 20, Color(1, 1, 1, 0.7), 4)
+		var l := RaceHud.make_label("Looking for races...  (the other computer taps \"Host at Home\")", 20, Color(1, 1, 1, 0.7), 4)
 		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		_games_box.add_child(l)
 		return
@@ -145,6 +175,18 @@ func _host() -> void:
 		_say(err)
 		return
 	_say("")
+	_show_lobby()
+
+
+func _host_internet() -> void:
+	_say("")
+	Net.host_internet()
+	_show_lobby()
+
+
+func _join_code() -> void:
+	_say("Joining...")
+	Net.join_internet(_code.text)
 	_show_lobby()
 
 
@@ -173,6 +215,7 @@ func _build_lobby() -> void:
 	var cols := HBoxContainer.new()
 	cols.add_theme_constant_override("separation", 20)
 	_lobby.add_child(cols)
+	_lobby_cols = cols
 	# Left: who's here and my car
 	var left := PanelContainer.new()
 	left.custom_minimum_size = Vector2(500, 330)
@@ -231,12 +274,23 @@ func _refresh_lobby() -> void:
 		return
 	if not Net.active:
 		return
-	if Net.players.is_empty():
+	var joining := Net.players.is_empty()
+	_lobby_cols.visible = not joining   # nothing to show until the host answers
+	_wait_label.text = "Connecting to the race..." if joining else "Waiting for the host to start..."
+	if joining:
 		_lobby_title.text = "Joining..."
 	else:
 		_lobby_title.text = "%s's race" % String(Net.players.get(1, {}).get("name", "?"))
 		_say("")
-	_address_label.text = ("Others can find you automatically, or join at:  %s" % Net.local_address()) if Net.is_host else ""
+	if Net.internet and Net.is_host:
+		_address_label.text = ("Race code:  %s     Tell your cousins to type it in Race Online!" % Net.room_code) if Net.room_code != "" \
+			else "Getting a race code..."
+		_address_label.add_theme_font_size_override("font_size", 28)
+		_address_label.add_theme_color_override("font_color", Color(0.6, 1.0, 1.0))
+	elif Net.is_host:
+		_address_label.text = "Others on your Wi-Fi can find you automatically, or join at:  %s" % Net.local_address()
+	else:
+		_address_label.text = ("Internet race  %s" % Net.room_code) if Net.internet else ""
 	for c in _players_box.get_children():
 		_players_box.remove_child(c)
 		c.queue_free()
