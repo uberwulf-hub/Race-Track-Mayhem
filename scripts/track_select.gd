@@ -20,6 +20,10 @@ var _maps: Array = []          # cached [points, heights, max_h, rect] per track
 var _custom_row: HBoxContainer
 var _delete_button: Button
 var _delete_armed := false
+var _header: Label
+var _badge: PanelContainer
+var _badge_label: Label
+var _time := 0.0
 
 
 func _ready() -> void:
@@ -39,6 +43,7 @@ func _ready() -> void:
 	add_child(dots_bg)
 
 	var header := RaceHud.make_label("PICK A TRACK!", 60, Color(1.0, 0.85, 0.2), 16)
+	_header = header
 	header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	RaceHud.pin(header, Vector2(0.5, 0), Vector2(-500, 10), Vector2(1000, 76))
 	add_child(header)
@@ -87,6 +92,24 @@ func _ready() -> void:
 	for b: Button in [edit, _delete_button]:
 		b.add_theme_font_size_override("font_size", 20)
 
+	# A "MY TRACK" ribbon on the corner of your own tracks, so they stand out.
+	_badge = PanelContainer.new()
+	var bs := StyleBoxFlat.new()
+	bs.bg_color = Color(1.0, 0.3, 0.55)
+	bs.set_corner_radius_all(16)
+	bs.set_border_width_all(5)
+	bs.border_color = Color.WHITE
+	bs.set_content_margin_all(10)
+	bs.shadow_color = Color(0, 0, 0, 0.35)
+	bs.shadow_size = 8
+	_badge.add_theme_stylebox_override("panel", bs)
+	_badge_label = RaceHud.make_label("", 26, Color.WHITE, 8)
+	_badge_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_badge.add_child(_badge_label)
+	RaceHud.pin(_badge, Vector2(0.5, 0.5), Vector2(300, -282), Vector2(240, 60))
+	_badge.rotation = deg_to_rad(8.0)
+	add_child(_badge)
+
 	# Arrows on either side
 	var left := _button(self, "<", func(): _change(-1))
 	left.add_theme_font_size_override("font_size", 52)
@@ -103,8 +126,14 @@ func _ready() -> void:
 	RaceHud.pin(_dots, Vector2(0.5, 1), Vector2(-200, -132), Vector2(400, 30))
 	add_child(_dots)
 	for i in Game.track_count():
+		if i == Track.TRACKS.size():
+			# A little gap and a wrench between the game's tracks and yours.
+			var gap := RaceHud.make_label("|", 30, Color(1, 1, 1, 0.5), 4)
+			gap.set_meta("divider", true)
+			_dots.add_child(gap)
 		var d := Panel.new()
 		d.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		d.set_meta("track", i)
 		_dots.add_child(d)
 
 	var bottom := HBoxContainer.new()
@@ -181,13 +210,24 @@ func _show() -> void:
 	_custom_row.visible = Game.is_custom_track(_index)
 	var info: Dictionary = Game.track_info(_index)
 	var col: Color = info["color"]
-	_card_style.bg_color = col.darkened(0.15)
+	var mine := Game.is_custom_track(_index)
+	# Your own tracks get a blueprint look and a rainbow border.
+	_card_style.bg_color = Color(0.09, 0.27, 0.58) if mine else col.darkened(0.15)
+	_card_style.set_border_width_all(10 if mine else 8)
+	if not mine:
+		_card_style.border_color = Color(1.0, 0.85, 0.2)
+	_map.blueprint = mine
+	_badge.visible = mine
+	_badge_label.text = "MY TRACK!" if Game.player_name == "" else "%s'S TRACK!" % Game.player_name.to_upper()
+	_badge.custom_minimum_size = Vector2(0, 0)
+	_header.text = "YOUR OWN TRACKS!" if mine else "PICK A TRACK!"
+	_header.add_theme_color_override("font_color", Color(0.55, 1.0, 1.0) if mine else Color(1.0, 0.85, 0.2))
 	_room_label.text = "%d / %d   -   %s" % [_index + 1, Game.track_count(), info["room_name"]]
 	_name_label.text = info["name"]
 	var stars := int(info["stars"])
 	_stars_label.text = "Trickiness  " + "★".repeat(stars) + "☆".repeat(3 - stars)
 	if info.get("custom", false):
-		_stars_label.text = "Made by YOU!"
+		_stars_label.text = "Built by %s!" % (Game.player_name if Game.player_name != "" else "YOU")
 	var lines := PackedStringArray()
 	for f: String in info["features"]:
 		lines.append("*  " + f)
@@ -195,15 +235,31 @@ func _show() -> void:
 	_blurb_label.text = info["blurb"]
 	_update_best()
 	_map.set_data(_maps[_index])
-	for i in _dots.get_child_count():
-		var dot := _dots.get_child(i) as Panel
+	for child in _dots.get_children():
+		if not child.has_meta("track"):
+			continue
+		var i: int = child.get_meta("track")
+		var dot := child as Panel
+		var custom_dot := Game.is_custom_track(i)
 		var sb := StyleBoxFlat.new()
-		sb.set_corner_radius_all(12)
-		sb.bg_color = Game.track_info(i)["color"]
-		sb.set_border_width_all(4 if i == _index else 0)
+		# The game's tracks are round dots; yours are blue diamonds.
+		sb.set_corner_radius_all(3 if custom_dot else 12)
+		sb.bg_color = Color(0.35, 0.75, 1.0) if custom_dot else Game.track_info(i)["color"]
+		sb.set_border_width_all(4 if i == _index else (2 if custom_dot else 0))
 		sb.border_color = Color.WHITE
 		dot.add_theme_stylebox_override("panel", sb)
 		dot.custom_minimum_size = Vector2(30, 30) if i == _index else Vector2(18, 18)
+		dot.pivot_offset = dot.custom_minimum_size * 0.5
+		dot.rotation = PI / 4.0 if custom_dot else 0.0
+
+
+func _process(delta: float) -> void:
+	_time += delta
+	if Game.is_custom_track(_index):
+		_card_style.border_color = Color.from_hsv(fmod(_time * 0.3, 1.0), 0.65, 1.0)
+		_badge.pivot_offset = _badge.size * 0.5
+		var pulse := 1.0 + sin(_time * 4.0) * 0.05
+		_badge.scale = Vector2(pulse, pulse)
 
 
 func _update_best() -> void:
@@ -241,6 +297,10 @@ class TrackMap extends Control:
 	var heights := PackedFloat32Array()
 	var max_h := 1.0
 	var rect := Rect2()
+	var blueprint := false:
+		set(v):
+			blueprint = v
+			queue_redraw()
 
 	static func compute(index: int) -> Array:
 		var t := Track.for_index(index)
@@ -265,7 +325,21 @@ class TrackMap extends Control:
 		queue_redraw()
 
 	func _draw() -> void:
-		draw_rect(Rect2(Vector2.ZERO, size), Color(0, 0, 0, 0.25), true)
+		if blueprint:
+			# Graph-paper grid, like a plan you drew yourself.
+			draw_rect(Rect2(Vector2.ZERO, size), Color(0.05, 0.18, 0.42), true)
+			var step := 24.0
+			var x := 0.0
+			while x <= size.x:
+				draw_line(Vector2(x, 0), Vector2(x, size.y), Color(0.55, 0.8, 1.0, 0.18), 1.0)
+				x += step
+			var y := 0.0
+			while y <= size.y:
+				draw_line(Vector2(0, y), Vector2(size.x, y), Color(0.55, 0.8, 1.0, 0.18), 1.0)
+				y += step
+			draw_rect(Rect2(Vector2.ZERO, size), Color(0.7, 0.9, 1.0, 0.6), false, 3.0)
+		else:
+			draw_rect(Rect2(Vector2.ZERO, size), Color(0, 0, 0, 0.25), true)
 		if pts.is_empty():
 			return
 		var sc := minf(size.x / rect.size.x, size.y / rect.size.y) * 0.88
@@ -277,8 +351,12 @@ class TrackMap extends Control:
 			var a := pts[i] * sc + off
 			var b := pts[j] * sc + off
 			var h := heights[i] / max_h
-			draw_line(a, b, Color(0.1, 0.05, 0.0, 0.9), 12.0, true)
-			draw_line(a, b, Color(1.0, 0.45, 0.05).lerp(Color(1.0, 0.95, 0.55), h), 7.0, true)
+			if blueprint:
+				draw_line(a, b, Color(0.02, 0.1, 0.3, 0.9), 12.0, true)
+				draw_line(a, b, Color(0.55, 0.85, 1.0).lerp(Color.WHITE, h), 7.0, true)
+			else:
+				draw_line(a, b, Color(0.1, 0.05, 0.0, 0.9), 12.0, true)
+				draw_line(a, b, Color(1.0, 0.45, 0.05).lerp(Color(1.0, 0.95, 0.55), h), 7.0, true)
 		var s := pts[0] * sc + off
 		draw_circle(s, 9.0, Color.BLACK)
 		draw_circle(s, 6.0, Color.WHITE)
