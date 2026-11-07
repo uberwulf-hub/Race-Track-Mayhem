@@ -125,7 +125,9 @@ static func for_index(index: int) -> Track:
 	if index >= TRACKS.size():
 		t.custom = true
 		var slot := index - TRACKS.size()
-		if slot < Game.custom_tracks.size():
+		if index == Game.ONLINE_TRACK:
+			t.custom_pieces = Net.race_config.get("custom", {}).get("pieces", [])
+		elif slot < Game.custom_tracks.size():
 			t.custom_pieces = Game.custom_tracks[slot].get("pieces", [])
 	return t
 

@@ -43,6 +43,12 @@ var _flames: Dictionary = {}         # racer -> CPUParticles3D
 var _ai_engines: Dictionary = {}     # racer -> AudioStreamPlayer3D
 var _pass_side: Dictionary = {}      # racer -> was it ahead of player 1?
 
+# Online
+var online := false
+var _by_key: Dictionary = {}         # net key -> Racer
+var _net_go := false                 # the host said start the countdown
+var _send_timer := 0.0
+
 
 ## Everything that belongs to one human player's half of the screen.
 class View:
@@ -64,6 +70,7 @@ func _ready() -> void:
 	# The race node keeps listening while paused (so ESC can un-pause);
 	# everything that moves is pausable.
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	online = Net.active and Net.in_race
 	track = Track.for_index(Game.selected_track)
 	track.name = "Track"
 	add_child(track)
@@ -86,7 +93,7 @@ func _ready() -> void:
 	hud = views[0].hud
 	camera = views[0].camera
 
-	if humans.size() == 1 and Game.ghost_enabled:
+	if humans.size() == 1 and Game.ghost_enabled and not online:
 		ghost = GhostCar.new()
 		add_child(ghost)
 		ghost.setup(track, Game.track_id(), player)
@@ -97,6 +104,12 @@ func _ready() -> void:
 		powerups.setup(track, racers)
 		powerups.item_got.connect(_on_item_got)
 		powerups.item_hit.connect(_on_item_hit)
+		if online:
+			powerups.online = true
+			powerups.item_used.connect(func(r: Racer, kind: String, side: float): Net.send_item(r.net_key, kind, side))
+			powerups.item_hit.connect(func(v: Racer, kind: String, by: Racer):
+				if not v.remote:
+					Net.send_hit(v.net_key, kind, by.net_key if by else ""))
 		powerups.process_mode = Node.PROCESS_MODE_PAUSABLE
 
 	for n: Node in [track, room]:
@@ -110,6 +123,13 @@ func _ready() -> void:
 	# Each room has its own race song (custom tracks use their room's song).
 	Sfx.play_music("race_" + String(Game.track_info(Game.selected_track)["room"]), -9.0)
 	_set_state(State.INTRO)
+	if online:
+		Net.states_received.connect(_on_net_states)
+		Net.item_used.connect(_on_net_item)
+		Net.item_hit.connect(_on_net_hit)
+		Net.go_received.connect(func(): _net_go = true)
+		Net.player_left.connect(_on_player_left)
+		Net.race_scene_ready()
 
 
 # ---------------------------------------------------------------------------
@@ -119,6 +139,17 @@ func _ready() -> void:
 ## Who's racing: the humans plus computer cars. In a Grand Prix the same
 ## line-up is kept for all five races.
 func _make_roster() -> Array:
+	if online:
+		# The host's line-up: my car is player 1, the rest are driven elsewhere
+		# (the computer cars run on the host).
+		var out: Array = []
+		var me := "p%d" % Net.my_id()
+		for e: Dictionary in Net.race_config["roster"]:
+			var mine: bool = e["key"] == me or (e.get("ai", false) and Net.is_host)
+			var is_person: bool = not e.get("ai", false)
+			out.append({"name": e["name"], "car": e["car"], "look": e.get("look", {}), "key": e["key"],
+				"player": 1 if e["key"] == me else 0, "remote": not mine, "human": is_person})
+		return out
 	if Game.gp_active and not Game.gp_roster.is_empty():
 		return Game.gp_roster
 	var roster: Array = []
@@ -154,6 +185,8 @@ func _spawn_racers() -> void:
 	var order: Array = ai.duplicate()
 	for i in people.size():
 		order.insert(mini(1 + i * 2, order.size()), people[i])
+	if online:
+		order = roster   # the host already set the grid
 
 	var base_skill: float = [0.85, 0.93, 1.0][Game.difficulty]
 	for slot in order.size():
@@ -162,9 +195,14 @@ func _spawn_racers() -> void:
 		var car_def := CarData.get_car(int(entry["car"]))
 		var r := Racer.new()
 		add_child(r)
-		var look := Game.custom_for(car_def["id"]) if pnum > 0 else {}
+		var look: Dictionary = Game.custom_for(car_def["id"]) if pnum > 0 else entry.get("look", {})
 		r.setup(track, car_def, pnum > 0, entry["name"], look)
 		r.player_index = pnum
+		r.human = pnum > 0 or entry.get("human", false)
+		r.remote = entry.get("remote", false)
+		r.net_key = entry.get("key", "")
+		if r.net_key != "":
+			_by_key[r.net_key] = r
 		if Game.two_player and pnum > 0:
 			r.input_prefix = "p%d_" % pnum
 		r.skid_marks = skid_marks
@@ -328,8 +366,11 @@ func _process(delta: float) -> void:
 	_state_time += delta
 	match state:
 		State.INTRO:
-			if _state_time > INTRO_HOLD + INTRO_ZOOM:
+			# Online, everyone waits for the host so the countdown is together.
+			if _state_time > INTRO_HOLD + INTRO_ZOOM and (not online or _net_go):
 				_set_state(State.COUNTDOWN)
+			elif online and _state_time > INTRO_HOLD + INTRO_ZOOM:
+				_all_huds(func(h: RaceHud): h.flash_message("Waiting for the others...", Color(0.7, 0.9, 1.0), 0.3))
 		State.COUNTDOWN:
 			var step := int(floor(_state_time / 1.0))
 			if step != _countdown_step:
@@ -387,8 +428,19 @@ func _physics_process(delta: float) -> void:
 		powerups.update(delta)
 	for i in racers.size():
 		for j in range(i + 1, racers.size()):
+			if racers[i].remote and racers[j].remote:
+				continue   # their own computers sort that out
 			racers[i].bump_with(racers[j])
 	_update_places()
+	if online:
+		_send_timer -= delta
+		if _send_timer <= 0.0:
+			_send_timer = Net.SEND_RATE
+			var states: Array = []
+			for r in racers:
+				if not r.remote:
+					states.append(r.net_state())
+			Net.send_states(states)
 
 
 func _update_places() -> void:
@@ -401,13 +453,14 @@ func _update_places() -> void:
 ## Keeps the computer cars close to the leading human so races stay exciting.
 func _update_rubber_band(delta: float) -> void:
 	var base: float = [0.85, 0.93, 1.0][Game.difficulty]
-	var lead := humans[0]
-	for h in humans:
+	var people := racers.filter(func(r: Racer) -> bool: return r.human)
+	var lead: Racer = people[0] if not people.is_empty() else humans[0]
+	for h: Racer in people:
 		if h.total > lead.total:
 			lead = h
-	var all_done := humans.all(func(h: Racer) -> bool: return h.has_finished)
+	var all_done := people.all(func(h: Racer) -> bool: return h.has_finished)
 	for r in racers:
-		if r.is_player:
+		if r.is_player or r.human or r.remote:
 			continue
 		var gap := r.total - lead.total
 		var target := base
@@ -487,11 +540,23 @@ const CRASH_MESSAGES := {
 	"loop": "MAYHEM!  Too slow for the loop!",
 	"jump": "WHOOPS!  Missed the jump!",
 	"corner": "WHOA!  Too fast for that turn!",
+	"wall": "BONK!  Slow down for the turns!",
+	"wall_hard": "SPIN OUT!  Way too fast!",
 }
 
 
 func _on_crash(r: Racer, reason: String) -> void:
 	var v := _view_for(r)
+	if reason.begins_with("wall"):
+		# Bounced off the rail: no fade, the car is still on the track.
+		if v:
+			v.hud.flash_message(CRASH_MESSAGES[reason], Color(1.0, 0.6, 0.3), 0.7)
+			v.shake = maxf(v.shake, 0.3 if reason == "wall_hard" else 0.18)
+			_rumble(v, 0.6, 0.4, 0.3)
+			Sfx.play("bump", 0.8)
+			if reason == "wall_hard":
+				Sfx.play("skid", 1.0, -4.0)
+		return
 	if v:
 		v.hud.flash_message(CRASH_MESSAGES.get(reason, "MAYHEM!"), Color(1.0, 0.45, 0.3), 0.9)
 		Sfx.play("crash")
@@ -602,6 +667,7 @@ func _update_view_extras(v: View, delta: float) -> void:
 				near.append([clampf((o.lateral - r.lateral) / Track.HALF_WIDTH, -1.0, 1.0), 1.0 - behind / 14.0, o.car["body"]])
 	v.hud.set_nearby(near)
 	v.hud.set_item(r.item if powerups else "", r.shield_timer > 0.0)
+	v.hud.set_incoming(powerups.incoming_for(r) if powerups and state == State.RACING and not r.has_finished else {})
 	if r == player and ghost:
 		ghost.follow(r.race_time - r.lap_start_time, state == State.RACING and not r.has_finished)
 
@@ -782,6 +848,12 @@ func _build_pause_menu() -> void:
 	_pause_menu = _centered_panel(layer, "PAUSED")
 	var box: VBoxContainer = _pause_menu.get_meta("box")
 	_add_button(box, "Keep Racing", _toggle_pause)
+	if online:
+		_add_button(box, "Leave Online Race", func():
+			Net.leave("")
+			Game.goto_menu())
+		_pause_menu.visible = false
+		return
 	if not Game.gp_active:
 		_add_button(box, "Restart Race", func(): Game.goto_race())
 		_add_button(box, "Change Car", func(): Game.goto_garage())
@@ -796,6 +868,13 @@ func _build_pause_menu() -> void:
 
 
 func _toggle_pause() -> void:
+	if online:
+		# Online races can't stop for everyone: just show the menu.
+		_pause_menu.visible = not _pause_menu.visible
+		if _pause_menu.visible:
+			Sfx.play("click")
+			(_pause_menu.get_meta("box").get_child(1) as Button).grab_focus()
+		return
 	var p := not get_tree().paused
 	get_tree().paused = p
 	_pause_menu.visible = p
@@ -844,6 +923,8 @@ func _add_button(box: Container, text: String, cb: Callable) -> Button:
 ## Finished racers in finishing order, then the rest by how far they got.
 func _final_order() -> Array[Racer]:
 	var rows: Array[Racer] = _finish_order.duplicate()
+	if online:   # messages arrive in any order: sort by the actual times
+		rows.sort_custom(func(a: Racer, b: Racer) -> bool: return a.finish_time < b.finish_time)
 	var rest: Array[Racer] = []
 	for r in racers:
 		if not rows.has(r):
@@ -920,6 +1001,18 @@ func _show_results() -> void:
 		_add_button(buttons, "Quit Cup", func():
 			Game.end_grand_prix()
 			Game.goto_menu())
+	elif online:
+		if Net.is_host:
+			first = _add_button(buttons, "Race Again!", func(): Net.start_race())
+			_add_button(buttons, "Back to Lobby", func(): Net.back_to_lobby())
+		else:
+			var wait := RaceHud.make_label("Waiting for the host...", 24, Color(0.7, 0.9, 1.0), 6)
+			buttons.add_child(wait)
+		var leave := _add_button(buttons, "Leave", func():
+			Net.leave("")
+			Game.goto_menu())
+		if first == null:
+			first = leave
 	else:
 		first = _add_button(buttons, "Race Again!", func(): Game.goto_race())
 		_add_button(buttons, "Change Car", func(): Game.goto_garage())
@@ -956,7 +1049,7 @@ func _refresh_results() -> void:
 		grid.add_child(RaceHud.make_label("", 28, Color.WHITE, 8))
 	for i in rows.size():
 		var r := rows[i]
-		var col := Color(1.0, 0.85, 0.2) if r.player_index == 1 else (Color(0.5, 0.9, 1.0) if r.player_index == 2 else Color.WHITE)
+		var col := Color(1.0, 0.85, 0.2) if r.player_index == 1 else (Color(0.5, 0.9, 1.0) if r.player_index == 2 or r.human else Color.WHITE)
 		var cells: Array[Label] = []
 		for c in cols:
 			cells.append(grid.get_child(i * cols + c) as Label)
@@ -967,3 +1060,48 @@ func _refresh_results() -> void:
 			cells[3].text = "%d pts" % int(Game.gp_points.get(r.racer_name, 0))
 		for l in cells:
 			l.add_theme_color_override("font_color", col)
+
+
+# ---------------------------------------------------------------------------
+# Online
+# ---------------------------------------------------------------------------
+
+func _on_net_states(states: Array) -> void:
+	for st in states:
+		if not (st is Array) or st.size() < 12:
+			continue
+		var r: Racer = _by_key.get(st[0])
+		if r and r.remote:
+			r.apply_net_state(st)
+
+
+## Someone on another computer used a power-up: show it here too.
+func _on_net_item(key: String, kind: String, side: float) -> void:
+	var r: Racer = _by_key.get(key)
+	if r and r.remote and powerups:
+		powerups.use_remote(r, kind, side)
+
+
+## A hit that counted on another computer: show the message here.
+func _on_net_hit(victim_key: String, kind: String, by_key: String) -> void:
+	var v: Racer = _by_key.get(victim_key)
+	var by: Racer = _by_key.get(by_key)
+	if v and by and not by.remote and v.remote:
+		_on_item_hit(v, kind, by)
+
+
+func _on_player_left(peer_id: int) -> void:
+	var r: Racer = _by_key.get("p%d" % peer_id)
+	if r == null:
+		return
+	_by_key.erase(r.net_key)
+	racers.erase(r)
+	if powerups:
+		powerups.racers.erase(r)
+	_finish_order.erase(r)
+	_ai_engines.erase(r)
+	_flames.erase(r)
+	_pass_side.erase(r)
+	for v in views:
+		v.hud.flash_message("%s left the race" % r.racer_name, Color(0.8, 0.85, 1.0), 1.5)
+	r.queue_free()

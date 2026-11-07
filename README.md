@@ -72,7 +72,7 @@ In split screen, controller 1 drives player 1 and controller 2 drives player 2.
 
 Tips:
 - Drive over the glowing striped pads for a **BOOST**.
-- **Steer into the turns.** Corners push you outward, and if you slam the outside rail too fast you fly off the track.
+- **Steer into the turns.** Corners push you outward. Slam the outside rail too fast and you BONK off it and slow right down (really fast = a spin-out), but you stay on the track.
   Little drivers can switch on **Steering help** in Options.
 - **Hit the jumps fast** and line up your landing. Too slow and you drop into the gap; land beside the track and over the edge you go.
 - Keep your speed up in the loops. Too slow upside down and you fall off. **MAYHEM!**
@@ -89,6 +89,18 @@ Whenever you come off the track, the screen fades and you're put back where you 
 - **Bubble Shield:** blocks the next hit.
 
 Cars further back get better power-ups, and the computer cars use them too. Switch them off in Options.
+A blinking **INCOMING!** warning (with an arrow for the side) shows when a bubble or ball is about to hit you.
+
+**Race Online (home network).** Race other computers in your house:
+- One computer taps **Race Online! > Host a Race**. The others tap **Race Online!** and the race shows up
+  under "Races on your network" (or type the host's address, shown in the host's lobby).
+- Up to 6 racers. Everyone picks their car; the host picks the track (including their own Track Builder
+  tracks), laps, power-ups and whether computer cars join in.
+- Each computer drives its own car and shares where it is about 20 times a second. Power-ups work online:
+  shots appear on every screen, and hits count on the computer of the car that got hit.
+- The first time you host, Windows may ask whether to let the game use the network: choose **Allow**
+  (tick "Private networks").
+- Racing over the internet (with cousins in another house) is planned next; it builds on the same code.
 
 **Players.** Up to 6 players each get their own save slot. The game asks "Who's racing?" when it starts:
 pick your name, or make a new player (type a name, or use the on-screen letters with a controller) and choose
@@ -98,8 +110,10 @@ tracks and settings (difficulty, laps, steering help). Switch players any time f
 **Track Builder.** Build your own tracks from the main menu or the track picker. Your pieces show as a row of
 numbered chips: tap a chip (or tap the piece on the track) to pick it, and it glows on the track. Then move it
 left or right, or delete it. Undo brings back anything. There are two modes (switch with the Mode button):
-- **Easy:** 8 big, simple pieces that go on the end of the track.
-- **Advanced:** every piece; new pieces go in right after the one you picked; drag chips to reorder; Replace,
+Click the track (or a chip) where you want to build: new pieces go right after it, shown by the yellow
+"NEW PIECES GO HERE" arrow and a "+" in the chip row. Tap Done to build on the end again.
+- **Easy:** 8 big, simple pieces.
+- **Advanced:** every piece; drag chips to reorder; Replace,
   Flip (left/right) and Copy; Redo; and shortcuts (`[` `]` pick, Ctrl+Left/Right move, F flip, D copy, Delete, Ctrl+Z/Y).
 
 Your own tracks stand out in the track picker with a blueprint card and a "YOUR TRACK" ribbon.

@@ -37,6 +37,8 @@ var player_tag := "":        # "P1" / "P2" in split screen
 			_tag_label.visible = v != ""
 var _tag_label: Label
 var _wrong_way: Label
+var _incoming: Label
+var _incoming_on := false
 var _behind: BehindArrows
 var _item_panel: PanelContainer
 var _item_style: StyleBoxFlat
@@ -210,6 +212,12 @@ func setup(p_track: Track, p_racers: Array[Racer], p_player: Racer) -> void:
 	pin(_wrong_way, Vector2(0.5, 0.5), Vector2(-400, 40), Vector2(800, 100))
 	_wrong_way.visible = false
 	_root.add_child(_wrong_way)
+	# "Incoming!" when a power-up is about to hit you from behind.
+	_incoming = make_label("", 40, Color(1.0, 0.85, 0.2), 14)
+	_incoming.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	pin(_incoming, Vector2(0.5, 1), Vector2(-300, -250), Vector2(600, 60))
+	_incoming.visible = false
+	_root.add_child(_incoming)
 
 	# --- player tag (split screen) ---
 	_tag_label = make_label(player_tag, 40, Color(0.5, 0.9, 1.0), 12)
@@ -253,7 +261,7 @@ func set_race_ui_visible(v: bool) -> void:
 		if c == _item_panel:
 			c.visible = v and _item_kind != ""
 			continue
-		if c == _center_label or c == _message_label or c == _title_box or c == _speed_lines or c == _fade or c == _wrong_way or c == _tag_label:
+		if c == _center_label or c == _message_label or c == _title_box or c == _speed_lines or c == _fade or c == _wrong_way or c == _tag_label or c == _incoming:
 			continue
 		c.visible = v
 
@@ -263,6 +271,32 @@ func hide_hint() -> void:
 	if _hint_label:
 		_hint_label.visible = false
 		_hint_label.modulate.a = 0.0
+
+
+## Warns about a shot coming from behind: {"kind", "dist", "side"} or {} for none.
+## Blinks faster the closer it gets; the arrow shows which side it's on.
+func set_incoming(threat: Dictionary) -> void:
+	if _incoming == null:
+		return
+	var on := not threat.is_empty()
+	if on != _incoming_on:
+		_incoming_on = on
+		if on:
+			Sfx.play("beep", 1.6, -6.0)
+	_incoming.visible = on
+	if not on:
+		return
+	var d: float = threat["dist"]
+	var side: float = threat["side"]
+	var arrow := "<<  " if side < -0.25 else ""
+	var arrow_r := "  >>" if side > 0.25 else ""
+	_incoming.text = "%s! INCOMING %s !%s" % [arrow, "BUBBLE" if threat["kind"] == "bubble" else "BALL", arrow_r]
+	var rate := lerpf(16.0, 5.0, clampf(d / 32.0, 0.0, 1.0))
+	var blink := sin(Time.get_ticks_msec() * 0.001 * rate) > -0.2
+	_incoming.modulate.a = 1.0 if blink else 0.35
+	var k := 1.0 + clampf(1.0 - d / 32.0, 0.0, 1.0) * 0.25
+	_incoming.pivot_offset = Vector2(300, 30)
+	_incoming.scale = Vector2(k, k)
 
 
 func set_wrong_way(on: bool) -> void:

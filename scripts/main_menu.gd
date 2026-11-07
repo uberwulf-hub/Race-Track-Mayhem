@@ -146,11 +146,16 @@ func _build_ui() -> void:
 		Game.goto_editor(-1))
 	for b: Button in [_players_button, builder]:
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var online := _button(_main_box, "Race Online!", func():
+		Game.end_grand_prix()
+		Game.goto("res://scenes/online.tscn"))
+	online.add_theme_color_override("font_color", Color(0.75, 1.0, 1.0))
 	var more := _row(_main_box)
-	for b: Button in [_button(more, "Options", func(): _show_panel(_options_panel)), _button(more, "How to Play", func(): _show_panel(_help_panel))]:
-		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var extras: Array = [_button(more, "Options", func(): _show_panel(_options_panel)), _button(more, "How to Play", func(): _show_panel(_help_panel))]
 	if OS.get_name() != "Web":
-		_button(_main_box, "Quit", func(): get_tree().quit())
+		extras.append(_button(more, "Quit", func(): get_tree().quit()))
+	for b: Button in extras:
+		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	play.grab_focus.call_deferred()
 
 	# Who's playing (their own save slot); press to switch.
@@ -188,6 +193,13 @@ func _build_ui() -> void:
 	var credits_btn := _button(root, "Credits", func(): _show_panel(_credits_panel))
 	credits_btn.add_theme_font_size_override("font_size", 20)
 	RaceHud.pin(credits_btn, Vector2(0, 1), Vector2(16, -64), Vector2(130, 48))
+
+	if Net.end_reason != "":
+		var note := RaceHud.make_label(Net.end_reason, 26, Color(1.0, 0.75, 0.5), 8)
+		note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		RaceHud.pin(note, Vector2(0.5, 1), Vector2(-400, -90), Vector2(800, 40))
+		root.add_child(note)
+		Net.end_reason = ""
 
 	# First time in this session (or nobody saved yet): ask who's racing.
 	if Game.player_slot < 0 or not Game.player_chosen:
@@ -395,11 +407,12 @@ func _build_help(root: Control) -> Control:
 		"2 PLAYERS:  Player 1 uses W A S D + Space (or controller 1).",
 		"Player 2 uses the arrow keys + Enter (or controller 2).",
 		"",
-		"Drive over glowing pads for a BOOST. Steer into turns or you'll fly off!",
+		"Drive over glowing pads for a BOOST. Slow down for turns or you'll spin out!",
 		"Win races to earn STARS and unlock paint, stickers, wheels...",
 		"...and win a Grand Prix to unlock the SECRET car!",
 		"TRACK BUILDER: snap pieces together to build and race your own tracks!",
 		"POWER-UPS: drive through ? boxes, then press E (or Y) to use them!",
+		"RACE ONLINE: one computer taps Host a Race, the others find it and join!",
 	]
 	for line in lines:
 		var l := RaceHud.make_label(line, 22, Color.WHITE, 6)

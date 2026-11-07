@@ -13,6 +13,9 @@ extends Node3D
 
 signal item_got(racer: Racer, kind: String)
 signal item_hit(victim: Racer, kind: String, by: Racer)
+signal item_used(racer: Racer, kind: String, side: float)   # for online races
+
+var online := false   # online: hits only count for cars driven on this computer
 
 const KINDS := ["bubble", "ball", "balloon", "rocket", "shield"]
 const NAMES := {"bubble": "Bubble Blaster", "ball": "Bouncy Ball", "balloon": "Water Balloon", "rocket": "Rocket Boost", "shield": "Bubble Shield"}
@@ -128,7 +131,7 @@ func _update_boxes(delta: float) -> void:
 			if _track_gap(r.s, b["s"]) < 1.6 and absf(r.lateral - float(b["lat"])) < 1.4:
 				b["timer"] = BOX_RESPAWN
 				node.visible = false
-				if r.item == "":
+				if r.item == "" and not r.remote:
 					r.item = _roll_item(r)
 					_ai_wait[r] = randf_range(1.0, 4.0)
 					item_got.emit(r, r.item)
@@ -173,12 +176,23 @@ func use_item(r: Racer) -> void:
 	if kind == "" or r.mode != Racer.Mode.DRIVING:
 		return
 	r.item = ""
+	var side := 1.0 if randf() < 0.5 else -1.0
+	item_used.emit(r, kind, side)
+	_use(r, kind, side)
+
+
+## A power-up used on another computer (online): show it here too.
+func use_remote(r: Racer, kind: String, side: float) -> void:
+	_use(r, kind, side)
+
+
+func _use(r: Racer, kind: String, side: float) -> void:
 	match kind:
 		"bubble":
 			_shoot(r, "bubble", maxf(r.speed, 20.0) + 22.0, 0.0, 6.0)
 			Sfx.play("throw", 1.2)
 		"ball":
-			_shoot(r, "ball", maxf(r.speed, 20.0) + 14.0, (1.0 if randf() < 0.5 else -1.0) * 9.0, 7.0)
+			_shoot(r, "ball", maxf(r.speed, 20.0) + 14.0, side * 9.0, 7.0)
 			Sfx.play("throw", 0.9)
 		"balloon":
 			var s := fposmod(r.s - 3.0, track.length)
@@ -187,11 +201,13 @@ func use_item(r: Racer) -> void:
 			_puddles.append({"s": s, "lat": r.lateral, "life": 18.0, "node": node, "owner": r})
 			Sfx.play("splash", 1.2, -4.0)
 		"rocket":
-			r.boost_timer = 2.4
-			r.speed = maxf(r.speed, float(r.stats["top_speed"]) * 1.35)
+			if not r.remote:
+				r.boost_timer = 2.4
+				r.speed = maxf(r.speed, float(r.stats["top_speed"]) * 1.35)
 			Sfx.play("boost", 0.9)
 		"shield":
-			r.shield_timer = 10.0
+			if not r.remote:
+				r.shield_timer = 10.0
 			Sfx.play("shield")
 
 
@@ -331,6 +347,10 @@ func _update_puddles(delta: float) -> void:
 
 
 func _hit(r: Racer, kind: String, by: Racer) -> void:
+	if r.remote:
+		# Its own computer decides what happens; just say "got 'em" here.
+		item_hit.emit(r, kind, by)
+		return
 	if r.shield_timer > 0.0:
 		r.shield_timer = 0.0
 		Sfx.play("pop", 0.8)
@@ -352,6 +372,22 @@ func _hit(r: Racer, kind: String, by: Racer) -> void:
 	item_hit.emit(r, kind, by)
 
 
+## The nearest shot coming up behind a car (for the "incoming!" warning):
+## {"kind", "dist" (track units behind), "side" (-1 left .. 1 right)} or {}.
+func incoming_for(r: Racer, within: float = 32.0) -> Dictionary:
+	var best := {}
+	var best_d := within
+	for p in _shots:
+		if p["owner"] == r:
+			continue
+		var d := _ahead(float(p["s"]), r.s)   # > 0: the car is ahead of the shot
+		if d > 0.0 and d < best_d and float(p["speed"]) > absf(r.speed) + 2.0:
+			best_d = d
+			best = {"kind": p["kind"], "dist": d,
+				"side": clampf((float(p["lat"]) - r.lateral) / Track.HALF_WIDTH, -1.0, 1.0)}
+	return best
+
+
 func _nearest_ahead(owner: Racer, from_s: float, within: float) -> Racer:
 	var best: Racer = null
 	var best_d := within
@@ -371,7 +407,7 @@ func _nearest_ahead(owner: Racer, from_s: float, within: float) -> Racer:
 
 func _ai(delta: float) -> void:
 	for r in racers:
-		if r.is_player or r.item == "" or r.mode != Racer.Mode.DRIVING or not r.controls_enabled:
+		if r.is_player or r.remote or r.item == "" or r.mode != Racer.Mode.DRIVING or not r.controls_enabled:
 			continue
 		_ai_wait[r] = float(_ai_wait.get(r, 0.0)) - delta
 		if _ai_wait[r] > 0.0:

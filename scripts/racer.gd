@@ -94,6 +94,7 @@ var _air_gap_start := 0.0
 var _air_gap_end := 0.0
 var _invuln := 0.0
 var _bump_cooldown := 0.0
+var _wall_cooldown := 0.0
 
 # AI
 var ai_skill := 0.9
@@ -107,6 +108,14 @@ var scraping := false
 var _visual_basis := Basis.IDENTITY
 var player_index := 0           # 0 = computer, 1 = player 1, 2 = player 2
 var input_prefix := ""          # "p1_" / "p2_" in split screen
+
+# Online races
+var net_key := ""               # who this car is on every computer ("p<peer>" or "ai<n>")
+var remote := false             # driven by another computer; we just show it
+var human := false              # a person drives it (here or on another computer)
+var _net_pos := Vector3.ZERO
+var _net_rot := Quaternion.IDENTITY
+var _net_seen := false
 var skid_marks: SkidMarks
 var _mark_dist := 0.0
 var _last_speed := 0.0
@@ -151,7 +160,11 @@ func progress() -> float:
 func _physics_process(delta: float) -> void:
 	if track == null:
 		return
+	if remote:
+		_process_remote(delta)
+		return
 	_bump_cooldown = maxf(0.0, _bump_cooldown - delta)
+	_wall_cooldown = maxf(0.0, _wall_cooldown - delta)
 	_invuln = maxf(0.0, _invuln - delta)
 	shield_timer = maxf(0.0, shield_timer - delta)
 	bubble_timer = maxf(0.0, bubble_timer - delta)
@@ -253,13 +266,19 @@ func _physics_process(delta: float) -> void:
 	scraping = false
 	if absf(lateral) > limit:
 		var side := signf(lateral)
-		# Hitting the outside rail in a turn too fast = flying off the track!
+		# Slamming into the outside rail in a turn too fast: BONK! The car
+		# bounces off and slows right down (a really hard hit spins it out),
+		# but it stays on the track.
 		var outward := slide * side + maxf(0.0, lateral_vel * side) * 0.5 + maxf(0.0, knock * side)
-		if absf(curve) > 0.02 and absf(speed) > 22.0 and outward > _fly_off_limit() and _invuln <= 0.0 \
+		if absf(curve) > 0.02 and absf(speed) > 22.0 and outward > _fly_off_limit() and _wall_cooldown <= 0.0 \
 				and (f & (Track.FLAG_LOOP | Track.FLAG_GAP)) == 0:
-			var vel := -frame.basis.z * speed * 0.85 + frame.basis.x * side * (outward * 1.6 + 3.0) + Vector3.UP * 5.0
-			_fall_off(vel, s - 4.0, float(stats["top_speed"]) * 0.35, "corner")
-			return
+			_wall_cooldown = 0.6
+			var hard := outward > _fly_off_limit() * 2.0
+			speed *= 0.4 if hard else 0.6
+			knock = -side * clampf(outward * 0.9, 3.0, 9.0)            # pushed back towards the middle
+			spin_vel += -side * (11.0 if hard else 5.0)                 # spin out (or a little twist)
+			bumped.emit(self, 1.0 if hard else 0.6)
+			crashed.emit(self, "wall_hard" if hard else "wall")
 		lateral = clampf(lateral, -limit, limit)
 		lateral_vel = 0.0
 		if knock * side > 0.0:
@@ -344,6 +363,84 @@ func _leave_skid_marks(ds: float, slide: float, frame: Transform3D) -> void:
 	for side: float in [-0.55, 0.55]:
 		var p := global_position + b.x * side + b.z * 0.65
 		skid_marks.add_mark(p, Basis(b.x, frame.basis.y, b.z), strength)
+
+
+# ---------------------------------------------------------------------------
+# Online: sending and showing cars driven on other computers
+# ---------------------------------------------------------------------------
+
+const NET_AIR := 1
+const NET_FALLING := 2
+const NET_FLAME := 4
+const NET_SHIELD := 8
+const NET_BUBBLE := 16
+const NET_FINISHED := 32
+const NET_BRAKING := 64
+
+
+## This car's state, to send to the other computers.
+func net_state() -> Array:
+	var f := 0
+	if mode == Mode.AIRBORNE:
+		f |= NET_AIR
+	if mode == Mode.FALLING:
+		f |= NET_FALLING
+	if boost_timer > 0.0 or turbo_on:
+		f |= NET_FLAME
+	if shield_timer > 0.0:
+		f |= NET_SHIELD
+	if bubble_timer > 0.0:
+		f |= NET_BUBBLE
+	if has_finished:
+		f |= NET_FINISHED
+	if braking:
+		f |= NET_BRAKING
+	return [net_key, global_position, global_transform.basis.get_rotation_quaternion(),
+		speed, s, total, lateral, steer_input, f, lap, finish_time, best_lap]
+
+
+## Takes in a state sent by the computer that drives this car.
+func apply_net_state(st: Array) -> void:
+	_net_pos = st[1]
+	_net_rot = st[2]
+	speed = st[3]
+	s = st[4]
+	total = st[5]
+	lateral = st[6]
+	steer_input = st[7]
+	var f: int = st[8]
+	lap = st[9]
+	best_lap = st[11]
+	mode = Mode.FALLING if f & NET_FALLING else (Mode.AIRBORNE if f & NET_AIR else Mode.DRIVING)
+	in_air = mode == Mode.AIRBORNE
+	boost_timer = 0.2 if f & NET_FLAME else 0.0
+	shield_timer = 1.0 if f & NET_SHIELD else 0.0
+	bubble_timer = 1.0 if f & NET_BUBBLE else 0.0
+	braking = (f & NET_BRAKING) != 0
+	if not _net_seen:
+		_net_seen = true
+		global_transform = Transform3D(Basis(_net_rot), _net_pos)
+	if (f & NET_FINISHED) and not has_finished:
+		has_finished = true
+		finish_time = st[10]
+		finished.emit(self)
+
+
+func _process_remote(delta: float) -> void:
+	_update_item_visuals(delta)
+	if not _net_seen:
+		return
+	# Glide towards where the car was last seen, a little ahead along its way.
+	var k := minf(1.0, delta * 14.0)
+	var guess := _net_pos
+	var t := global_transform
+	t.origin = t.origin.lerp(guess, k)
+	t.basis = Basis(t.basis.get_rotation_quaternion().slerp(_net_rot, k))
+	global_transform = t
+	if model:
+		model.animate(speed, steer_input, delta)
+		if model.shadow:
+			model.shadow.visible = mode != Mode.FALLING
 
 
 func _check_laps() -> void:

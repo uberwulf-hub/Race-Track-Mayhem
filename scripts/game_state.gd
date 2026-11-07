@@ -9,6 +9,8 @@ const SAVE_PATH := "user://race_track_mayhem.cfg"
 const PLAYER_PATH := "user://player_%d.cfg"
 const MAX_PLAYERS := 6
 const NAME_LENGTH := 12
+## Track number used in online races on the host's own track.
+const ONLINE_TRACK := 999
 const DIFFICULTY_NAMES := ["Easy", "Normal", "Hard"]
 const QUALITY_NAMES := ["Low", "Medium", "High"]
 const GP_POINTS := [10, 8, 6, 5, 4]
@@ -59,6 +61,7 @@ var ui_theme: Theme
 var player_slot := -1
 var player_name := ""
 var player_chosen := false        # picked on the "Who's racing?" screen this time
+var _own_prefs := {}              # this player's settings while an online race uses the host's
 
 
 func _ready() -> void:
@@ -247,6 +250,30 @@ func _read_player(cfg: ConfigFile) -> void:
 	p2_car = clampi(p2_car, 0, CarData.count() - 1)
 
 
+## Online races use the host's laps, difficulty and power-ups; keep this
+## player's own settings safe (and saved) until the online session ends.
+func begin_online_override(p_laps: int, p_difficulty: int, p_powerups: bool) -> void:
+	if _own_prefs.is_empty():
+		_own_prefs = {"laps": laps, "difficulty": difficulty, "powerups": powerups_enabled,
+			"track": selected_track, "two_player": two_player}
+	laps = clampi(p_laps, 1, 9)
+	difficulty = clampi(p_difficulty, 0, 2)
+	powerups_enabled = p_powerups
+	two_player = false
+	end_grand_prix()
+
+
+func end_online_override() -> void:
+	if _own_prefs.is_empty():
+		return
+	laps = _own_prefs["laps"]
+	difficulty = _own_prefs["difficulty"]
+	powerups_enabled = _own_prefs["powerups"]
+	selected_track = _own_prefs["track"]
+	two_player = _own_prefs["two_player"]
+	_own_prefs = {}
+
+
 func _write_player() -> void:
 	if player_slot < 0:
 		return
@@ -254,12 +281,12 @@ func _write_player() -> void:
 	cfg.set_value("player", "name", player_name)
 	cfg.set_value("player", "car", selected_car)
 	cfg.set_value("player", "p2_car", p2_car)
-	cfg.set_value("player", "track", selected_track)
-	cfg.set_value("settings", "laps", laps)
-	cfg.set_value("settings", "difficulty", difficulty)
+	cfg.set_value("player", "track", _own_prefs.get("track", selected_track))
+	cfg.set_value("settings", "laps", _own_prefs.get("laps", laps))
+	cfg.set_value("settings", "difficulty", _own_prefs.get("difficulty", difficulty))
 	cfg.set_value("settings", "steer_assist", steer_assist)
 	cfg.set_value("settings", "ghost", ghost_enabled)
-	cfg.set_value("settings", "powerups", powerups_enabled)
+	cfg.set_value("settings", "powerups", _own_prefs.get("powerups", powerups_enabled))
 	cfg.set_value("settings", "builder_advanced", builder_advanced)
 	cfg.set_value("records", "best_times", best_times)
 	cfg.set_value("records", "best_laps", best_laps)
@@ -358,6 +385,8 @@ func apply_quality(env: Environment, sun: DirectionalLight3D = null) -> void:
 
 ## Records a finished race. Returns true if it was a new best race time.
 func submit_result(race_time: float, best_lap: float) -> bool:
+	if selected_track == ONLINE_TRACK:
+		return false   # someone else's track: no record to keep
 	var new_record := false
 	var key := "%s_%d" % [track_id(), laps]
 	if not best_times.has(key) or race_time < float(best_times[key]):
@@ -630,10 +659,17 @@ static func room_name(theme: String) -> String:
 func track_info(index: int) -> Dictionary:
 	if index < Track.TRACKS.size():
 		return Track.TRACKS[maxi(index, 0)]
+	if index == ONLINE_TRACK:
+		return custom_track_info(Net.race_config.get("custom", {}), "online_custom", "A track built by the host!")
 	var slot := index - Track.TRACKS.size()
 	if slot >= custom_tracks.size():
 		return Track.TRACKS[0]
 	var t: Dictionary = custom_tracks[slot]
+	return custom_track_info(t, "custom_%d_%s" % [slot, String(t.get("name", "")).to_snake_case()],
+		"A track YOU built! %d pieces." % (t.get("pieces", []) as Array).size())
+
+
+static func custom_track_info(t: Dictionary, track_key: String, blurb: String) -> Dictionary:
 	var pieces: Array = t.get("pieces", [])
 	var feats: Array = []
 	for id in pieces:
@@ -643,11 +679,11 @@ func track_info(index: int) -> Dictionary:
 	if feats.is_empty():
 		feats.append("Built by you!")
 	return {
-		"id": "custom_%d_%s" % [slot, String(t.get("name", "")).to_snake_case()],
+		"id": track_key,
 		"name": t.get("name", "My Track"),
 		"room": t.get("room", "bedroom"),
 		"room_name": room_name(t.get("room", "bedroom")),
-		"blurb": "A track YOU built! %d pieces." % pieces.size(),
+		"blurb": blurb,
 		"features": feats.slice(0, 5),
 		"stars": 0,
 		"color": Color(0.95, 0.55, 0.15),

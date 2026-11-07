@@ -57,6 +57,7 @@ var _strip: HBoxContainer
 var _mode_button: Button
 var _redo_button: Button
 var _hint: Label
+var _insert_mark: Label
 
 
 func _ready() -> void:
@@ -152,12 +153,11 @@ func _palette(id: String) -> void:
 		Sfx.play("back")
 		return
 	_remember()
-	if _advanced() and _sel >= 0:
+	if _sel >= 0:
 		_sel += 1
 		_pieces.insert(_sel, id)       # in after the picked piece, and pick the new one
 	else:
 		_pieces.append(id)
-		_sel = -1
 	Sfx.play("click", randf_range(0.95, 1.15))
 	_disarm_clear()
 	_rebuild()
@@ -168,6 +168,7 @@ func _select(i: int) -> void:
 	_replacing = false
 	if _sel >= 0:
 		Sfx.play("click", 1.2)
+		_say("New pieces go after #%d now (the yellow arrow). Tap Done to build on the end again." % (_sel + 1), Color(1.0, 0.95, 0.5))
 	_refresh_selection()
 
 
@@ -282,7 +283,7 @@ func _toggle_mode() -> void:
 	_fill_palette()
 	_refresh_selection()
 	_say("Advanced mode: all the pieces, drag chips to move them, and more tools!" if _advanced() \
-		else "Easy mode: tap a piece to add it. Tap a chip below to move or delete it.", Color(0.7, 0.9, 1.0))
+		else "Easy mode: click the track where you want to build, then tap a piece to add it there.", Color(0.7, 0.9, 1.0))
 
 
 ## Keyboard shortcuts (Advanced mode, plus Delete and Ctrl+Z everywhere).
@@ -383,11 +384,11 @@ func _refresh_selection() -> void:
 		_tool_buttons["flip"].disabled = not Track.FLIPPED.has(id)
 		_tool_buttons["copy"].disabled = _pieces.size() >= MAX_PIECES
 		_tool_buttons["replace"].text = "Pick a new piece!" if _replacing else "Replace"
-	if _advanced():
-		_palette_title.text = ("Tap the new piece for #%d:" % (_sel + 1)) if _replacing else \
-			(("Add after #%d:" % (_sel + 1)) if _sel >= 0 else "Add to the end:")
+	if _replacing:
+		_palette_title.text = "Tap the new piece for #%d:" % (_sel + 1)
 	else:
-		_palette_title.text = "Tap to add a piece:"
+		_palette_title.text = ("Add after #%d:" % (_sel + 1)) if _sel >= 0 else "Add to the end:"
+	_place_insert_mark()
 	_place_highlight()
 	_place_cursor()
 
@@ -432,7 +433,7 @@ func _place_cursor() -> void:
 	_cursor = Node3D.new()
 	add_child(_cursor)
 	var end := _track.builder_end
-	if _advanced() and _sel >= 0:
+	if _sel >= 0:
 		end = _track.piece_end(_sel)
 	_cursor.global_transform = Transform3D(end.basis, end.origin + end.basis.y * 3.0)
 	var mat := StandardMaterial3D.new()
@@ -440,6 +441,8 @@ func _place_cursor() -> void:
 	mat.emission_enabled = true
 	mat.emission = Color(1.0, 0.9, 0.2)
 	mat.emission_energy_multiplier = 1.5
+	mat.no_depth_test = true          # always visible, even behind a loop
+	mat.render_priority = 10
 	var cone := MeshInstance3D.new()
 	var cm := CylinderMesh.new()
 	cm.top_radius = 0.0
@@ -450,13 +453,15 @@ func _place_cursor() -> void:
 	cone.rotation.x = -PI * 0.5
 	_cursor.add_child(cone)
 	var label := Label3D.new()
-	label.text = "NEXT PIECE"
+	label.text = "NEW PIECES GO HERE"
 	label.font_size = 64
 	label.pixel_size = 0.04
 	label.outline_size = 14
 	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	label.position = Vector3(0, 3.5, 0)
 	label.modulate = Color(1.0, 0.95, 0.4)
+	label.no_depth_test = true
+	label.render_priority = 11
 	_cursor.add_child(label)
 
 
@@ -665,7 +670,7 @@ func _build_ui() -> void:
 	_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	RaceHud.pin(_status, Vector2(0.5, 1), Vector2(-280, -224), Vector2(600, 44))
 	root.add_child(_status)
-	_hint = RaceHud.make_label("Tap a chip or the track to pick a piece.  Q / E or right-drag turns the view, wheel zooms.", 16, Color(1, 1, 1, 0.8), 6)
+	_hint = RaceHud.make_label("Click the track where you want to add pieces.   Q / E: turn the view   Wheel: zoom", 16, Color(1, 1, 1, 0.8), 6)
 	RaceHud.pin(_hint, Vector2(1, 0), Vector2(-830, 74), Vector2(810, 24))
 	_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	root.add_child(_hint)
@@ -720,7 +725,8 @@ func _style_piece_button(b: Button, col: Color, depth: int) -> void:
 func _fill_strip() -> void:
 	for c in _strip.get_children():
 		_strip.remove_child(c)
-		c.queue_free()
+		if c != _insert_mark:
+			c.queue_free()
 	_strip.add_child(_end_chip("START"))
 	for i in _pieces.size():
 		var id := String(_pieces[i])
@@ -735,6 +741,25 @@ func _fill_strip() -> void:
 		_strip.add_child(chip)
 		chip.set_picked(false)
 	_strip.add_child(_end_chip("back to\nSTART"))
+
+
+## A "+" in the chip row where new pieces will go.
+func _place_insert_mark() -> void:
+	if _insert_mark == null or not is_instance_valid(_insert_mark):
+		_insert_mark = RaceHud.make_label("+", 40, Color(1.0, 0.95, 0.3), 10)
+		_insert_mark.custom_minimum_size = Vector2(30, 70)
+		_insert_mark.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		_insert_mark.tooltip_text = "New pieces go here"
+	if _insert_mark.get_parent() != _strip:
+		if _insert_mark.get_parent():
+			_insert_mark.get_parent().remove_child(_insert_mark)
+		_strip.add_child(_insert_mark)
+	# After the picked chip, or just before "back to START".
+	var at := _strip.get_child_count() - 2
+	for c in _strip.get_children():
+		if c is Chip and (c as Chip).index == _sel:
+			at = c.get_index() + 1
+	_strip.move_child(_insert_mark, clampi(at, 0, _strip.get_child_count() - 1))
 
 
 func _end_chip(text: String) -> Label:
