@@ -91,6 +91,13 @@ Whenever you come off the track, the screen fades and you're put back where you 
 Cars further back get better power-ups, and the computer cars use them too. Switch them off in Options.
 A blinking **INCOMING!** warning (with an arrow for the side) shows when a bubble or ball is about to hit you.
 
+**Android (phones and tablets).** Each release also has `RaceTrackMayhem-android.apk`. Open the release page
+on the phone, download the .apk and open it (allow "install unknown apps" when Android asks).
+- Big on-screen buttons: steer < >, GO, BRAKE, TURBO, ITEM, pause and R (back on track). Steer with one thumb
+  and hold GO with the other. Options > Touch buttons: Auto (on for phones/tablets), On or Off.
+- Phones start on Low graphics, and the back button works like Back. Race Online works on phones too.
+- Track Builder: tap the track to choose where to build, drag to turn the view, pinch or +/- to zoom.
+
 **Race Online (home network).** Race other computers in your house:
 - One computer taps **Race Online! > Host a Race**. The others tap **Race Online!** and the race shows up
   under "Races on your network" (or type the host's address, shown in the host's lobby).
