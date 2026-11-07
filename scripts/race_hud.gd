@@ -44,6 +44,16 @@ var _item_panel: PanelContainer
 var _item_style: StyleBoxFlat
 var _item_name: Label
 var _item_hint: Label
+var _speed_box: Control
+var _turbo_box: Control
+var touch := false:             # on-screen buttons: show "tap" hints instead of keys
+	set(v):
+		touch = v
+		if v:
+			hide_hint()
+			if _item_hint:
+				_item_hint.text = "tap ITEM"
+			_make_room_for_buttons()
 var _item_kind := ""
 
 
@@ -58,6 +68,22 @@ static func make_label(text: String, size: int, color: Color = Color.WHITE, outl
 
 
 ## Pins a control to an anchor point of its parent with a fixed offset and size.
+## With on-screen buttons the bottom corners belong to your thumbs: move the
+## speed, turbo meter and mini map up out of the way.
+func _make_room_for_buttons() -> void:
+	if _speed_box:
+		pin(_speed_box, Vector2(1, 0), Vector2(-300, 108), Vector2(280, 90))
+		_speed_label.add_theme_font_size_override("font_size", 30)
+	if _turbo_box:
+		pin(_turbo_box, Vector2(0, 0), Vector2(20, 236), Vector2(240, 70))
+		_turbo_label.text = "TURBO"
+		_turbo_label.add_theme_font_size_override("font_size", 22)
+	if _minimap:
+		_minimap.set_anchors_preset(Control.PRESET_TOP_LEFT)
+		_minimap.position = Vector2(20, 316)
+		_minimap.size = Vector2(170, 150)
+
+
 static func pin(c: Control, anchor: Vector2, offset: Vector2, size: Vector2) -> void:
 	c.anchor_left = anchor.x
 	c.anchor_right = anchor.x
@@ -110,6 +136,7 @@ func setup(p_track: Track, p_racers: Array[Racer], p_player: Racer) -> void:
 
 	# --- bottom right: speed ---
 	var br := VBoxContainer.new()
+	_speed_box = br
 	RaceHud.pin(br, Vector2(1, 1), Vector2(-300, -120), Vector2(280, 100))
 	_root.add_child(br)
 	_speed_label = make_label("0 mph", 40)
@@ -120,6 +147,7 @@ func setup(p_track: Track, p_racers: Array[Racer], p_player: Racer) -> void:
 
 	# --- bottom left: turbo ---
 	var bl := VBoxContainer.new()
+	_turbo_box = bl
 	RaceHud.pin(bl, Vector2(0, 1), Vector2(24, -110), Vector2(300, 90))
 	_root.add_child(bl)
 	_turbo_label = make_label("TURBO  [SPACE]", 26, Color(0.5, 0.95, 1.0))

@@ -152,7 +152,7 @@ func _build_ui() -> void:
 	online.add_theme_color_override("font_color", Color(0.75, 1.0, 1.0))
 	var more := _row(_main_box)
 	var extras: Array = [_button(more, "Options", func(): _show_panel(_options_panel)), _button(more, "How to Play", func(): _show_panel(_help_panel))]
-	if OS.get_name() != "Web":
+	if OS.get_name() != "Web" and not Game.is_mobile():
 		extras.append(_button(more, "Quit", func(): get_tree().quit()))
 	for b: Button in extras:
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -348,6 +348,8 @@ func _build_options(root: Control) -> Control:
 		Game.ghost_enabled = not Game.ghost_enabled)
 	_choice(grid, "Power-ups:", func() -> String: return "On" if Game.powerups_enabled else "Off", func():
 		Game.powerups_enabled = not Game.powerups_enabled)
+	_choice(grid, "Touch buttons:", func() -> String: return Game.TOUCH_NAMES[Game.touch_mode], func():
+		Game.touch_mode = (Game.touch_mode + 1) % 3)
 	_slider_row(grid, "Volume:", Game.master_volume, func(v: float): Game.set_volume(v))
 	_slider_row(grid, "Music:", Game.music_volume, func(v: float): Game.set_music_volume(v))
 	_slider_row(grid, "Sounds:", Game.sfx_volume, func(v: float): Game.set_sfx_volume(v))

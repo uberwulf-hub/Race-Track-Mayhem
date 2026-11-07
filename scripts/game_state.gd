@@ -13,6 +13,7 @@ const NAME_LENGTH := 12
 const ONLINE_TRACK := 999
 const DIFFICULTY_NAMES := ["Easy", "Normal", "Hard"]
 const QUALITY_NAMES := ["Low", "Medium", "High"]
+const TOUCH_NAMES := ["Auto", "On", "Off"]
 const GP_POINTS := [10, 8, 6, 5, 4]
 
 var selected_car: int = 0
@@ -27,6 +28,7 @@ var best_laps: Dictionary = {}   # track id -> best single lap (seconds)
 
 # Settings
 var quality: int = 1             # 0 low, 1 medium, 2 high
+var touch_mode: int = 0          # on-screen buttons: 0 auto (phones/tablets), 1 on, 2 off
 var fullscreen := false
 var steer_assist := true         # gentle steering help for little drivers
 var ghost_enabled := true        # race against your best lap
@@ -62,6 +64,29 @@ var player_slot := -1
 var player_name := ""
 var player_chosen := false        # picked on the "Who's racing?" screen this time
 var _own_prefs := {}              # this player's settings while an online race uses the host's
+
+
+static func is_mobile() -> bool:
+	return OS.has_feature("mobile")
+
+
+## Show the on-screen buttons? (Auto = on phones, tablets and touch screens.)
+func use_touch() -> bool:
+	if touch_mode == 1:
+		return true
+	if touch_mode == 2:
+		return false
+	return is_mobile() or DisplayServer.is_touchscreen_available()
+
+
+## Android's back button (or back gesture) works like Esc / Back.
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_GO_BACK_REQUEST:
+		for pressed in [true, false]:
+			var ev := InputEventAction.new()
+			ev.action = "ui_cancel"
+			ev.pressed = pressed
+			Input.parse_input_event(ev)
 
 
 func _ready() -> void:
@@ -114,7 +139,9 @@ func load_settings() -> void:
 	master_volume = float(cfg.get_value("settings", "volume", 0.8))
 	music_volume = float(cfg.get_value("settings", "music_volume", 0.6))
 	sfx_volume = float(cfg.get_value("settings", "sfx_volume", 0.9))
-	quality = clampi(int(cfg.get_value("settings", "quality", 1)), 0, 2)
+	# Phones and tablets start on Low graphics so the game runs smoothly.
+	quality = clampi(int(cfg.get_value("settings", "quality", 0 if is_mobile() else 1)), 0, 2)
+	touch_mode = clampi(int(cfg.get_value("settings", "touch", 0)), 0, 2)
 	fullscreen = bool(cfg.get_value("settings", "fullscreen", false))
 	_apply_volume()
 	if has_file and not cfg.has_section_key("players", "last") and _list_slots().is_empty():
@@ -138,6 +165,7 @@ func save_settings() -> void:
 	cfg.set_value("settings", "sfx_volume", sfx_volume)
 	cfg.set_value("settings", "quality", quality)
 	cfg.set_value("settings", "fullscreen", fullscreen)
+	cfg.set_value("settings", "touch", touch_mode)
 	cfg.set_value("players", "last", player_slot)
 	cfg.save(SAVE_PATH)
 	_write_player()

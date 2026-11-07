@@ -48,6 +48,7 @@ var online := false
 var _by_key: Dictionary = {}         # net key -> Racer
 var _net_go := false                 # the host said start the countdown
 var _send_timer := 0.0
+var touch: TouchControls
 
 
 ## Everything that belongs to one human player's half of the screen.
@@ -120,6 +121,13 @@ func _ready() -> void:
 			r.model.set_headlights(true)
 	_build_pause_menu()
 	_setup_ai_engines()
+	# On-screen buttons for phones and tablets (one player).
+	if Game.use_touch() and humans.size() == 1:
+		touch = TouchControls.new().setup(humans[0].input_prefix)
+		touch.process_mode = Node.PROCESS_MODE_ALWAYS
+		add_child(touch)
+		for v in views:
+			v.hud.touch = true
 	# Each room has its own race song (custom tracks use their room's song).
 	Sfx.play_music("race_" + String(Game.track_info(Game.selected_track)["room"]), -9.0)
 	_set_state(State.INTRO)
@@ -474,7 +482,7 @@ func _update_rubber_band(delta: float) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event.is_action_pressed("pause") and not _results_shown:
+	if (event.is_action_pressed("pause") or event.is_action_pressed("ui_cancel")) and not _results_shown:
 		_toggle_pause()
 		return
 	if state != State.RACING and state != State.COUNTDOWN:
@@ -667,6 +675,9 @@ func _update_view_extras(v: View, delta: float) -> void:
 				near.append([clampf((o.lateral - r.lateral) / Track.HALF_WIDTH, -1.0, 1.0), 1.0 - behind / 14.0, o.car["body"]])
 	v.hud.set_nearby(near)
 	v.hud.set_item(r.item if powerups else "", r.shield_timer > 0.0)
+	if touch:
+		touch.visible = state != State.INTRO and not _results_shown and not _pause_menu.visible
+		touch.set_item_ready(r.item != "")
 	v.hud.set_incoming(powerups.incoming_for(r) if powerups and state == State.RACING and not r.has_finished else {})
 	if r == player and ghost:
 		ghost.follow(r.race_time - r.lap_start_time, state == State.RACING and not r.has_finished)
