@@ -57,18 +57,18 @@ There are no art or sound files. The cars, track, bedroom and sound effects are 
 
 ## Controls
 
-| Action | 1 player | Player 1 (split screen) | Player 2 (split screen) | Gamepad |
-|---|---|---|---|---|
-| Go | W / ↑ | W | ↑ | A or right trigger |
-| Steer | A D / ← → | A D | ← → | Left stick / D-pad |
-| Brake / reverse | S / ↓ | S | ↓ | X or left trigger |
-| **Turbo** (blue bar) | Space / Shift | Space / Shift | Enter / Ctrl / Num 0 | B or right bumper |
-| Use power-up | E / Q | E / Q | / or Num 1 | Y |
-| Back on track | R | R | Backspace | Back / View |
-| Change camera | C | C | C | Left bumper |
-| Pause | Esc / P | Esc / P | Esc / P | Start |
+| Action | Keyboard | Gamepad | Touch screen |
+|---|---|---|---|
+| Go | W / ↑ | A or right trigger | GO |
+| Steer | A D / ← → | Left stick / D-pad | < > |
+| Brake / reverse | S / ↓ | X or left trigger | BRAKE |
+| **Turbo** (blue bar) | Space / Shift | B or right bumper | TURBO |
+| Use power-up | E / Q | Y | ITEM |
+| Back on track | R | Back / View | R |
+| Change camera | C | Left bumper | |
+| Pause | Esc / P | Start | II |
 
-In split screen, controller 1 drives player 1 and controller 2 drives player 2.
+To race each other, use **Race Online!**: every player on their own computer, phone or tablet.
 
 Tips:
 - Drive over the glowing striped pads for a **BOOST**.
@@ -138,7 +138,6 @@ Your own tracks stand out in the track picker with a blueprint card and a "YOUR 
 - **Quick Race:** pick a car and any of the 6 tracks.
 - **Grand Prix:** race all 6 tracks in a row for points (10, 8, 6, 5, 4), then a trophy ceremony on the podium.
   Gold, silver and bronze trophies are kept on the shelf in the bedroom (one per difficulty).
-- **2 players:** split screen on one PC, with keyboard + controller or two controllers. Works with both modes.
 - **Ghost car:** a see-through replay of your best clean lap on each track drives alongside you.
 
 **Unlockables.** Finish races to earn stars (3 for 1st place, 2 for 2nd, 1 for finishing), plus bonus stars for Grand Prix trophies:

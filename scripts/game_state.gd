@@ -40,7 +40,7 @@ var trophies: Dictionary = {}    # difficulty (int) -> best Grand Prix place (1.
 var custom: Dictionary = {}      # car id -> {"paint": id, "sticker": id, "wheels": id}
 
 # Game modes
-var two_player := false
+var two_player := false        # same-screen split screen (no longer offered in the menu)
 var picking := 1                 # which player is choosing a car in the garage
 var p2_car: int = 1
 var gp_active := false

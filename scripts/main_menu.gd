@@ -15,7 +15,6 @@ var _options_panel: Control
 var _help_panel: Control
 var _credits_panel: Control
 var _title: Control
-var _players_button: Button
 var _option_buttons: Dictionary = {}
 var _laps_label: Label
 var _diff_button: Button
@@ -138,14 +137,10 @@ func _build_ui() -> void:
 	for b: Button in [play, cup]:
 		b.add_theme_font_size_override("font_size", 38)
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var mid := _row(_main_box)
-	_players_button = _button(mid, "", _toggle_players)
-	_update_players_button()
-	var builder := _button(mid, "Track Builder", func():
+	var builder := _button(_main_box, "Track Builder", func():
 		Game.end_grand_prix()
 		Game.goto_editor(-1))
-	for b: Button in [_players_button, builder]:
-		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	builder.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var online := _button(_main_box, "Race Online!", func():
 		Game.end_grand_prix()
 		Game.goto("res://scenes/online.tscn"))
@@ -242,15 +237,6 @@ func _row(parent: Container) -> HBoxContainer:
 	row.add_theme_constant_override("separation", 12)
 	parent.add_child(row)
 	return row
-
-
-func _toggle_players() -> void:
-	Game.two_player = not Game.two_player
-	_update_players_button()
-
-
-func _update_players_button() -> void:
-	_players_button.text = "Players: 2" if Game.two_player else "Players: 1"
 
 
 ## A pop-up panel with a title and a Back button in its top corner (so Back is
@@ -405,9 +391,6 @@ func _build_help(root: Control) -> Control:
 		"",
 		"Go:  W / Up      Steer:  A D / Left Right      Brake:  S / Down",
 		"TURBO:  Space      Back on track:  R      Camera:  C      Pause:  Esc",
-		"",
-		"2 PLAYERS:  Player 1 uses W A S D + Space (or controller 1).",
-		"Player 2 uses the arrow keys + Enter (or controller 2).",
 		"",
 		"Drive over glowing pads for a BOOST. Slow down for turns or you'll spin out!",
 		"Win races to earn STARS and unlock paint, stickers, wheels...",
