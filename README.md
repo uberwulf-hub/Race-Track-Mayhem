@@ -95,7 +95,15 @@ pick your name, or make a new player (type a name, or use the on-screen letters 
 how tough the other cars are. Each player keeps their own stars, unlocks, trophies, best times, ghost laps,
 tracks and settings (difficulty, laps, steering help). Switch players any time from the button at the top-left of the menu.
 
-**Track Builder.** Build your own tracks from the main menu or the track picker:
+**Track Builder.** Build your own tracks from the main menu or the track picker. Your pieces show as a row of
+numbered chips: tap a chip (or tap the piece on the track) to pick it, and it glows on the track. Then move it
+left or right, or delete it. Undo brings back anything. There are two modes (switch with the Mode button):
+- **Easy:** 8 big, simple pieces that go on the end of the track.
+- **Advanced:** every piece; new pieces go in right after the one you picked; drag chips to reorder; Replace,
+  Flip (left/right) and Copy; Redo; and shortcuts (`[` `]` pick, Ctrl+Left/Right move, F flip, D copy, Delete, Ctrl+Z/Y).
+
+Your own tracks stand out in the track picker with a blueprint card and a "YOUR TRACK" ribbon.
+
 - **Pieces:** Straight, Turn Left/Right, Bend Left/Right, Boost Pad, Loop, Corkscrew, Jump, Big Jump, Hill, Bumps, Spiral and Wiggles.
 - **Live preview:** a toy car drives your track while you build. A bouncing arrow shows where the next piece goes.
 - **Always a working circuit:** the road back to the start line is drawn for you, so any combination of pieces makes a working track.

@@ -241,7 +241,9 @@ func _update_players_button() -> void:
 	_players_button.text = "Players: 2" if Game.two_player else "Players: 1"
 
 
-func _panel(root: Control, title_text: String) -> Array:
+## A pop-up panel with a title and a Back button in its top corner (so Back is
+## always on screen, however small the window). Pass back = Callable() for none.
+func _panel(root: Control, title_text: String, back: Variant = null) -> Array:
 	var center := CenterContainer.new()
 	center.set_anchors_preset(Control.PRESET_FULL_RECT)
 	center.visible = false
@@ -255,6 +257,15 @@ func _panel(root: Control, title_text: String) -> Array:
 	var t := RaceHud.make_label(title_text, 48, Color(1.0, 0.85, 0.2), 12)
 	t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(t)
+	var cb: Callable = back if back is Callable else func(): _show_panel(null)
+	if cb.is_valid():
+		var back_btn := _button(t, "< Back", cb)
+		back_btn.add_theme_font_size_override("font_size", 20)
+		back_btn.set_anchors_preset(Control.PRESET_TOP_LEFT)
+		back_btn.position = Vector2(-6, 4)
+		back_btn.size = Vector2(110, 44)
+		back_btn.set_meta("corner_back", true)
+		t.set_meta("back", back_btn)
 	return [center, box]
 
 
@@ -269,9 +280,21 @@ func _show_panel(panel: Control) -> void:
 	if panel == null:
 		(_main_box.get_child(0).get_child(0) as Button).grab_focus()
 	else:
-		var buttons := panel.find_children("*", "Button", true, false)
+		var buttons := panel.find_children("*", "Button", true, false).filter(func(x): return not x.has_meta("corner_back"))
 		if buttons.size() > 0:
 			(buttons[0] as Button).grab_focus()
+		_fit_to_screen.call_deferred(panel)
+
+
+## Shrinks a panel that's taller than the window, so nothing ends up off screen.
+func _fit_to_screen(center: Control) -> void:
+	var panel := center.get_child(0) as Control
+	panel.scale = Vector2.ONE
+	await get_tree().process_frame
+	var room := get_viewport().get_visible_rect().size - Vector2(24, 24)
+	var k := minf(1.0, minf(room.y / maxf(1.0, panel.size.y), room.x / maxf(1.0, panel.size.x)))
+	panel.pivot_offset = panel.size * 0.5
+	panel.scale = Vector2(k, k)
 
 
 func _build_options(root: Control) -> Control:
@@ -279,7 +302,7 @@ func _build_options(root: Control) -> Control:
 	var box: VBoxContainer = parts[1]
 	box.add_theme_constant_override("separation", 8)
 	var grid := GridContainer.new()
-	grid.columns = 2
+	grid.columns = 4   # two settings per row, so it fits on small screens
 	grid.add_theme_constant_override("h_separation", 24)
 	grid.add_theme_constant_override("v_separation", 6)
 	box.add_child(grid)
@@ -315,7 +338,7 @@ func _build_options(root: Control) -> Control:
 
 	var note := RaceHud.make_label("Graphics: Low runs on any PC. High looks amazing but needs a good graphics card.", 18, Color(0.85, 0.9, 1.0), 4)
 	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	note.custom_minimum_size = Vector2(560, 0)
+	note.custom_minimum_size = Vector2(760, 0)
 	note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(note)
 	_button(box, "Back", func(): _show_panel(null))
@@ -326,7 +349,7 @@ func _build_options(root: Control) -> Control:
 func _choice(grid: GridContainer, label: String, current: Callable, next: Callable) -> void:
 	grid.add_child(RaceHud.make_label(label, 28))
 	var b := _button(grid, current.call(), Callable())
-	b.custom_minimum_size = Vector2(240, 0)
+	b.custom_minimum_size = Vector2(200, 0)
 	b.pressed.connect(func():
 		next.call()
 		b.text = current.call()
@@ -342,7 +365,7 @@ func _slider_row(box: Container, label: String, value: float, setter: Callable) 
 	slider.max_value = 1.0
 	slider.step = 0.05
 	slider.value = value
-	slider.custom_minimum_size = Vector2(260, 40)
+	slider.custom_minimum_size = Vector2(200, 40)
 	slider.value_changed.connect(func(v: float):
 		setter.call(v)
 		Sfx.play("click"))
@@ -424,7 +447,7 @@ func _player_text() -> String:
 
 
 func _build_who(root: Control) -> Control:
-	var parts := _panel(root, "Who's racing?")
+	var parts := _panel(root, "Who's racing?", Callable())
 	_who_list = parts[1]
 	return parts[0]
 
@@ -512,7 +535,11 @@ func _pick_player(slot: int) -> void:
 
 
 func _build_new_player(root: Control) -> Control:
-	var parts := _panel(root, "New Player")
+	var parts := _panel(root, "New Player", func():
+		if _renaming:
+			_show_panel(null)
+		else:
+			_open_who())
 	var box: VBoxContainer = parts[1]
 	_new_title = box.get_child(0) as Label
 	box.add_theme_constant_override("separation", 10)

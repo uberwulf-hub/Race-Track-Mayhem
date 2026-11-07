@@ -95,6 +95,7 @@ var stretch := Vector2.ZERO   # how long the auto-sized straights came out
 var custom := false           # a track built in the Track Builder
 var custom_pieces: Array = [] # its piece ids, in order (see PIECES)
 var builder_end := Transform3D()  # where the last piece ends (the builder's arrow goes here)
+var piece_ranges: Array = []      # Track Builder: [first, end) raw point indices of each piece
 
 ## The pieces kids can build with in the Track Builder. Stunt pieces come
 ## with their own boost pad so cars are always fast enough.
@@ -127,6 +128,39 @@ static func for_index(index: int) -> Track:
 		if slot < Game.custom_tracks.size():
 			t.custom_pieces = Game.custom_tracks[slot].get("pieces", [])
 	return t
+
+
+## Left pieces turn into right ones and the other way round.
+const FLIPPED := {"left": "right", "right": "left", "bend_left": "bend_right", "bend_right": "bend_left"}
+
+
+## The points along one Track Builder piece (for highlighting and clicking it).
+func piece_points(i: int) -> PackedVector3Array:
+	var out := PackedVector3Array()
+	if i < 0 or i >= piece_ranges.size():
+		return out
+	for k in range(int(piece_ranges[i][0]), int(piece_ranges[i][1])):
+		out.append(_raw_pos[k])
+	return out
+
+
+func piece_ups(i: int) -> PackedVector3Array:
+	var out := PackedVector3Array()
+	if i < 0 or i >= piece_ranges.size():
+		return out
+	for k in range(int(piece_ranges[i][0]), int(piece_ranges[i][1])):
+		out.append(_raw_up[k])
+	return out
+
+
+## Where a piece ends, facing along the road (the builder's arrow goes here).
+func piece_end(i: int) -> Transform3D:
+	if i < 0 or i >= piece_ranges.size() or int(piece_ranges[i][1]) == 0:
+		return Transform3D(Basis(), Vector3(0.0, BASE_HEIGHT, 0.0))
+	var k := int(piece_ranges[i][1]) - 1
+	var fwd := _raw_fwd[k]
+	var up := _raw_up[k]
+	return Transform3D(Basis(fwd.cross(up).normalized(), up, -fwd), _raw_pos[k])
 
 
 static func piece_info(id: String) -> Dictionary:
@@ -460,8 +494,11 @@ const CLOSE_RADIUS := 17.0
 ## back to the start line.
 func _build_custom_layout() -> void:
 	_reset_turtle()
+	piece_ranges.clear()
 	for id in custom_pieces:
+		var first := _raw_pos.size()
 		_piece(String(id))
+		piece_ranges.append([first, _raw_pos.size()])
 	var right := _fwd.cross(_up).normalized()
 	builder_end = Transform3D(Basis(right, _up, -_fwd), _pos)
 	_close_to_start()

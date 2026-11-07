@@ -51,6 +51,7 @@ const ROOM_THEMES := [["bedroom", "The Bedroom"], ["playroom", "The Playroom"], 
 var custom_tracks: Array = []    # [{"name": String, "room": String, "pieces": Array[String]}]
 var editing_slot := -1           # which custom track the builder is editing (-1 = a new one)
 var skip_track_select := false   # "Race It!" in the builder goes straight to the race
+var builder_advanced := false    # Track Builder in Advanced mode (more pieces and tools)
 
 var ui_theme: Theme
 
@@ -236,6 +237,7 @@ func _read_player(cfg: ConfigFile) -> void:
 	steer_assist = bool(cfg.get_value("settings", "steer_assist", true))
 	ghost_enabled = bool(cfg.get_value("settings", "ghost", true))
 	powerups_enabled = bool(cfg.get_value("settings", "powerups", true))
+	builder_advanced = bool(cfg.get_value("settings", "builder_advanced", false))
 	best_times = cfg.get_value("records", "best_times", {})
 	best_laps = cfg.get_value("records", "best_laps", {})
 	stars = int(cfg.get_value("progress", "stars", 0))
@@ -258,6 +260,7 @@ func _write_player() -> void:
 	cfg.set_value("settings", "steer_assist", steer_assist)
 	cfg.set_value("settings", "ghost", ghost_enabled)
 	cfg.set_value("settings", "powerups", powerups_enabled)
+	cfg.set_value("settings", "builder_advanced", builder_advanced)
 	cfg.set_value("records", "best_times", best_times)
 	cfg.set_value("records", "best_laps", best_laps)
 	cfg.set_value("progress", "stars", stars)

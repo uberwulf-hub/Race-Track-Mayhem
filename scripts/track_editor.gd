@@ -1,10 +1,20 @@
 extends Node3D
 ## The Track Builder: snap pieces together to make your own track!
-## Press a piece button to add it to the end of the track. The road back to
-## the start line is drawn for you automatically, so every track works.
-## A little car drives your track while you build it.
+## Press a piece button to add it. The pieces show as a row of chips along
+## the bottom: tap one (or tap the piece on the track) to pick it, then move
+## it, delete it and so on. The road back to the start line is drawn for you
+## automatically, so every track works. A little car drives it as you build.
+##
+## Easy mode: 8 simple pieces, new pieces go on the end.
+## Advanced mode: all the pieces, new pieces go in after the one you picked,
+## drag chips to reorder, plus Replace, Flip, Copy and keyboard shortcuts.
 
 const MAX_PIECES := 40
+const EASY_PIECES := ["straight", "left", "right", "boost", "loop", "jump", "hill", "bumps"]
+const SHORT := {"straight": "Straight", "left": "Left", "right": "Right", "bend_left": "Bend L",
+	"bend_right": "Bend R", "boost": "Boost", "loop": "Loop", "corkscrew": "Cork-\nscrew",
+	"jump": "Jump", "big_jump": "Big\nJump", "hill": "Hill", "bumps": "Bumps", "spiral": "Spiral", "wiggles": "Wiggles"}
+const HISTORY := 60
 const NAMES := ["Super Speedway", "Zoom Zone", "Crazy Circuit", "Loop Land", "Turbo Town", "Wiggle Way", "Jump Jungle", "Rocket Run"]
 
 var _pieces: Array = []
@@ -29,6 +39,24 @@ var _status: Label
 var _count_label: Label
 var _clear_button: Button
 var _clear_armed := false
+
+var _sel := -1                  # the picked piece (-1 = none)
+var _replacing := false         # Advanced: the next palette tap replaces the picked piece
+var _undo_stack: Array = []
+var _redo_stack: Array = []
+var _highlight: MeshInstance3D
+var _ui_root: Control
+var _palette_panel: PanelContainer
+var _palette_title: Label
+var _palette_grid: GridContainer
+var _tools: PanelContainer
+var _tools_title: Label
+var _tool_buttons: Dictionary = {}
+var _strip_scroll: ScrollContainer
+var _strip: HBoxContainer
+var _mode_button: Button
+var _redo_button: Button
+var _hint: Label
 
 
 func _ready() -> void:
@@ -70,9 +98,19 @@ func _process(delta: float) -> void:
 		_car.animate(32.0, 0.0, delta)
 	if _cursor:
 		_cursor.scale = Vector3.ONE * (1.0 + sin(_time * 5.0) * 0.12)
+	if _highlight:
+		var m := _highlight.material_override as StandardMaterial3D
+		m.emission_energy_multiplier = 1.2 + sin(_time * 6.0) * 0.6
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		_pick_at(event.position)
+		return
+	if event is InputEventKey and event.pressed and not event.echo and not _name_edit.has_focus():
+		if _key_shortcut(event as InputEventKey):
+			get_viewport().set_input_as_handled()
+			return
 	if event is InputEventMouseButton and event.pressed:
 		if event.button_index == MOUSE_BUTTON_WHEEL_UP:
 			_cam_zoom = clampf(_cam_zoom * 0.9, 0.4, 1.6)
@@ -88,23 +126,134 @@ func _unhandled_input(event: InputEvent) -> void:
 # Building
 # ---------------------------------------------------------------------------
 
-func _add(id: String) -> void:
+func _advanced() -> bool:
+	return Game.builder_advanced
+
+
+## Remembers the track before a change, so Undo can bring it back.
+func _remember() -> void:
+	_undo_stack.append([_pieces.duplicate(), _sel])
+	if _undo_stack.size() > HISTORY:
+		_undo_stack.pop_front()
+	_redo_stack.clear()
+
+
+## A palette button: add a piece (or swap the picked one, in Replace mode).
+func _palette(id: String) -> void:
+	if _replacing and _sel >= 0:
+		_remember()
+		_pieces[_sel] = id
+		_replacing = false
+		Sfx.play("select")
+		_rebuild()
+		return
 	if _pieces.size() >= MAX_PIECES:
 		_say("That's the biggest track allowed! (%d pieces)" % MAX_PIECES, Color(1.0, 0.7, 0.3))
 		Sfx.play("back")
 		return
-	_pieces.append(id)
+	_remember()
+	if _advanced() and _sel >= 0:
+		_sel += 1
+		_pieces.insert(_sel, id)       # in after the picked piece, and pick the new one
+	else:
+		_pieces.append(id)
+		_sel = -1
 	Sfx.play("click", randf_range(0.95, 1.15))
 	_disarm_clear()
 	_rebuild()
 
 
-func _undo() -> void:
-	if _pieces.is_empty():
+func _select(i: int) -> void:
+	_sel = i if i >= 0 and i < _pieces.size() else -1
+	_replacing = false
+	if _sel >= 0:
+		Sfx.play("click", 1.2)
+	_refresh_selection()
+
+
+func _move(d: int) -> void:
+	var j := _sel + d
+	if _sel < 0 or j < 0 or j >= _pieces.size():
+		Sfx.play("back")
 		return
-	_pieces.pop_back()
+	_remember()
+	var t = _pieces[_sel]
+	_pieces[_sel] = _pieces[j]
+	_pieces[j] = t
+	_sel = j
+	Sfx.play("click", 1.0 + d * 0.1)
+	_rebuild()
+
+
+## Drag and drop in the chip row (Advanced): put piece `from` at `to`.
+func _move_to(from: int, to: int) -> void:
+	if from == to or from < 0 or from >= _pieces.size():
+		return
+	_remember()
+	var id = _pieces[from]
+	_pieces.remove_at(from)
+	to = clampi(to if to < from else to - 1, 0, _pieces.size())
+	_pieces.insert(to, id)
+	_sel = to
+	Sfx.play("select")
+	_rebuild()
+
+
+func _delete_selected() -> void:
+	if _sel < 0:
+		return
+	_remember()
+	_pieces.remove_at(_sel)
+	_sel = mini(_sel, _pieces.size() - 1)   # pick the next one, so you can keep deleting
+	Sfx.play("crash", 1.5, -12.0)
+	_rebuild()
+
+
+func _flip_selected() -> void:
+	if _sel < 0 or not Track.FLIPPED.has(String(_pieces[_sel])):
+		return
+	_remember()
+	_pieces[_sel] = Track.FLIPPED[String(_pieces[_sel])]
+	Sfx.play("select")
+	_rebuild()
+
+
+func _copy_selected() -> void:
+	if _sel < 0 or _pieces.size() >= MAX_PIECES:
+		return
+	_remember()
+	_pieces.insert(_sel + 1, _pieces[_sel])
+	_sel += 1
+	Sfx.play("select")
+	_rebuild()
+
+
+func _toggle_replace() -> void:
+	_replacing = not _replacing and _sel >= 0
+	_refresh_selection()
+
+
+func _undo() -> void:
+	if _undo_stack.is_empty():
+		Sfx.play("back")
+		return
+	_redo_stack.append([_pieces.duplicate(), _sel])
+	var snap: Array = _undo_stack.pop_back()
+	_pieces = snap[0]
+	_sel = mini(int(snap[1]), _pieces.size() - 1)
 	Sfx.play("back")
 	_disarm_clear()
+	_rebuild()
+
+
+func _redo() -> void:
+	if _redo_stack.is_empty():
+		return
+	_undo_stack.append([_pieces.duplicate(), _sel])
+	var snap: Array = _redo_stack.pop_back()
+	_pieces = snap[0]
+	_sel = mini(int(snap[1]), _pieces.size() - 1)
+	Sfx.play("select")
 	_rebuild()
 
 
@@ -113,7 +262,9 @@ func _clear() -> void:
 		_clear_armed = true
 		_clear_button.text = "Sure? Tap again"
 		return
+	_remember()
 	_pieces.clear()
+	_sel = -1
 	_disarm_clear()
 	Sfx.play("crash", 1.3, -10.0)
 	_rebuild()
@@ -122,6 +273,66 @@ func _clear() -> void:
 func _disarm_clear() -> void:
 	_clear_armed = false
 	_clear_button.text = "Clear"
+
+
+func _toggle_mode() -> void:
+	Game.builder_advanced = not Game.builder_advanced
+	Game.save_settings()
+	_replacing = false
+	_fill_palette()
+	_refresh_selection()
+	_say("Advanced mode: all the pieces, drag chips to move them, and more tools!" if _advanced() \
+		else "Easy mode: tap a piece to add it. Tap a chip below to move or delete it.", Color(0.7, 0.9, 1.0))
+
+
+## Keyboard shortcuts (Advanced mode, plus Delete and Ctrl+Z everywhere).
+func _key_shortcut(k: InputEventKey) -> bool:
+	if k.ctrl_pressed and k.keycode == KEY_Z:
+		_undo()
+		return true
+	if k.ctrl_pressed and k.keycode == KEY_Y:
+		_redo()
+		return true
+	if k.keycode == KEY_DELETE or k.keycode == KEY_BACKSPACE:
+		_delete_selected()
+		return true
+	if not _advanced():
+		return false
+	match k.keycode:
+		KEY_BRACKETLEFT, KEY_COMMA:
+			_select(maxi(0, _sel - 1) if _sel >= 0 else _pieces.size() - 1)
+			return true
+		KEY_BRACKETRIGHT, KEY_PERIOD:
+			_select(mini(_pieces.size() - 1, _sel + 1))
+			return true
+		KEY_F:
+			_flip_selected()
+			return true
+		KEY_D:
+			_copy_selected()
+			return true
+	if k.ctrl_pressed and k.keycode == KEY_LEFT:
+		_move(-1)
+		return true
+	if k.ctrl_pressed and k.keycode == KEY_RIGHT:
+		_move(1)
+		return true
+	return false
+
+
+## Clicking the track in 3D picks the piece under the mouse.
+func _pick_at(mouse: Vector2) -> void:
+	var best := -1
+	var best_d := 42.0   # pixels
+	for i in _pieces.size():
+		for p in _track.piece_points(i):
+			if _cam.is_position_behind(p):
+				continue
+			var d := _cam.unproject_position(p).distance_to(mouse)
+			if d < best_d:
+				best_d = d
+				best = i
+	_select(best)
 
 
 ## Rebuilds the 3D preview from the piece list.
@@ -138,25 +349,92 @@ func _rebuild() -> void:
 	_fit = maxf(r.size.x, r.size.y) * 0.85 + 30.0
 	_floor.position = _center
 	(_floor.mesh as PlaneMesh).size = r.size + Vector2(160, 160)
-	_place_cursor()
 	_count_label.text = "%d / %d pieces" % [_pieces.size(), MAX_PIECES]
+	_fill_strip()
+	_refresh_selection()
 	var clashes := _track.count_clashes()
 	if _pieces.is_empty():
 		_say("Tap a piece to start building!", Color(1, 1, 1))
 	elif clashes > 0:
-		_say("Uh-oh! The track runs into itself. Try Undo, or add more pieces.", Color(1.0, 0.75, 0.3))
+		_say("Uh-oh! The track runs into itself. Try Undo, or move a piece.", Color(1.0, 0.75, 0.3))
 	else:
 		_say("Looking great! Keep building, or tap Race It!", Color(0.6, 1.0, 0.65))
 
 
-## A bouncing arrow at the end of your pieces, where the next one will go.
+## Shows which piece is picked: the glowing piece on the track, the chip,
+## the tools panel and where the next piece will go.
+func _refresh_selection() -> void:
+	if _sel >= _pieces.size():
+		_sel = _pieces.size() - 1
+	for c in _strip.get_children():
+		if c is Chip:
+			(c as Chip).set_picked((c as Chip).index == _sel)
+			if (c as Chip).index == _sel:
+				_strip_scroll.ensure_control_visible.call_deferred(c)
+	_tools.visible = _sel >= 0
+	_redo_button.visible = _advanced()
+	if _sel >= 0:
+		var id := String(_pieces[_sel])
+		_tools_title.text = "#%d  %s" % [_sel + 1, Track.piece_info(id).get("name", id)]
+		_tool_buttons["left"].disabled = _sel == 0
+		_tool_buttons["right"].disabled = _sel == _pieces.size() - 1
+		for k in ["flip", "copy", "replace"]:
+			_tool_buttons[k].visible = _advanced()
+		_tool_buttons["flip"].disabled = not Track.FLIPPED.has(id)
+		_tool_buttons["copy"].disabled = _pieces.size() >= MAX_PIECES
+		_tool_buttons["replace"].text = "Pick a new piece!" if _replacing else "Replace"
+	if _advanced():
+		_palette_title.text = ("Tap the new piece for #%d:" % (_sel + 1)) if _replacing else \
+			(("Add after #%d:" % (_sel + 1)) if _sel >= 0 else "Add to the end:")
+	else:
+		_palette_title.text = "Tap to add a piece:"
+	_place_highlight()
+	_place_cursor()
+
+
+func _place_highlight() -> void:
+	if _highlight:
+		_highlight.queue_free()
+		_highlight = null
+	if _sel < 0:
+		return
+	var pts := _track.piece_points(_sel)
+	var ups := _track.piece_ups(_sel)
+	if pts.size() < 2:
+		return
+	# A glowing ribbon just above the road on the picked piece.
+	var im := ImmediateMesh.new()
+	im.surface_begin(Mesh.PRIMITIVE_TRIANGLE_STRIP)
+	for k in pts.size():
+		var fwd := (pts[mini(k + 1, pts.size() - 1)] - pts[maxi(k - 1, 0)]).normalized()
+		var side := fwd.cross(ups[k]).normalized() * 5.2
+		var lift := ups[k] * 0.45
+		im.surface_add_vertex(pts[k] + lift - side)
+		im.surface_add_vertex(pts[k] + lift + side)
+	im.surface_end()
+	_highlight = MeshInstance3D.new()
+	_highlight.mesh = im
+	var mat := StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.albedo_color = Color(0.4, 1.0, 1.0, 0.55)
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	mat.emission_enabled = true
+	mat.emission = Color(0.3, 1.0, 1.0)
+	_highlight.material_override = mat
+	add_child(_highlight)
+
+
+## A bouncing arrow where the next piece will go.
 func _place_cursor() -> void:
 	if _cursor:
 		_cursor.queue_free()
 	_cursor = Node3D.new()
 	add_child(_cursor)
 	var end := _track.builder_end
-	_cursor.global_transform = Transform3D(end.basis, end.origin + Vector3.UP * 3.0)
+	if _advanced() and _sel >= 0:
+		end = _track.piece_end(_sel)
+	_cursor.global_transform = Transform3D(end.basis, end.origin + end.basis.y * 3.0)
 	var mat := StandardMaterial3D.new()
 	mat.albedo_color = Color(1.0, 1.0, 0.3)
 	mat.emission_enabled = true
@@ -308,70 +586,163 @@ func _build_ui() -> void:
 	top.add_theme_constant_override("separation", 14)
 	RaceHud.pin(top, Vector2(0, 0), Vector2(16, 10), Vector2(1248, 64))
 	root.add_child(top)
-	top.add_child(RaceHud.make_label("TRACK BUILDER", 40, Color(1.0, 0.85, 0.2), 12))
+	top.add_child(RaceHud.make_label("TRACK BUILDER", 34, Color(1.0, 0.85, 0.2), 12))
 	_name_edit = LineEdit.new()
-	_name_edit.custom_minimum_size = Vector2(330, 52)
+	_name_edit.custom_minimum_size = Vector2(280, 52)
 	_name_edit.max_length = 24
 	_name_edit.placeholder_text = "Name your track"
 	_name_edit.add_theme_font_size_override("font_size", 26)
 	top.add_child(_name_edit)
 	_room_button = _button(top, "Room: " + Game.room_name(_room_theme).trim_prefix("The "), _cycle_room)
-	_room_button.add_theme_font_size_override("font_size", 22)
-	_count_label = RaceHud.make_label("", 22, Color.WHITE, 8)
-	top.add_child(_count_label)
+	_room_button.add_theme_font_size_override("font_size", 20)
+	_room_button.custom_minimum_size = Vector2(260, 52)
+	_count_label = RaceHud.make_label("", 20, Color.WHITE, 8)
+	_count_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	RaceHud.pin(_count_label, Vector2(1, 1), Vector2(-212, -218), Vector2(200, 32))
+	root.add_child(_count_label)
+
+	_mode_button = _button(root, "", _toggle_mode)
+	_mode_button.add_theme_font_size_override("font_size", 20)
+	_mode_button.tooltip_text = "Easy: big simple pieces.  Advanced: every piece and more tools."
+	RaceHud.pin(_mode_button, Vector2(1, 0), Vector2(-232, 14), Vector2(218, 52))
+	_ui_root = root
 
 	# --- left: piece palette ---
-	var panel := PanelContainer.new()
-	RaceHud.pin(panel, Vector2(0, 0), Vector2(12, 84), Vector2(352, 520))
-	root.add_child(panel)
+	_palette_panel = PanelContainer.new()
+	RaceHud.pin(_palette_panel, Vector2(0, 0), Vector2(12, 84), Vector2(352, 430))
+	root.add_child(_palette_panel)
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 6)
-	panel.add_child(box)
-	box.add_child(RaceHud.make_label("Tap to add a piece:", 22, Color(1.0, 0.95, 0.6), 8))
-	var grid := GridContainer.new()
-	grid.columns = 2
-	grid.add_theme_constant_override("h_separation", 6)
-	grid.add_theme_constant_override("v_separation", 6)
-	box.add_child(grid)
-	for p in Track.PIECES:
-		var b := _button(grid, p["name"], Callable())
-		var id: String = p["id"]
-		b.pressed.connect(func(): _add(id))
-		b.custom_minimum_size = Vector2(150, 54)
-		b.add_theme_font_size_override("font_size", 20)
-		var col: Color = p["color"]
-		for state in ["normal", "hover", "pressed"]:
-			var sb := StyleBoxFlat.new()
-			sb.bg_color = col.lightened(0.15) if state == "hover" else (col.darkened(0.15) if state == "pressed" else col)
-			sb.border_color = col.darkened(0.35)
-			sb.set_border_width_all(3)
-			sb.border_width_bottom = 7
-			sb.set_corner_radius_all(14)
-			b.add_theme_stylebox_override(state, sb)
+	_palette_panel.add_child(box)
+	_palette_title = RaceHud.make_label("", 22, Color(1.0, 0.95, 0.6), 8)
+	box.add_child(_palette_title)
+	_palette_grid = GridContainer.new()
+	_palette_grid.columns = 2
+	_palette_grid.add_theme_constant_override("h_separation", 6)
+	_palette_grid.add_theme_constant_override("v_separation", 6)
+	box.add_child(_palette_grid)
+	_fill_palette()
+
+	# --- right: tools for the picked piece ---
+	_tools = PanelContainer.new()
+	RaceHud.pin(_tools, Vector2(1, 0), Vector2(-282, 110), Vector2(270, 300))
+	root.add_child(_tools)
+	var tbox := VBoxContainer.new()
+	tbox.add_theme_constant_override("separation", 6)
+	_tools.add_child(tbox)
+	_tools_title = RaceHud.make_label("", 24, Color(0.5, 1.0, 1.0), 8)
+	_tools_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	tbox.add_child(_tools_title)
+	var moves := HBoxContainer.new()
+	moves.add_theme_constant_override("separation", 6)
+	tbox.add_child(moves)
+	_tool_buttons["left"] = _button(moves, "< Move", func(): _move(-1))
+	_tool_buttons["right"] = _button(moves, "Move >", func(): _move(1))
+	for k in ["left", "right"]:
+		_tool_buttons[k].size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_tool_buttons["delete"] = _button(tbox, "Delete", _delete_selected)
+	_tool_buttons["delete"].modulate = Color(1.0, 0.75, 0.7)
+	_tool_buttons["replace"] = _button(tbox, "Replace", _toggle_replace)
+	_tool_buttons["flip"] = _button(tbox, "Flip Left/Right", _flip_selected)
+	_tool_buttons["copy"] = _button(tbox, "Copy", _copy_selected)
+	_tool_buttons["done"] = _button(tbox, "Done", func(): _select(-1))
+	for b in _tool_buttons.values():
+		(b as Button).add_theme_font_size_override("font_size", 18)
+		(b as Button).custom_minimum_size = Vector2(0, 44)
+
+	# --- the piece chips, in track order ---
+	_strip_scroll = ScrollContainer.new()
+	_strip_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	RaceHud.pin(_strip_scroll, Vector2(0, 1), Vector2(12, -178), Vector2(1256, 86))
+	root.add_child(_strip_scroll)
+	_strip = HBoxContainer.new()
+	_strip.add_theme_constant_override("separation", 6)
+	_strip_scroll.add_child(_strip)
 
 	# --- status line ---
-	_status = RaceHud.make_label("", 24, Color.WHITE, 10)
+	_status = RaceHud.make_label("", 22, Color.WHITE, 10)
 	_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	RaceHud.pin(_status, Vector2(0.5, 1), Vector2(-260, -150), Vector2(860, 60))
+	RaceHud.pin(_status, Vector2(0.5, 1), Vector2(-280, -224), Vector2(600, 44))
 	root.add_child(_status)
-	var hint := RaceHud.make_label("Q / E or right-drag to turn the view, mouse wheel to zoom", 16, Color(1, 1, 1, 0.8), 6)
-	RaceHud.pin(hint, Vector2(1, 0), Vector2(-520, 80), Vector2(500, 24))
-	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	root.add_child(hint)
+	_hint = RaceHud.make_label("Tap a chip or the track to pick a piece.  Q / E or right-drag turns the view, wheel zooms.", 16, Color(1, 1, 1, 0.8), 6)
+	RaceHud.pin(_hint, Vector2(1, 0), Vector2(-830, 74), Vector2(810, 24))
+	_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	root.add_child(_hint)
 
 	# --- bottom bar ---
 	var bottom := HBoxContainer.new()
 	bottom.alignment = BoxContainer.ALIGNMENT_CENTER
 	bottom.add_theme_constant_override("separation", 14)
-	RaceHud.pin(bottom, Vector2(0.5, 1), Vector2(-440, -86), Vector2(1000, 76))
+	RaceHud.pin(bottom, Vector2(0.5, 1), Vector2(-500, -86), Vector2(1000, 76))
 	root.add_child(bottom)
 	_button(bottom, "Back", _back)
 	_button(bottom, "Undo", _undo)
+	_redo_button = _button(bottom, "Redo", _redo)
 	_clear_button = _button(bottom, "Clear", _clear)
 	_button(bottom, "Save", func(): _save())
 	var race := _button(bottom, "Race It!", _race_it)
 	race.add_theme_font_size_override("font_size", 36)
+
+
+## The piece buttons: 8 big ones in Easy mode, all of them in Advanced.
+func _fill_palette() -> void:
+	_mode_button.text = "Mode: Advanced" if _advanced() else "Mode: Easy"
+	for c in _palette_grid.get_children():
+		_palette_grid.remove_child(c)
+		c.queue_free()
+	var big := not _advanced()
+	for p in Track.PIECES:
+		var id: String = p["id"]
+		if big and not EASY_PIECES.has(id):
+			continue
+		var b := _button(_palette_grid, p["name"], func(): _palette(id))
+		b.custom_minimum_size = Vector2(160, 80) if big else Vector2(160, 46)
+		b.add_theme_font_size_override("font_size", 26 if big else 19)
+		_style_piece_button(b, p["color"], 7)
+	_palette_panel.reset_size.call_deferred()   # shrink to fit
+
+
+func _style_piece_button(b: Button, col: Color, depth: int) -> void:
+	for state in ["normal", "hover", "pressed", "focus"]:
+		var sb := StyleBoxFlat.new()
+		sb.bg_color = col.lightened(0.15) if state == "hover" else (col.darkened(0.15) if state == "pressed" else col)
+		sb.border_color = Color.WHITE if state == "focus" else col.darkened(0.35)
+		sb.set_border_width_all(3)
+		sb.border_width_bottom = depth
+		sb.set_corner_radius_all(14)
+		if state == "focus":
+			sb.draw_center = false
+		b.add_theme_stylebox_override(state, sb)
+
+
+## One chip per piece, plus Start and the automatic road home at the ends.
+func _fill_strip() -> void:
+	for c in _strip.get_children():
+		_strip.remove_child(c)
+		c.queue_free()
+	_strip.add_child(_end_chip("START"))
+	for i in _pieces.size():
+		var id := String(_pieces[i])
+		var chip := Chip.new()
+		chip.editor = self
+		chip.index = i
+		chip.text = "%d\n%s" % [i + 1, SHORT.get(id, id)]
+		chip.custom_minimum_size = Vector2(84, 70)
+		chip.add_theme_font_size_override("font_size", 15)
+		chip.color = Track.piece_info(id).get("color", Color.GRAY)
+		chip.pressed.connect(func(): _select(-1 if _sel == chip.index else chip.index))
+		_strip.add_child(chip)
+		chip.set_picked(false)
+	_strip.add_child(_end_chip("back to\nSTART"))
+
+
+func _end_chip(text: String) -> Label:
+	var l := RaceHud.make_label(text, 15, Color(1, 1, 1, 0.75), 6)
+	l.custom_minimum_size = Vector2(78, 70)
+	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	return l
 
 
 func _button(parent: Control, text: String, cb: Callable) -> Button:
@@ -381,3 +752,43 @@ func _button(parent: Control, text: String, cb: Callable) -> Button:
 		b.pressed.connect(cb)
 	parent.add_child(b)
 	return b
+
+
+## A piece in the chip row. Tap to pick it; in Advanced mode drag it to move it.
+class Chip extends Button:
+	var editor
+	var index := 0
+	var color := Color.GRAY
+
+	func set_picked(on: bool) -> void:
+		var sb := StyleBoxFlat.new()
+		sb.bg_color = color if not on else color.lightened(0.2)
+		sb.set_corner_radius_all(12)
+		sb.set_border_width_all(5 if on else 2)
+		sb.border_width_bottom = 8 if on else 5
+		sb.border_color = Color(0.5, 1.0, 1.0) if on else color.darkened(0.4)
+		for state in ["normal", "hover", "pressed"]:
+			add_theme_stylebox_override(state, sb)
+		var fsb := sb.duplicate() as StyleBoxFlat
+		fsb.border_color = Color.WHITE
+		add_theme_stylebox_override("focus", fsb)
+		scale = Vector2(1.08, 1.08) if on else Vector2.ONE
+		pivot_offset = custom_minimum_size * 0.5
+
+	func _get_drag_data(_at: Vector2) -> Variant:
+		if not editor._advanced():
+			return null
+		var ghost := Button.new()
+		ghost.text = text
+		ghost.custom_minimum_size = custom_minimum_size
+		ghost.modulate = Color(1, 1, 1, 0.75)
+		set_drag_preview(ghost)
+		return {"chip": index}
+
+	func _can_drop_data(_at: Vector2, data: Variant) -> bool:
+		return data is Dictionary and data.has("chip")
+
+	func _drop_data(at: Vector2, data: Variant) -> void:
+		# Drop on the right half of a chip = after it.
+		var to := index + (1 if at.x > size.x * 0.5 else 0)
+		editor._move_to(int(data["chip"]), to)
