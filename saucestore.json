@@ -1,7 +1,7 @@
 {
   "name": "Race Track Mayhem",
   "category": "Game",
-  "description": "A toy-car racing game for kids. Pick one of five toy cars and race around six tracks set up in giant rooms of the house (the bedroom, playroom, kitchen, bathroom and living room) and out in the garden. Loop-de-loops, corkscrews, spiral climbs, a giant jump over the pond, boost pads and a Ready, Set, GO! countdown. Grand Prix cups, 2-player split screen, unlockable paint jobs and a secret car. Keyboard or game controller.",
+  "description": "A toy-car racing game for kids. Pick a toy car and race around seven tracks set up in giant rooms of the house (the bedroom, playroom, kitchen, bathroom, living room and garage) and out in the garden, plus a new Weekly Challenge track every Monday. Loop-de-loops, corkscrews, spiral climbs, big jumps, power-ups and a Ready, Set, GO! countdown. Build and share your own tracks, race friends online with a race code, chase online best times, and unlock paint jobs and secret cars. Keyboard, controller or touch screen.",
   "icon": "store/icon.png",
   "assets": { "windows": "RaceTrackMayhem-windows.zip" },
   "requirements": [

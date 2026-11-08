@@ -8,11 +8,9 @@ extends CanvasLayer
 const ALPHA := 0.42
 
 var _buttons: Dictionary = {}   # id -> TouchScreenButton
-var _prefix := ""
 
 
-func setup(input_prefix: String = "") -> TouchControls:
-	_prefix = input_prefix
+func setup() -> TouchControls:
 	layer = 8
 	_add("left", "<", "steer_left", 170, Color(0.3, 0.6, 1.0), true)
 	_add("right", ">", "steer_right", 170, Color(0.3, 0.6, 1.0), true)
@@ -63,7 +61,7 @@ func _add(id: String, text: String, action: String, size: int, col: Color, passb
 	var b := TouchScreenButton.new()
 	b.texture_normal = _circle(size, col, ALPHA)
 	b.texture_pressed = _circle(size, col.lightened(0.25), 0.8)
-	b.action = (_prefix + action) if prefixed and _prefix != "" else action
+	b.action = action
 	b.passby_press = passby
 	b.visibility_mode = TouchScreenButton.VISIBILITY_ALWAYS
 	var shape := CircleShape2D.new()

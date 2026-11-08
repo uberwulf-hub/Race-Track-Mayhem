@@ -107,7 +107,6 @@ var _sparks: CPUParticles3D
 var scraping := false
 var _visual_basis := Basis.IDENTITY
 var player_index := 0           # 0 = computer, 1 = player 1, 2 = player 2
-var input_prefix := ""          # "p1_" / "p2_" in split screen
 
 # Online races
 var net_key := ""               # who this car is on every computer ("p<peer>" or "ai<n>")
@@ -325,9 +324,9 @@ func _physics_process(delta: float) -> void:
 	_leave_skid_marks(ds, slide, frame)
 
 
-## Name of an input action for this player ("accelerate" or "p2_accelerate").
+## Name of an input action for this player.
 func action(action_name: String) -> String:
-	return input_prefix + action_name
+	return action_name
 
 
 ## Steering help for little drivers: leans against the turn's push and keeps

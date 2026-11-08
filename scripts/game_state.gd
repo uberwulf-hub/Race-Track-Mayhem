@@ -46,9 +46,6 @@ var trophies: Dictionary = {}    # difficulty (int) -> best Grand Prix place (1.
 var custom: Dictionary = {}      # car id -> {"paint": id, "sticker": id, "wheels": id}
 
 # Game modes
-var two_player := false        # same-screen split screen (no longer offered in the menu)
-var picking := 1                 # which player is choosing a car in the garage
-var p2_car: int = 1
 var gp_active := false
 var gp_race := 0                 # which race of the cup (0..4)
 var gp_points: Dictionary = {}   # racer name -> points
@@ -288,7 +285,6 @@ static func clean_name(n: String) -> String:
 ## Loads one player's slot (an empty ConfigFile gives a fresh start).
 func _read_player(cfg: ConfigFile) -> void:
 	selected_car = int(cfg.get_value("player", "car", 0))
-	p2_car = int(cfg.get_value("player", "p2_car", 1))
 	custom_tracks = cfg.get_value("builder", "tracks", [])
 	# Saves remember how many built-in tracks there were, so a picked Track
 	# Builder track stays the same one when new built-in tracks are added.
@@ -310,7 +306,6 @@ func _read_player(cfg: ConfigFile) -> void:
 	trophies = cfg.get_value("progress", "trophies", {})
 	custom = cfg.get_value("progress", "custom", {})
 	selected_car = clampi(selected_car, 0, CarData.count() - 1)
-	p2_car = clampi(p2_car, 0, CarData.count() - 1)
 
 
 ## Online races use the host's laps, difficulty and power-ups; keep this
@@ -318,11 +313,10 @@ func _read_player(cfg: ConfigFile) -> void:
 func begin_online_override(p_laps: int, p_difficulty: int, p_powerups: bool) -> void:
 	if _own_prefs.is_empty():
 		_own_prefs = {"laps": laps, "difficulty": difficulty, "powerups": powerups_enabled,
-			"track": selected_track, "two_player": two_player}
+			"track": selected_track}
 	laps = clampi(p_laps, 1, 9)
 	difficulty = clampi(p_difficulty, 0, 2)
 	powerups_enabled = p_powerups
-	two_player = false
 	end_grand_prix()
 
 
@@ -333,7 +327,6 @@ func end_online_override() -> void:
 	difficulty = _own_prefs["difficulty"]
 	powerups_enabled = _own_prefs["powerups"]
 	selected_track = _own_prefs["track"]
-	two_player = _own_prefs["two_player"]
 	_own_prefs = {}
 
 
@@ -343,8 +336,10 @@ func _write_player() -> void:
 	var cfg := ConfigFile.new()
 	cfg.set_value("player", "name", player_name)
 	cfg.set_value("player", "car", selected_car)
-	cfg.set_value("player", "p2_car", p2_car)
-	cfg.set_value("player", "track", _own_prefs.get("track", selected_track))
+	var keep_track: int = _own_prefs.get("track", selected_track)
+	if keep_track == WEEKLY_TRACK or keep_track == ONLINE_TRACK:
+		keep_track = 0   # special tracks aren't remembered as "the last track"
+	cfg.set_value("player", "track", keep_track)
 	cfg.set_value("player", "built_in_tracks", Track.TRACKS.size())
 	cfg.set_value("settings", "laps", _own_prefs.get("laps", laps))
 	cfg.set_value("settings", "difficulty", _own_prefs.get("difficulty", difficulty))
@@ -526,19 +521,6 @@ func _setup_input() -> void:
 	_add_action("use_item", [KEY_E, KEY_Q], [JOY_BUTTON_Y], [])
 	_add_action("camera", [KEY_C], [JOY_BUTTON_LEFT_SHOULDER], [])
 	_add_action("pause", [KEY_ESCAPE, KEY_P], [JOY_BUTTON_START], [])
-	# Two-player split screen: each player gets their own keys and controller.
-	_add_player_actions("p1_", KEY_W, KEY_S, KEY_A, KEY_D, [KEY_SPACE, KEY_SHIFT], KEY_R, 0, [KEY_E, KEY_Q])
-	_add_player_actions("p2_", KEY_UP, KEY_DOWN, KEY_LEFT, KEY_RIGHT, [KEY_ENTER, KEY_KP_0, KEY_CTRL], KEY_BACKSPACE, 1, [KEY_SLASH, KEY_KP_1])
-
-
-func _add_player_actions(prefix: String, up: Key, down: Key, left: Key, right: Key, turbo: Array, reset: Key, device: int, item_keys: Array) -> void:
-	_add_action(prefix + "accelerate", [up], [JOY_BUTTON_A], [[JOY_AXIS_TRIGGER_RIGHT, 1.0]], device)
-	_add_action(prefix + "brake", [down], [JOY_BUTTON_X], [[JOY_AXIS_TRIGGER_LEFT, 1.0]], device)
-	_add_action(prefix + "steer_left", [left], [JOY_BUTTON_DPAD_LEFT], [[JOY_AXIS_LEFT_X, -1.0]], device)
-	_add_action(prefix + "steer_right", [right], [JOY_BUTTON_DPAD_RIGHT], [[JOY_AXIS_LEFT_X, 1.0]], device)
-	_add_action(prefix + "turbo", turbo, [JOY_BUTTON_B, JOY_BUTTON_RIGHT_SHOULDER], [], device)
-	_add_action(prefix + "respawn", [reset], [JOY_BUTTON_BACK], [], device)
-	_add_action(prefix + "use_item", item_keys, [JOY_BUTTON_Y], [], device)
 
 
 func _add_action(action: String, keys: Array, buttons: Array, axes: Array, device: int = -1) -> void:

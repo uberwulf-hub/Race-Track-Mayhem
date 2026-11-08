@@ -21,9 +21,7 @@ var _header: Label
 
 func _ready() -> void:
 	Sfx.play_music("garage")
-	if not Game.two_player:
-		Game.picking = 1
-	_index = Game.selected_car if Game.picking == 1 else Game.p2_car
+	_index = Game.selected_car
 	_build_scene()
 	_build_ui()
 	_show_car(false)
@@ -102,17 +100,9 @@ func _show_car(animate: bool) -> void:
 func _choose() -> void:
 	if not CarData.is_available(_index):
 		return
-	if Game.picking == 1:
-		Game.selected_car = _index
-	else:
-		Game.p2_car = _index
+	Game.selected_car = _index
 	Game.save_settings()
 	Sfx.play("go")
-	if Game.two_player and Game.picking == 1:
-		Game.picking = 2
-		Game.goto_garage()
-		return
-	Game.picking = 1
 	if Game.skip_track_select and not Game.gp_active:
 		Game.skip_track_select = false
 		Game.goto_race()
@@ -126,12 +116,8 @@ func _choose() -> void:
 
 func _go_back() -> void:
 	Game.skip_track_select = false
-	if Game.two_player and Game.picking == 2:
-		Game.picking = 1
-		Game.goto_garage()
-	else:
-		Game.end_grand_prix()
-		Game.goto_menu()
+	Game.end_grand_prix()
+	Game.goto_menu()
 
 
 ## Shows a locked car as a dark mystery shape.
@@ -261,11 +247,11 @@ func _build_ui() -> void:
 	layer.add_child(root)
 
 	var header_text := "PICK YOUR CAR!"
-	if Game.two_player:
-		header_text = "PLAYER %d: PICK YOUR CAR!" % Game.picking
-	elif Game.gp_active:
+	if Game.gp_active:
 		header_text = "GRAND PRIX: PICK YOUR CAR!"
-	var header := RaceHud.make_label(header_text, 56, Color(1.0, 0.85, 0.2) if Game.picking == 1 else Color(0.5, 0.9, 1.0), 16)
+	elif Game.skip_track_select and Game.selected_track == Game.WEEKLY_TRACK:
+		header_text = "WEEKLY CHALLENGE: PICK YOUR CAR!"
+	var header := RaceHud.make_label(header_text, 56, Color(1.0, 0.85, 0.2), 16)
 	header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	RaceHud.pin(header, Vector2(0.5, 0), Vector2(-500, 16), Vector2(1000, 80))
 	root.add_child(header)
@@ -350,10 +336,10 @@ func _build_ui() -> void:
 	_make_button(bottom, "Back", _go_back)
 	_make_button(bottom, "  <  ", func(): _change(-1))
 	var go_text := "Pick a Track  >"
-	if Game.two_player and Game.picking == 1:
-		go_text = "Player 2  >"
-	elif Game.gp_active:
+	if Game.gp_active:
 		go_text = "Start the Cup!"
+	elif Game.skip_track_select:
+		go_text = "RACE!"
 	_race_button = _make_button(bottom, go_text, _choose)
 	_race_button.add_theme_font_size_override("font_size", 38)
 	_make_button(bottom, "  >  ", func(): _change(1))

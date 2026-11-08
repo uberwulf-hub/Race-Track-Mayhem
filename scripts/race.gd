@@ -3,8 +3,8 @@ extends Node3D
 ## does the big zoom-in intro and the Ready-Set-GO countdown, then keeps score
 ## until everyone crosses the finish line.
 ##
-## Works for one player (full screen) or two players (split screen). Each
-## human player gets a "View": their own camera, HUD, engine sounds and rumble.
+## The player gets a "View": their camera, HUD, engine sounds and rumble.
+## (Racing friends happens online, each on their own device.)
 ## In a Grand Prix it also hands out points and moves on to the next track.
 
 enum State { INTRO, COUNTDOWN, RACING, FINISHED }
@@ -57,7 +57,6 @@ class View:
 	var index := 0                    # 0 = player 1, 1 = player 2
 	var camera: Camera3D
 	var hud: RaceHud
-	var viewport: SubViewport         # null when there's only one player
 	var cam_mode := 2                 # CamMode.INTRO
 	var cam_up := Vector3.UP
 	var shake := 0.0
@@ -123,7 +122,7 @@ func _ready() -> void:
 	_setup_ai_engines()
 	# On-screen buttons for phones and tablets (one player).
 	if Game.use_touch() and humans.size() == 1:
-		touch = TouchControls.new().setup(humans[0].input_prefix)
+		touch = TouchControls.new().setup()
 		touch.process_mode = Node.PROCESS_MODE_ALWAYS
 		add_child(touch)
 		for v in views:
@@ -163,19 +162,14 @@ func _make_roster() -> Array:
 	if Game.gp_active and not Game.gp_roster.is_empty():
 		return Game.gp_roster
 	var roster: Array = []
-	var two := Game.two_player
-	var me := Game.player_name
-	if me == "":
-		me = "Player 1" if two else "You"
+	var me := Game.player_name if Game.player_name != "" else "You"
 	roster.append({"name": me, "car": Game.selected_car, "player": 1})
-	if two:
-		roster.append({"name": "Player 2", "car": Game.p2_car, "player": 2})
 	var pool: Array[int] = []
 	for i in CarData.count():
-		if not CarData.get_car(i).get("secret", false) and i != Game.selected_car and not (two and i == Game.p2_car):
+		if not CarData.get_car(i).get("secret", false) and i != Game.selected_car:
 			pool.append(i)
 	pool.shuffle()
-	var names := AI_NAMES.filter(func(n): return String(n).to_lower() != me.to_lower() and n != "Player 2")
+	var names := AI_NAMES.filter(func(n): return String(n).to_lower() != me.to_lower())
 	names.shuffle()
 	var k := 0
 	while roster.size() < 5:
@@ -213,8 +207,6 @@ func _spawn_racers() -> void:
 		r.net_key = entry.get("key", "")
 		if r.net_key != "":
 			_by_key[r.net_key] = r
-		if Game.two_player and pnum > 0:
-			r.input_prefix = "p%d_" % pnum
 		r.skid_marks = skid_marks
 		r.laps_to_win = Game.laps
 		r.ai_skill = clampf(base_skill + randf_range(-0.04, 0.04), 0.7, 1.0)
@@ -237,35 +229,11 @@ func _spawn_racers() -> void:
 
 
 func _build_views() -> void:
-	var split := humans.size() > 1
-	var container: HBoxContainer
-	if split:
-		var layer := CanvasLayer.new()
-		layer.layer = 0
-		add_child(layer)
-		container = HBoxContainer.new()
-		container.set_anchors_preset(Control.PRESET_FULL_RECT)
-		container.add_theme_constant_override("separation", 4)
-		container.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		layer.add_child(container)
 	for i in humans.size():
 		var v := View.new()
 		v.racer = humans[i]
 		v.index = i
 		var parent: Node = self
-		if split:
-			var svc := SubViewportContainer.new()
-			svc.stretch = true
-			svc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			svc.mouse_filter = Control.MOUSE_FILTER_IGNORE
-			container.add_child(svc)
-			var sv := SubViewport.new()
-			sv.audio_listener_enable_3d = i == 0
-			sv.msaa_3d = get_viewport().msaa_3d
-			sv.size_2d_override_stretch = true
-			svc.add_child(sv)
-			v.viewport = sv
-			parent = sv
 		var cam := Camera3D.new()
 		cam.fov = 64.0
 		cam.near = 0.1
@@ -281,14 +249,11 @@ func _build_views() -> void:
 		var h := RaceHud.new()
 		parent.add_child(h)
 		h.setup(track, racers, humans[i])
-		if split:
-			h.player_tag = "P%d" % (i + 1)
-			h.hide_hint()
 		h.show_title(true)
 		v.hud = h
 		v.audio = CarAudio.new()
 		add_child(v.audio)
-		v.audio.setup(humans[i], -3.0 if split else 0.0)
+		v.audio.setup(humans[i], 0.0)
 		for n: Node in [cam, h]:
 			n.process_mode = Node.PROCESS_MODE_PAUSABLE
 		views.append(v)
@@ -416,11 +381,6 @@ func _process(delta: float) -> void:
 				_refresh_results()
 	_update_flames()
 	for v in views:
-		if v.viewport:
-			# Draw each half's HUD a bit smaller so it fits half the screen.
-			var want := Vector2i(Vector2(v.viewport.size) * 1.6)
-			if v.viewport.size_2d_override != want:
-				v.viewport.size_2d_override = want
 		_update_view_extras(v, delta)
 		_update_camera(v, delta)
 

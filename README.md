@@ -8,7 +8,7 @@ Pick a toy car and a track, then race four computer cars around an orange plasti
 kid's bedroom floor. Each race starts with the camera looking at the whole bedroom, then it swoops
 down to your car for **3… 2… 1… GO!**
 
-**6 tracks, each in its own room (and one outside!)**
+**7 tracks, each in its own room (and one outside!), plus a new Weekly Challenge track every Monday**
 
 | Track | Room | Trickiness | Highlights |
 |---|---|---|---|
@@ -18,6 +18,13 @@ down to your car for **3… 2… 1… GO!**
 | Bubble Bath Bash | Bathroom: bubbly tub, GIANT rubber duck | ★★☆ | double loop, wavy bumps, zig-zags, jump |
 | Sofa Slalom | Living room at sunset: sofa, TV, sleeping cat | ★★★ | slalom, spiral, corkscrew, loop, jump |
 | Backyard Blast | **Outdoors in the garden:** blue sky, picket fence, big tree with a swing, flowers, gnome, pond with a frog, butterflies | ★★☆ | giant jump over the pond, bumpy lawn, loop, spiral, slalom |
+| Workshop Wheelie | Garage: pegboard of tools, workbench, red tool chest, tyre stacks, cones, a bike | ★★☆ | jump, hill, bumps, big jump over the toolbox, loop, slalom |
+
+**Weekly Challenge** (main menu): a brand-new track every Monday, the same for everyone, with its own
+online top 10 for the week.
+
+**Cars:** Red Rocket, Blue Bolt, Monster Max, Sunny Buggy and Bubblegum Van, plus unlockable Rocket Rascal
+(25 stars or a Grand Prix win), Fire Engine Fred (30 stars) and Ice Cream Dream (40 stars).
 
 ![The five rooms](docs/screenshot-rooms.png)
 
@@ -98,6 +105,13 @@ on the phone, download the .apk and open it (allow "install unknown apps" when A
 - Phones start on Low graphics, and the back button works like Back. Race Online works on phones too.
 - Track Builder: tap the track to choose where to build, drag to turn the view, pinch or +/- to zoom.
 
+**For little racers:** **Auto-Go** (Options, or when making a new player) drives forward by itself, so they
+only steer. On phones, **Tilt to steer** turns the car by tipping the phone like a steering wheel.
+
+**Cheers online:** six quick, kid-safe messages (Nice!, Wow!, Haha!, GG!, Go go go!, Oops!) in the lobby, on
+the results, or with keys 1-6 in a race, where they pop up over your car. After a race, players can ask the host
+for a **Rematch!**
+
 **Race Online (home network).** Race other computers in your house:
 - One computer taps **Race Online! > Host a Race**. The others tap **Race Online!** and the race shows up
   under "Races on your network" (or type the host's address, shown in the host's lobby).
@@ -155,8 +169,8 @@ server as internet races (`server/relay/tracks.mjs`).
   where you can also edit or delete them. Your best times and ghost car are kept for each one.
 
 **Ways to play**
-- **Quick Race:** pick a car and any of the 6 tracks.
-- **Grand Prix:** race all 6 tracks in a row for points (10, 8, 6, 5, 4), then a trophy ceremony on the podium.
+- **Quick Race:** pick a car and any of the 7 tracks.
+- **Grand Prix:** race all 7 tracks in a row for points (10, 8, 6, 5, 4), then a trophy ceremony on the podium.
   Gold, silver and bronze trophies are kept on the shelf in the bedroom (one per difficulty).
 - **Ghost car:** a see-through replay of your best clean lap on each track drives alongside you.
 

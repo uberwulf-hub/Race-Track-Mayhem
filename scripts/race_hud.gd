@@ -29,13 +29,6 @@ var _speed_lines: SpeedLines
 var _fade: ColorRect
 var _fade_tween: Tween
 var speed_effect := 0.0     # 0..1, set by the race camera
-var player_tag := "":        # "P1" / "P2" in split screen
-	set(v):
-		player_tag = v
-		if _tag_label:
-			_tag_label.text = v
-			_tag_label.visible = v != ""
-var _tag_label: Label
 var _wrong_way: Label
 var _incoming: Label
 var _incoming_on := false
@@ -220,8 +213,6 @@ func setup(p_track: Track, p_racers: Array[Racer], p_player: Racer) -> void:
 	_item_name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	ib.add_child(_item_name)
 	var key := "E / Y button"
-	if player and player.input_prefix == "p2_":
-		key = "/ key / Y button"
 	_item_hint = make_label("press " + key, 18, Color(1, 1, 1, 0.9), 6)
 	_item_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	ib.add_child(_item_hint)
@@ -248,11 +239,6 @@ func setup(p_track: Track, p_racers: Array[Racer], p_player: Racer) -> void:
 	_root.add_child(_incoming)
 
 	# --- player tag (split screen) ---
-	_tag_label = make_label(player_tag, 40, Color(0.5, 0.9, 1.0), 12)
-	pin(_tag_label, Vector2(0.5, 0), Vector2(-60, 8), Vector2(120, 50))
-	_tag_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_tag_label.visible = player_tag != ""
-	_root.add_child(_tag_label)
 
 	_fade = ColorRect.new()
 	_fade.color = Color(0.05, 0.02, 0.12, 0.0)
@@ -289,7 +275,7 @@ func set_race_ui_visible(v: bool) -> void:
 		if c == _item_panel:
 			c.visible = v and _item_kind != ""
 			continue
-		if c == _center_label or c == _message_label or c == _title_box or c == _speed_lines or c == _fade or c == _wrong_way or c == _tag_label or c == _incoming:
+		if c == _center_label or c == _message_label or c == _title_box or c == _speed_lines or c == _fade or c == _wrong_way or c == _incoming:
 			continue
 		c.visible = v
 
