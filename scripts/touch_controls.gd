@@ -21,6 +21,10 @@ func setup(input_prefix: String = "") -> TouchControls:
 	_add("turbo", "TURBO", "turbo", 130, Color(0.2, 0.85, 0.95), true)
 	_add("item", "ITEM", "use_item", 120, Color(1.0, 0.8, 0.2), false)
 	_add("pause", "II", "pause", 76, Color(0.6, 0.6, 0.75), false, false)
+	# Tilting the phone steers instead of the arrow buttons.
+	if Game.tilt_steer > 0:
+		for id in ["left", "right"]:
+			_buttons[id].visible = false
 	_add("respawn", "R", "respawn", 76, Color(0.75, 0.55, 1.0), false, false)
 	return self
 

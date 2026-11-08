@@ -34,6 +34,9 @@ var steer_assist := true         # gentle steering help for little drivers
 var ghost_enabled := true        # race against your best lap
 var powerups_enabled := true     # item boxes on the track
 var online_times := true         # send best times to the online top-10 lists
+var auto_go := false             # the car accelerates by itself (for little racers)
+var tilt_steer := 0              # phones: 0 off, 1 tilt to steer, 2 tilt (flipped)
+const TILT_NAMES := ["Off", "On", "On (flipped)"]
 
 # Progress
 var stars: int = 0               # earned by finishing races
@@ -65,6 +68,23 @@ var player_slot := -1
 var player_name := ""
 var player_chosen := false        # picked on the "Who's racing?" screen this time
 var _own_prefs := {}              # this player's settings while an online race uses the host's
+
+
+## Tilt steering: tip the phone like a steering wheel. -1 (left) .. 1 (right).
+func tilt_amount() -> float:
+	var g := Input.get_gravity()
+	if g.length() < 1.0:
+		return 0.0
+	# In landscape the phone's long side is its y axis; which way is "right"
+	# depends on which way round it's held.
+	var side := g.y / g.length()
+	if DisplayServer.screen_get_orientation() == DisplayServer.SCREEN_REVERSE_LANDSCAPE:
+		side = -side
+	if tilt_steer == 2:
+		side = -side
+	if absf(side) < 0.06:
+		return 0.0   # a little dead zone so holding it "about level" goes straight
+	return clampf((side - signf(side) * 0.06) * 3.0, -1.0, 1.0)
 
 
 static func is_mobile() -> bool:
@@ -144,6 +164,7 @@ func load_settings() -> void:
 	quality = clampi(int(cfg.get_value("settings", "quality", 0 if is_mobile() else 1)), 0, 2)
 	touch_mode = clampi(int(cfg.get_value("settings", "touch", 0)), 0, 2)
 	online_times = bool(cfg.get_value("settings", "online_times", true))
+	tilt_steer = clampi(int(cfg.get_value("settings", "tilt", 0)), 0, 2)
 	fullscreen = bool(cfg.get_value("settings", "fullscreen", false))
 	_apply_volume()
 	if has_file and not cfg.has_section_key("players", "last") and _list_slots().is_empty():
@@ -169,6 +190,7 @@ func save_settings() -> void:
 	cfg.set_value("settings", "fullscreen", fullscreen)
 	cfg.set_value("settings", "touch", touch_mode)
 	cfg.set_value("settings", "online_times", online_times)
+	cfg.set_value("settings", "tilt", tilt_steer)
 	cfg.set_value("players", "last", player_slot)
 	cfg.save(SAVE_PATH)
 	_write_player()
@@ -204,7 +226,7 @@ func _list_slots() -> Array:
 
 
 ## Makes a new player and switches to them. Returns the slot, or -1 if full.
-func create_player(new_name: String, diff: int, steer_help: bool) -> int:
+func create_player(new_name: String, diff: int, steer_help: bool, go_by_itself := false) -> int:
 	var slot := -1
 	for i in MAX_PLAYERS:
 		if not FileAccess.file_exists(PLAYER_PATH % i):
@@ -217,6 +239,7 @@ func create_player(new_name: String, diff: int, steer_help: bool) -> int:
 	player_name = clean_name(new_name)
 	difficulty = clampi(diff, 0, 2)
 	steer_assist = steer_help
+	auto_go = go_by_itself
 	player_chosen = true
 	save_settings()
 	return slot
@@ -272,6 +295,7 @@ func _read_player(cfg: ConfigFile) -> void:
 	ghost_enabled = bool(cfg.get_value("settings", "ghost", true))
 	powerups_enabled = bool(cfg.get_value("settings", "powerups", true))
 	builder_advanced = bool(cfg.get_value("settings", "builder_advanced", false))
+	auto_go = bool(cfg.get_value("settings", "auto_go", false))
 	best_times = cfg.get_value("records", "best_times", {})
 	best_laps = cfg.get_value("records", "best_laps", {})
 	stars = int(cfg.get_value("progress", "stars", 0))
@@ -319,6 +343,7 @@ func _write_player() -> void:
 	cfg.set_value("settings", "ghost", ghost_enabled)
 	cfg.set_value("settings", "powerups", _own_prefs.get("powerups", powerups_enabled))
 	cfg.set_value("settings", "builder_advanced", builder_advanced)
+	cfg.set_value("settings", "auto_go", auto_go)
 	cfg.set_value("records", "best_times", best_times)
 	cfg.set_value("records", "best_laps", best_laps)
 	cfg.set_value("progress", "stars", stars)

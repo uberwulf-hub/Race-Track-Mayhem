@@ -28,6 +28,7 @@ var _new_panel: Control
 var _name_edit: LineEdit
 var _new_diff := 0
 var _new_steer := true
+var _new_auto := false
 var _removing := false
 var _renaming := false
 var _new_title: Label
@@ -338,6 +339,11 @@ func _build_options(root: Control) -> Control:
 		Game.touch_mode = (Game.touch_mode + 1) % 3)
 	_choice(grid, "Online times:", func() -> String: return "On" if Game.online_times else "Off", func():
 		Game.online_times = not Game.online_times)
+	_choice(grid, "Auto-Go:", func() -> String: return "On" if Game.auto_go else "Off", func():
+		Game.auto_go = not Game.auto_go)
+	if Game.is_mobile():
+		_choice(grid, "Tilt to steer:", func() -> String: return Game.TILT_NAMES[Game.tilt_steer], func():
+			Game.tilt_steer = (Game.tilt_steer + 1) % 3)
 	_slider_row(grid, "Volume:", Game.master_volume, func(v: float): Game.set_volume(v))
 	_slider_row(grid, "Music:", Game.music_volume, func(v: float): Game.set_music_volume(v))
 	_slider_row(grid, "Sounds:", Game.sfx_volume, func(v: float): Game.set_sfx_volume(v))
@@ -589,12 +595,15 @@ func _build_new_player(root: Control) -> Control:
 	diff_btn.custom_minimum_size = Vector2(240, 0)
 	grid.add_child(RaceHud.make_label("Steering help:", 28))
 	var steer_btn := _button(grid, "", Callable())
+	grid.add_child(RaceHud.make_label("Auto-Go:", 28))
+	var auto_btn := _button(grid, "", Callable())
 	var hint := RaceHud.make_label("", 18, Color(0.85, 0.9, 1.0), 4)
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(hint)
 	var refresh := func():
 		diff_btn.text = Game.DIFFICULTY_NAMES[_new_diff]
 		steer_btn.text = "On" if _new_steer else "Off"
+		auto_btn.text = "On (car goes by itself)" if _new_auto else "Off"
 		hint.text = ["Easy: great for little racers.", "Normal: a fair race.", "Hard: the computer cars are fast!"][_new_diff] \
 			+ "  You can change this any time in Options."
 	diff_btn.pressed.connect(func():
@@ -602,6 +611,9 @@ func _build_new_player(root: Control) -> Control:
 		refresh.call())
 	steer_btn.pressed.connect(func():
 		_new_steer = not _new_steer
+		refresh.call())
+	auto_btn.pressed.connect(func():
+		_new_auto = not _new_auto
 		refresh.call())
 	_name_edit.set_meta("refresh", refresh)
 
@@ -633,6 +645,7 @@ func _open_new_player(rename := false) -> void:
 	_name_edit.text = Game.player_name if rename else ""
 	_new_diff = Game.difficulty if rename else 0
 	_new_steer = Game.steer_assist if rename else true
+	_new_auto = Game.auto_go if rename else false
 	(_name_edit.get_meta("refresh") as Callable).call()
 	_show_panel(_new_panel)
 	_name_edit.grab_focus.call_deferred()
@@ -647,10 +660,11 @@ func _finish_new_player() -> void:
 	if _renaming:
 		Game.difficulty = _new_diff
 		Game.steer_assist = _new_steer
+		Game.auto_go = _new_auto
 		Game.rename_player(_name_edit.text)
 		Game.goto_menu()
 		return
-	if Game.create_player(_name_edit.text, _new_diff, _new_steer) < 0:
+	if Game.create_player(_name_edit.text, _new_diff, _new_steer, _new_auto) < 0:
 		return
 	Sfx.play("voice_go")
 	Game.goto_menu()

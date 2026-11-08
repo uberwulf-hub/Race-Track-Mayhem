@@ -182,6 +182,10 @@ func _physics_process(delta: float) -> void:
 			throttle = Input.get_action_strength(action("accelerate"))
 			brake = Input.get_action_strength(action("brake"))
 			steer = Input.get_action_strength(action("steer_right")) - Input.get_action_strength(action("steer_left"))
+			if Game.auto_go and brake < 0.1:
+				throttle = 1.0          # Auto-Go: the car drives itself forward
+			if Game.tilt_steer > 0 and absf(steer) < 0.05:
+				steer = Game.tilt_amount()
 			want_turbo = Input.is_action_pressed(action("turbo"))
 			if Game.steer_assist:
 				steer = clampf(steer + _steer_help(steer), -1.0, 1.0)
