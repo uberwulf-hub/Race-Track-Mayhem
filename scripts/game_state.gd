@@ -11,6 +11,8 @@ const MAX_PLAYERS := 6
 const NAME_LENGTH := 12
 ## Track number used in online races on the host's own track.
 const ONLINE_TRACK := 999
+## Track number used for this week's challenge track.
+const WEEKLY_TRACK := 998
 const DIFFICULTY_NAMES := ["Easy", "Normal", "Hard"]
 const QUALITY_NAMES := ["Low", "Medium", "High"]
 const TOUCH_NAMES := ["Auto", "On", "Off"]
@@ -476,6 +478,8 @@ func best_time_for(track_index: int) -> float:
 func board_key(index: int, lap_count: int) -> String:
 	if index < Track.TRACKS.size():
 		return "%s_%d" % [Track.TRACKS[index]["id"], lap_count]
+	if index == WEEKLY_TRACK:
+		return "weekly%d_%d" % [int(weekly_track()["week"]), lap_count]
 	var pieces: Array = []
 	if index == ONLINE_TRACK:
 		pieces = Net.race_config.get("custom", {}).get("pieces", [])
@@ -722,7 +726,73 @@ func track_count() -> int:
 
 
 func is_custom_track(index: int) -> bool:
-	return index >= Track.TRACKS.size()
+	return index >= Track.TRACKS.size() and index != WEEKLY_TRACK
+
+
+# --------------------------------------------------------------------------
+# Weekly challenge: a new Track Builder-style track every Monday. It's made
+# from the week number, so everyone's game builds exactly the same track.
+# --------------------------------------------------------------------------
+
+const _WEEK_ADJ := ["Wacky", "Turbo", "Twisty", "Mega", "Zippy", "Loopy", "Bouncy", "Crazy", "Super", "Wild", "Speedy", "Jumpy"]
+const _WEEK_NOUN := ["Whirl", "Dash", "Rally", "Run", "Rumble", "Raceway", "Circuit", "Sprint", "Scramble", "Zoom", "Twister", "Blast"]
+var _weekly_cache: Dictionary = {}
+
+
+## The week number (weeks start on Monday).
+static func week_number() -> int:
+	# Day 0 of Unix time was a Thursday; shift so each week starts on Monday.
+	return int(floor((Time.get_unix_time_from_system() + 3.0 * 86400.0) / (7.0 * 86400.0)))
+
+
+## This week's challenge: {"week", "name", "room", "pieces"}.
+func weekly_track() -> Dictionary:
+	var week := week_number()
+	if int(_weekly_cache.get("week", -1)) == week:
+		return _weekly_cache
+	var rng := RandomNumberGenerator.new()
+	var pieces: Array = []
+	# Try a few variations of this week's track until one doesn't run into itself.
+	for attempt in 40:
+		rng.seed = week * 1000 + attempt
+		pieces = _random_pieces(rng)
+		var t := Track.new()
+		t.custom = true
+		t.custom_pieces = pieces
+		t._build_closed_layout()
+		t._resample()
+		var clashes := t.count_clashes()
+		t.free()
+		if clashes == 0:
+			break
+	rng.seed = week
+	var title := "%s %s" % [_WEEK_ADJ[rng.randi() % _WEEK_ADJ.size()], _WEEK_NOUN[rng.randi() % _WEEK_NOUN.size()]]
+	var room: String = ROOM_THEMES[week % ROOM_THEMES.size()][0]
+	_weekly_cache = {"week": week, "name": title, "room": room, "pieces": pieces}
+	return _weekly_cache
+
+
+static func _random_pieces(rng: RandomNumberGenerator) -> Array:
+	var stunts := ["loop", "corkscrew", "jump", "big_jump", "spiral", "hill", "bumps", "wiggles"]
+	var turns := ["left", "right", "bend_left", "bend_right"]
+	var out: Array = ["straight", "boost"]
+	var n := rng.randi_range(9, 13)
+	var used_stunts := 0
+	while out.size() < n:
+		var r := rng.randf()
+		if r < 0.42:
+			out.append(turns[rng.randi() % turns.size()])
+		elif r < 0.75 and used_stunts < 5:
+			out.append(stunts[rng.randi() % stunts.size()])
+			used_stunts += 1
+		elif r < 0.88:
+			out.append("straight")
+		else:
+			out.append("boost")
+	# Always at least one loop or jump: it's a challenge!
+	if not (out.has("loop") or out.has("jump") or out.has("big_jump")):
+		out.insert(rng.randi_range(2, out.size() - 1), ["loop", "jump"][rng.randi() % 2])
+	return out
 
 
 static func room_name(theme: String) -> String:
@@ -738,6 +808,13 @@ func track_info(index: int) -> Dictionary:
 		return Track.TRACKS[maxi(index, 0)]
 	if index == ONLINE_TRACK:
 		return custom_track_info(Net.race_config.get("custom", {}), "online_custom", "A track built by the host!")
+	if index == WEEKLY_TRACK:
+		var w := weekly_track()
+		var info := custom_track_info(w, "weekly_%d" % w["week"], "This week's challenge! A brand new track every Monday.")
+		info["custom"] = false
+		info["weekly"] = true
+		info["color"] = Color(0.95, 0.75, 0.15)
+		return info
 	var slot := index - Track.TRACKS.size()
 	if slot >= custom_tracks.size():
 		return Track.TRACKS[0]

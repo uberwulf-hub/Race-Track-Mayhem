@@ -138,10 +138,20 @@ func _build_ui() -> void:
 	for b: Button in [play, cup]:
 		b.add_theme_font_size_override("font_size", 38)
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var builder := _button(_main_box, "Track Builder", func():
+	var mid := _row(_main_box)
+	var builder := _button(mid, "Track Builder", func():
 		Game.end_grand_prix()
 		Game.goto_editor(-1))
-	builder.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	# This week's challenge track: new every Monday, with its own online top 10.
+	var weekly := _button(mid, "Weekly: " + String(Game.weekly_track()["name"]), func():
+		Game.end_grand_prix()
+		Game.selected_track = Game.WEEKLY_TRACK
+		Game.skip_track_select = true
+		Game.goto_garage())
+	weekly.tooltip_text = "This week's challenge track. A new one every Monday!"
+	weekly.add_theme_color_override("font_color", Color(1.0, 0.92, 0.45))
+	for b: Button in [builder, weekly]:
+		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var online := _button(_main_box, "Race Online!", func():
 		Game.end_grand_prix()
 		Game.goto("res://scenes/online.tscn"))
@@ -395,7 +405,8 @@ func _build_help(root: Control) -> Control:
 	var parts := _panel(root, "How to Play")
 	var box: VBoxContainer = parts[1]
 	var lines := [
-		"QUICK RACE: pick a car and one of 6 tracks.   GRAND PRIX: race all 6 for points!",
+		"QUICK RACE: pick a car and one of 7 tracks.   GRAND PRIX: race all 7 for points!",
+		"WEEKLY: a brand new challenge track every Monday, with its own online top 10!",
 		"",
 		"Go:  W / Up      Steer:  A D / Left Right      Brake:  S / Down",
 		"TURBO:  Space      Back on track:  R      Camera:  C      Pause:  Esc",
