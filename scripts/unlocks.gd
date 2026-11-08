@@ -28,6 +28,8 @@ const ITEMS: Array[Dictionary] = [
 	{"id": "wheels_glow", "kind": "wheels", "name": "Glow Wheels", "stars": 13},
 	# --- secret car (index into CarData.CARS) ---
 	{"id": "car_rocket", "kind": "car", "name": "Rocket Rascal", "stars": 25, "trophy": true},
+	{"id": "car_fire", "kind": "car", "name": "Fire Engine Fred", "stars": 30},
+	{"id": "car_icecream", "kind": "car", "name": "Ice Cream Dream", "stars": 40},
 ]
 
 

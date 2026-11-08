@@ -66,6 +66,30 @@ const CARS: Array[Dictionary] = [
 		"secret": true,
 		"unlock": "car_rocket",
 	},
+	{
+		"id": "fire_fred",
+		"name": "Fire Engine Fred",
+		"blurb": "Nee-naw! A big red fire engine with a ladder and flashing lights.",
+		"style": "fire",
+		"body": Color(0.88, 0.1, 0.08),
+		"accent": Color(0.96, 0.96, 0.96),
+		"number": 11,
+		"stats": {"speed": 3, "accel": 3, "handling": 3, "weight": 5},
+		"secret": true,
+		"unlock": "car_fire",
+	},
+	{
+		"id": "ice_cream_dream",
+		"name": "Ice Cream Dream",
+		"blurb": "Ding-a-ling! The ice cream truck, with a giant cone on the roof.",
+		"style": "icecream",
+		"body": Color(1.0, 0.8, 0.9),
+		"accent": Color(0.5, 0.85, 1.0),
+		"number": 8,
+		"stats": {"speed": 3, "accel": 4, "handling": 4, "weight": 3},
+		"secret": true,
+		"unlock": "car_icecream",
+	},
 ]
 
 const STAT_LABELS := {

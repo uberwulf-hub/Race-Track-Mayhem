@@ -44,6 +44,10 @@ func setup(car_def: Dictionary, with_shadow := true, look: Dictionary = {}) -> T
 			_build_van()
 		"rocket":
 			_build_rocket()
+		"fire":
+			_build_fire()
+		"icecream":
+			_build_icecream()
 		_:
 			_build_sport()
 	if paint.get("metal", false):
@@ -563,6 +567,96 @@ func _build_van() -> void:
 	for x: float in [-0.6, 0.6]:
 		_wheel(Vector3(x, 0.3, -0.72), 0.3, 0.24, true, Color(0.95, 0.95, 0.95))
 		_wheel(Vector3(x, 0.3, 0.72), 0.3, 0.24, false, Color(0.95, 0.95, 0.95))
+
+
+## Fire Engine Fred: a cab up front, a ladder on top and flashing lights.
+func _build_fire() -> void:
+	var body := paint(car["body"])
+	var white := plastic(car["accent"], 0.3)
+	var gl := glass()
+	_wheel_radius = 0.32
+	_box(body_root, Vector3(1.16, 0.8, 0.85), Vector3(0, 0.75, -0.72), body)                    # cab
+	_box(body_root, Vector3(1.0, 0.36, 0.05), Vector3(0, 0.92, -1.15), gl, Vector3(-0.15, 0, 0)) # windscreen
+	for side: float in [-1.0, 1.0]:
+		_box(body_root, Vector3(0.02, 0.3, 0.5), Vector3(side * 0.585, 0.92, -0.72), gl)
+	_box(body_root, Vector3(1.16, 0.62, 1.45), Vector3(0, 0.62, 0.42), body)                    # body
+	_box(body_root, Vector3(1.18, 0.1, 2.3), Vector3(0, 0.62, 0.0), white)                      # white stripe
+	# Locker doors along the sides (seams) and a coiled hose.
+	for z: float in [0.05, 0.45, 0.85]:
+		_seam(0.58, 0.36, 0.86, z)
+	for side: float in [-1.0, 1.0]:
+		var reel := MeshInstance3D.new()
+		var rc := CylinderMesh.new()
+		rc.top_radius = 0.16
+		rc.bottom_radius = 0.16
+		rc.height = 0.08
+		reel.mesh = rc
+		reel.rotation.z = PI * 0.5
+		reel.position = Vector3(side * 0.6, 0.78, 0.25)
+		reel.material_override = plastic(Color(0.95, 0.85, 0.2), 0.4)
+		body_root.add_child(reel)
+	# The ladder.
+	for x: float in [-0.25, 0.25]:
+		_box(body_root, Vector3(0.05, 0.05, 1.7), Vector3(x, 1.0, 0.25), chrome())
+	for i in 7:
+		_box(body_root, Vector3(0.5, 0.03, 0.03), Vector3(0, 1.0, -0.55 + i * 0.27), chrome())
+	_box(body_root, Vector3(0.12, 0.14, 0.12), Vector3(0, 0.95, 1.05), trim())                  # ladder mount
+	# Flashing lights on the cab roof.
+	_box(body_root, Vector3(0.8, 0.06, 0.18), Vector3(0, 1.18, -0.72), chrome())
+	_box(body_root, Vector3(0.3, 0.12, 0.14), Vector3(-0.22, 1.27, -0.72), glowing(Color(1.0, 0.1, 0.1), 2.0))
+	_box(body_root, Vector3(0.3, 0.12, 0.14), Vector3(0.22, 1.27, -0.72), glowing(Color(0.2, 0.4, 1.0), 2.0))
+	_lights(-1.15, 1.15, 0.55, 0.42)
+	_number_decals(0.62, 0.58, -0.72, 1.16)
+	_grille(0.5, 0.16, 0.45, -1.16)
+	_mirrors(0.52, 0.95, -0.95, white)
+	_plate(0.4, 1.15)
+	_side = {"hw": 0.58, "y": 0.62, "len": 2.2, "h": 0.4}
+	for x: float in [-0.62, 0.62]:
+		_wheel(Vector3(x, 0.32, -0.72), 0.32, 0.26, true, Color(0.95, 0.95, 0.95))
+		_wheel(Vector3(x, 0.32, 0.72), 0.32, 0.3, false, Color(0.95, 0.95, 0.95))
+
+
+## Ice Cream Dream: a pastel truck with a serving window and a giant cone.
+func _build_icecream() -> void:
+	var body := paint(car["body"])
+	var accent := plastic(car["accent"], 0.3)
+	var gl := glass()
+	_wheel_radius = 0.3
+	_box(body_root, Vector3(1.18, 0.95, 2.15), Vector3(0, 0.8, 0.05), body)
+	_box(body_root, Vector3(1.12, 0.42, 0.4), Vector3(0, 0.55, -1.14), body)                    # bonnet
+	_box(body_root, Vector3(1.0, 0.34, 0.05), Vector3(0, 1.0, -1.0), gl, Vector3(-0.35, 0, 0))
+	# Serving window with a striped awning on the right side.
+	_box(body_root, Vector3(0.02, 0.36, 0.8), Vector3(0.595, 0.95, 0.3), plastic(Color(0.2, 0.15, 0.2), 0.3))
+	for i in 5:
+		var col := Color(1.0, 0.4, 0.6) if i % 2 == 0 else Color.WHITE
+		var stripe := _box(body_root, Vector3(0.28, 0.03, 0.16), Vector3(0.7, 1.2, -0.02 + i * 0.16), plastic(col, 0.4))
+		stripe.rotation.z = -0.35
+	_box(body_root, Vector3(0.12, 0.04, 0.8), Vector3(0.65, 0.76, 0.3), accent)                 # counter
+	_box(body_root, Vector3(0.02, 0.16, 2.0), Vector3(-0.595, 0.55, 0.05), accent)             # stripe (left)
+	_box(body_root, Vector3(0.02, 0.16, 2.0), Vector3(0.595, 0.55, 0.05), accent)              # stripe (right)
+	# The giant cone on the roof: wafer cone, two scoops and a cherry.
+	var cone := MeshInstance3D.new()
+	var cm := CylinderMesh.new()
+	cm.top_radius = 0.26
+	cm.bottom_radius = 0.02
+	cm.height = 0.55
+	cone.mesh = cm
+	cone.position = Vector3(0, 1.55, 0.25)
+	cone.material_override = plastic(Color(0.85, 0.6, 0.3), 0.6)
+	body_root.add_child(cone)
+	_sphere(body_root, 0.28, Vector3(0, 1.9, 0.25), plastic(Color(1.0, 0.75, 0.85), 0.5))      # strawberry
+	_sphere(body_root, 0.24, Vector3(0, 2.18, 0.25), plastic(Color(0.55, 0.35, 0.2), 0.5))     # chocolate
+	_sphere(body_root, 0.07, Vector3(0, 2.44, 0.25), glowing(Color(0.95, 0.1, 0.15), 0.4))     # cherry
+	_box(body_root, Vector3(0.06, 0.25, 0.06), Vector3(0, 1.32, 0.25), trim())                  # stand
+	_lights(-1.35, 1.13, 0.6, 0.4)
+	_number_decals(1.05, 0.6, -0.6, 1.28)
+	_grille(0.5, 0.14, 0.42, -1.35)
+	_mirrors(0.52, 1.02, -0.9, accent)
+	_plate(0.48, 1.13)
+	_side = {"hw": 0.59, "y": 0.75, "len": 2.1, "h": 0.5}
+	for x: float in [-0.6, 0.6]:
+		_wheel(Vector3(x, 0.3, -0.72), 0.3, 0.24, true, Color(1.0, 0.85, 0.95))
+		_wheel(Vector3(x, 0.3, 0.72), 0.3, 0.24, false, Color(1.0, 0.85, 0.95))
 
 
 ## The secret car: a little rocket on wheels.
