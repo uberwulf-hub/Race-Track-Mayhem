@@ -137,6 +137,8 @@ func _ready() -> void:
 		Net.item_hit.connect(_on_net_hit)
 		Net.go_received.connect(func(): _net_go = true)
 		Net.player_left.connect(_on_player_left)
+		Net.emote_received.connect(_on_emote)
+		Net.rematch_voted.connect(_on_rematch_vote)
 		Net.race_scene_ready()
 
 
@@ -482,6 +484,12 @@ func _update_rubber_band(delta: float) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	# Online: number keys 1-6 send a quick emote.
+	if online and event is InputEventKey and event.pressed and not event.echo:
+		var k := (event as InputEventKey).keycode
+		if k >= KEY_1 and k <= KEY_6:
+			Net.send_emote(k - KEY_1)
+			return
 	if (event.is_action_pressed("pause") or event.is_action_pressed("ui_cancel")) and not _results_shown:
 		_toggle_pause()
 		return
@@ -1018,13 +1026,26 @@ func _show_results() -> void:
 			first = _add_button(buttons, "Race Again!", func(): Net.start_race())
 			_add_button(buttons, "Back to Lobby", func(): Net.back_to_lobby())
 		else:
-			var wait := RaceHud.make_label("Waiting for the host...", 24, Color(0.7, 0.9, 1.0), 6)
-			buttons.add_child(wait)
+			var vote := _add_button(buttons, "Rematch!", func(): Net.vote_rematch())
+			vote.pressed.connect(func():
+				vote.text = "Asked for a rematch!"
+				vote.disabled = true)
+			first = vote
 		var leave := _add_button(buttons, "Leave", func():
 			Net.leave("")
 			Game.goto_menu())
 		if first == null:
 			first = leave
+		# Quick cheers after the race (also keys 1-6 during it).
+		var cheers := HBoxContainer.new()
+		cheers.alignment = BoxContainer.ALIGNMENT_CENTER
+		cheers.add_theme_constant_override("separation", 8)
+		box.add_child(cheers)
+		for i in Net.EMOTES.size():
+			var idx := i
+			var e := _add_button(cheers, Net.EMOTES[i], func(): Net.send_emote(idx))
+			e.add_theme_font_size_override("font_size", 18)
+			e.add_theme_color_override("font_color", Net.EMOTE_COLORS[i])
 	else:
 		first = _add_button(buttons, "Race Again!", func(): Game.goto_race())
 		_add_button(buttons, "Change Car", func(): Game.goto_garage())
@@ -1108,6 +1129,40 @@ func _refresh_results() -> void:
 # ---------------------------------------------------------------------------
 # Online
 # ---------------------------------------------------------------------------
+
+## A speech bubble over the car of whoever sent the emote (and a line on the HUD).
+func _on_emote(peer_id: int, text: String) -> void:
+	var r: Racer = _by_key.get("p%d" % peer_id)
+	if r == null or not is_instance_valid(r):
+		return
+	var bubble := Label3D.new()
+	bubble.text = text
+	bubble.font_size = 72
+	bubble.pixel_size = 0.012
+	bubble.outline_size = 18
+	bubble.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	bubble.no_depth_test = true
+	bubble.modulate = Net.EMOTE_COLORS[Net.EMOTES.find(text)] if Net.EMOTES.has(text) else Color.WHITE
+	bubble.position = Vector3(0, 2.6, 0)
+	r.add_child(bubble)
+	var tw := bubble.create_tween()
+	tw.tween_property(bubble, "position:y", 3.4, 2.2)
+	tw.parallel().tween_property(bubble, "modulate:a", 0.0, 2.2).set_delay(1.2)
+	tw.tween_callback(bubble.queue_free)
+	if r != player:
+		Sfx.play("click", 1.5, -6.0)
+
+
+var _rematch_votes: Dictionary = {}
+
+func _on_rematch_vote(peer_id: int) -> void:
+	_rematch_votes[peer_id] = true
+	var names := PackedStringArray()
+	for id in _rematch_votes:
+		names.append(Net.player_name_of(int(id)))
+	for v in views:
+		v.hud.flash_message("%s want%s a rematch!" % [", ".join(names), "s" if names.size() == 1 else ""], Color(1.0, 0.85, 0.3), 2.5)
+	Sfx.play("select")
 
 func _on_net_states(states: Array) -> void:
 	for st in states:

@@ -16,6 +16,8 @@ var _start_button: Button
 var _wait_label: Label
 var _lobby_cols: Control
 var _code: LineEdit
+var _feed: Label
+var _feed_lines: Array = []
 
 
 func _ready() -> void:
@@ -269,6 +271,21 @@ func _build_lobby() -> void:
 	_settings_box.add_theme_constant_override("v_separation", 6)
 	rbox.add_child(_settings_box)
 
+	# Emote buttons and the latest messages.
+	var emotes := HBoxContainer.new()
+	emotes.alignment = BoxContainer.ALIGNMENT_CENTER
+	emotes.add_theme_constant_override("separation", 8)
+	_lobby.add_child(emotes)
+	for i in Net.EMOTES.size():
+		var idx := i
+		var e := _button(emotes, Net.EMOTES[i], func(): Net.send_emote(idx))
+		e.add_theme_font_size_override("font_size", 20)
+		e.add_theme_color_override("font_color", Net.EMOTE_COLORS[i])
+	_feed = RaceHud.make_label("", 22, Color.WHITE, 6)
+	_feed.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_lobby.add_child(_feed)
+	Net.emote_received.connect(_on_emote)
+
 	var bottom := HBoxContainer.new()
 	bottom.alignment = BoxContainer.ALIGNMENT_CENTER
 	bottom.add_theme_constant_override("separation", 16)
@@ -280,6 +297,17 @@ func _build_lobby() -> void:
 	_start_button.add_theme_font_size_override("font_size", 40)
 	_wait_label = RaceHud.make_label("Waiting for the host to start...", 26, Color(0.7, 0.9, 1.0), 8)
 	bottom.add_child(_wait_label)
+
+
+func _on_emote(peer_id: int, text: String) -> void:
+	if not is_inside_tree():
+		return
+	var who := "You" if peer_id == Net.my_id() else Net.player_name_of(peer_id)
+	_feed_lines.append("%s: %s" % [who, text])
+	while _feed_lines.size() > 2:
+		_feed_lines.pop_front()
+	_feed.text = "    ".join(_feed_lines)
+	Sfx.play("click", 1.4)
 
 
 func _show_lobby() -> void:

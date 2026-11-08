@@ -37,6 +37,12 @@ signal item_used(key: String, kind: String, side: float)
 signal item_hit(victim_key: String, kind: String, by_key: String)
 signal go_received                         # host says: start the countdown!
 signal player_left(peer_id: int)
+signal emote_received(peer_id: int, text: String)
+signal rematch_voted(peer_id: int)
+
+## Quick messages players can send (no typing, so they're kid-safe).
+const EMOTES := ["Nice!", "Wow!", "Haha!", "GG!", "Go go go!", "Oops!"]
+const EMOTE_COLORS := [Color(0.5, 1.0, 0.6), Color(1.0, 0.85, 0.3), Color(1.0, 0.6, 0.85), Color(0.6, 0.85, 1.0), Color(1.0, 0.55, 0.3), Color(0.8, 0.7, 1.0)]
 
 var active := false        # in an online lobby or race
 var is_host := false
@@ -528,6 +534,44 @@ func send_hit(victim_key: String, kind: String, by_key: String) -> void:
 @rpc("any_peer", "reliable")
 func _hit(victim_key: String, kind: String, by_key: String) -> void:
 	item_hit.emit(victim_key, kind, by_key)
+
+
+# ---------------------------------------------------------------------------
+# Emotes and rematch votes
+# ---------------------------------------------------------------------------
+
+var _last_emote := 0
+
+
+func send_emote(index: int) -> void:
+	if not active or index < 0 or index >= EMOTES.size():
+		return
+	if Time.get_ticks_msec() - _last_emote < 700:
+		return   # no spamming
+	_last_emote = Time.get_ticks_msec()
+	_emote.rpc(index)
+	emote_received.emit(my_id(), EMOTES[index])
+
+
+@rpc("any_peer", "reliable")
+func _emote(index: int) -> void:
+	if index >= 0 and index < EMOTES.size():
+		emote_received.emit(multiplayer.get_remote_sender_id(), EMOTES[index])
+
+
+func vote_rematch() -> void:
+	if active and not is_host:
+		_rematch.rpc_id(1)
+
+
+@rpc("any_peer", "reliable")
+func _rematch() -> void:
+	if is_host:
+		rematch_voted.emit(multiplayer.get_remote_sender_id())
+
+
+func player_name_of(peer_id: int) -> String:
+	return String(players.get(peer_id, {}).get("name", "Someone"))
 
 
 # ---------------------------------------------------------------------------
