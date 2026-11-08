@@ -115,6 +115,36 @@ static func plastic(color: Color, gloss: float = 0.22) -> StandardMaterial3D:
 	return m
 
 
+## Glossy car paint: plastic with a clear coat on top (shows on Medium/High graphics).
+static func paint(color: Color) -> StandardMaterial3D:
+	var m := plastic(color, 0.28)
+	m.clearcoat_enabled = true
+	m.clearcoat = 0.7
+	m.clearcoat_roughness = 0.08
+	return m
+
+
+static var _chrome_mat: StandardMaterial3D
+static func chrome() -> StandardMaterial3D:
+	if _chrome_mat == null:
+		_chrome_mat = StandardMaterial3D.new()
+		# Bright and shiny but only half metal, so it still looks silver on
+		# phones (whose renderer has no reflections for real metal).
+		_chrome_mat.albedo_color = Color(0.88, 0.9, 0.94)
+		_chrome_mat.metallic = 0.45
+		_chrome_mat.roughness = 0.14
+		_chrome_mat.metallic_specular = 1.0
+	return _chrome_mat
+
+
+static var _trim_mat: StandardMaterial3D
+## Dark rubber/plastic for seams, grilles and tyres' sidewalls.
+static func trim() -> StandardMaterial3D:
+	if _trim_mat == null:
+		_trim_mat = plastic(Color(0.07, 0.07, 0.08), 0.6)
+	return _trim_mat
+
+
 static func glass() -> StandardMaterial3D:
 	var m := plastic(Color(0.45, 0.8, 1.0), 0.04)
 	m.metallic = 0.35
@@ -228,20 +258,128 @@ func _wheel(pos: Vector3, radius: float, width: float, front: bool, hub_color: C
 	hc.radial_segments = 12
 	hub.mesh = hc
 	hub.rotation.z = PI * 0.5
-	hub.material_override = hub_mat
+	var dish := hub_mat.duplicate() as StandardMaterial3D
+	dish.albedo_color = hub_mat.albedo_color.darkened(0.55)   # the dish behind the spokes
+	hub.material_override = dish
 	spin.add_child(hub)
 
-	# A stripe on the tyre so you can see it spinning.
-	var mark := MeshInstance3D.new()
-	var mb := BoxMesh.new()
-	mb.size = Vector3(width + 0.06, radius * 0.25, radius * 1.1)
-	mark.mesh = mb
-	mark.material_override = plastic(Color(0.95, 0.95, 0.95), 0.4)
-	spin.add_child(mark)
+	# Chunky tread blocks around the tyre (one combined mesh).
+	var tread := MeshInstance3D.new()
+	tread.mesh = _tread_mesh(radius, width)
+	tread.material_override = tire.material_override
+	spin.add_child(tread)
+	# Spoked rims on both sides, with a centre cap (they show the wheels spinning).
+	var spokes := MeshInstance3D.new()
+	spokes.mesh = _spokes_mesh(radius * 0.55, width)
+	spokes.material_override = hub_mat
+	spin.add_child(spokes)
+	var cap := MeshInstance3D.new()
+	var cc := CylinderMesh.new()
+	cc.top_radius = radius * 0.17
+	cc.bottom_radius = radius * 0.17
+	cc.height = width + 0.1
+	cc.radial_segments = 10
+	cap.mesh = cc
+	cap.rotation.z = PI * 0.5
+	cap.material_override = chrome() if _wheel_style != "wheels_glow" else hub_mat
+	spin.add_child(cap)
 
 	_wheels.append(spin)
 	if front:
 		_front_pivots.append(steer_pivot)
+
+
+static var _mesh_cache: Dictionary = {}
+
+## Many little boxes merged into one mesh (one draw call instead of dozens).
+static func _merged_boxes(key: String, boxes: Array) -> ArrayMesh:
+	if _mesh_cache.has(key):
+		return _mesh_cache[key]
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for b: Array in boxes:   # [size: Vector3, transform: Transform3D]
+		var bm := BoxMesh.new()
+		bm.size = b[0]
+		st.append_from(bm, 0, b[1])
+	var mesh := st.commit()
+	_mesh_cache[key] = mesh
+	return mesh
+
+
+## Tread blocks standing out of the tyre all the way round (tyre axis = X).
+static func _tread_mesh(radius: float, width: float) -> ArrayMesh:
+	var boxes: Array = []
+	var n := 14
+	for i in n:
+		var a := TAU * i / n
+		var basis := Basis(Vector3.RIGHT, a)
+		for half: float in [-1.0, 1.0]:
+			# Two staggered rows of blocks, like a toy truck tyre.
+			var offset := a + (PI / n if half > 0.0 else 0.0)
+			var bb := Basis(Vector3.RIGHT, offset)
+			var pos := bb * Vector3(half * width * 0.24, radius, 0.0)
+			boxes.append([Vector3(width * 0.42, 0.055, radius * 0.2), Transform3D(bb, pos)])
+	return _merged_boxes("tread_%.3f_%.3f" % [radius, width], boxes)
+
+
+## Five spokes on each side of the wheel.
+static func _spokes_mesh(hub_radius: float, width: float) -> ArrayMesh:
+	var boxes: Array = []
+	for side: float in [-1.0, 1.0]:
+		for i in 5:
+			var a := TAU * i / 5.0
+			var bb := Basis(Vector3.RIGHT, a)
+			var pos := Vector3(side * (width * 0.5 + 0.03), 0.0, 0.0) + bb * Vector3(0.0, hub_radius * 0.55, 0.0)
+			boxes.append([Vector3(0.035, hub_radius * 0.95, hub_radius * 0.36), Transform3D(bb, pos)])
+	return _merged_boxes("spokes_%.3f_%.3f" % [hub_radius, width], boxes)
+
+
+# ---------------------------------------------------------------------------
+# Little details: seams, handles, mirrors, grille, plate, exhausts
+# ---------------------------------------------------------------------------
+
+## A door seam (thin dark line) on both sides.
+func _seam(x: float, y0: float, y1: float, z: float) -> void:
+	for side: float in [-1.0, 1.0]:
+		_box(body_root, Vector3(0.012, y1 - y0, 0.018), Vector3(side * (x + 0.004), (y0 + y1) * 0.5, z), trim())
+
+
+func _handles(x: float, y: float, z: float) -> void:
+	for side: float in [-1.0, 1.0]:
+		_box(body_root, Vector3(0.025, 0.035, 0.13), Vector3(side * (x + 0.012), y, z), chrome())
+
+
+func _mirrors(x: float, y: float, z: float, mat: Material) -> void:
+	for side: float in [-1.0, 1.0]:
+		_box(body_root, Vector3(0.12, 0.025, 0.03), Vector3(side * (x + 0.03), y - 0.03, z), trim())   # stalk
+		_box(body_root, Vector3(0.1, 0.08, 0.05), Vector3(side * (x + 0.1), y, z), mat)
+		_box(body_root, Vector3(0.08, 0.06, 0.005), Vector3(side * (x + 0.1), y, z + 0.028), chrome())  # the glass
+
+
+## A dark grille with chrome bars, facing forward (-Z).
+func _grille(width: float, height: float, y: float, z: float) -> void:
+	_box(body_root, Vector3(width, height, 0.03), Vector3(0, y, z), trim())
+	for i in 3:
+		var by := y - height * 0.3 + i * height * 0.3
+		_box(body_root, Vector3(width * 0.92, 0.018, 0.012), Vector3(0, by, z - 0.02), chrome())
+
+
+## A little number plate on the back.
+func _plate(y: float, z: float) -> void:
+	_box(body_root, Vector3(0.34, 0.13, 0.02), Vector3(0, y, z + 0.01), plastic(Color(0.98, 0.95, 0.75), 0.4))
+	var lbl := Label3D.new()
+	lbl.text = "RTM-%s" % str(car.get("number", 1))
+	lbl.font_size = 40
+	lbl.pixel_size = 0.0028
+	lbl.modulate = Color(0.1, 0.1, 0.25)
+	lbl.position = Vector3(0, y, z + 0.022)
+	body_root.add_child(lbl)
+
+
+func _exhausts(x: float, y: float, z: float) -> void:
+	for side: float in [-1.0, 1.0]:
+		_capsule(body_root, 0.045, 0.18, Vector3(side * x, y, z), chrome(), Vector3(PI * 0.5, 0, 0))
+		_box(body_root, Vector3(0.05, 0.05, 0.01), Vector3(side * x, y, z + 0.12), trim())
 
 
 func _number_decals(y: float, half_width: float, z: float, roof_y: float) -> void:
@@ -272,7 +410,20 @@ func _lights(front_z: float, back_z: float, y: float, spread: float) -> void:
 	var tail := glowing(Color(1.0, 0.1, 0.1), 1.5)
 	for side: float in [-1.0, 1.0]:
 		_sphere(body_root, 0.1, Vector3(side * spread, y, front_z), head, Vector3(1.0, 1.0, 0.5))
+		# Chrome ring around each headlight.
+		var ring := MeshInstance3D.new()
+		var rc := CylinderMesh.new()
+		rc.top_radius = 0.125
+		rc.bottom_radius = 0.125
+		rc.height = 0.03
+		rc.radial_segments = 14
+		ring.mesh = rc
+		ring.rotation.x = PI * 0.5
+		ring.position = Vector3(side * spread, y, front_z + 0.03)
+		ring.material_override = chrome()
+		body_root.add_child(ring)
 		_box(body_root, Vector3(0.22, 0.1, 0.05), Vector3(side * spread, y, back_z), tail)
+		_box(body_root, Vector3(0.25, 0.13, 0.03), Vector3(side * spread, y, back_z - 0.015), trim())
 
 
 # ---------------------------------------------------------------------------
@@ -280,7 +431,7 @@ func _lights(front_z: float, back_z: float, y: float, spread: float) -> void:
 # ---------------------------------------------------------------------------
 
 func _build_sport() -> void:
-	var body := plastic(car["body"])
+	var body := paint(car["body"])
 	var accent := plastic(car["accent"])
 	var gl := glass()
 	_wheel_radius = 0.3
@@ -295,6 +446,12 @@ func _build_sport() -> void:
 	_box(body_root, Vector3(1.15, 0.18, 0.2), Vector3(0, 0.3, 1.02), plastic(Color(0.15, 0.15, 0.15), 0.6))
 	_lights(-1.32, 1.04, 0.45, 0.38)
 	_number_decals(0.45, 0.57, 0.0, 0.99)
+	_seam(0.56, 0.3, 0.52, -0.3)
+	_seam(0.56, 0.3, 0.52, 0.62)
+	_handles(0.56, 0.47, 0.42)
+	_mirrors(0.45, 0.76, -0.28, accent)
+	_plate(0.48, 1.03)
+	_exhausts(0.28, 0.27, 1.12)
 	_side = {"hw": 0.57, "y": 0.42, "len": 2.0, "h": 0.3}
 	for x: float in [-0.62, 0.62]:
 		_wheel(Vector3(x, 0.3, -0.68), 0.3, 0.24, true, Color(0.85, 0.85, 0.9))
@@ -302,7 +459,7 @@ func _build_sport() -> void:
 
 
 func _build_monster() -> void:
-	var body := plastic(car["body"])
+	var body := paint(car["body"])
 	var dark := plastic(car["accent"], 0.5)
 	var gl := glass()
 	_wheel_radius = 0.56
@@ -321,6 +478,16 @@ func _build_monster() -> void:
 		_box(body_root, Vector3(0.02, 0.14, 0.7), Vector3(side * 0.58, 1.0, -0.55), flame)
 	_lights(-1.01, 1.01, 1.12, 0.4)
 	_number_decals(1.05, 0.58, 0.2, 1.77)
+	_seam(0.575, 0.85, 1.25, -0.15)
+	_seam(0.575, 0.85, 1.25, 0.62)
+	_handles(0.575, 1.16, 0.45)
+	_mirrors(0.5, 1.4, -0.25, dark)
+	_grille(0.5, 0.16, 0.95, -1.02)
+	_plate(0.98, 1.01)
+	# Roof light bar.
+	_box(body_root, Vector3(0.8, 0.06, 0.1), Vector3(0, 1.79, -0.2), chrome())
+	for i in 4:
+		_sphere(body_root, 0.055, Vector3(-0.3 + i * 0.2, 1.84, -0.2), glowing(Color(1.0, 0.85, 0.3), 1.2))
 	_side = {"hw": 0.58, "y": 1.05, "len": 2.0, "h": 0.4}
 	for x: float in [-0.78, 0.78]:
 		_wheel(Vector3(x, 0.56, -0.68), 0.56, 0.42, true, Color(0.95, 0.75, 0.1))
@@ -328,7 +495,7 @@ func _build_monster() -> void:
 
 
 func _build_buggy() -> void:
-	var body := plastic(car["body"])
+	var body := paint(car["body"])
 	var accent := plastic(car["accent"])
 	var bar := plastic(Color(0.15, 0.15, 0.18), 0.35)
 	_wheel_radius = 0.36
@@ -348,6 +515,19 @@ func _build_buggy() -> void:
 	_box(body_root, Vector3(0.3, 0.08, 0.02), Vector3(0, 1.08, -0.05), plastic(Color(0.2, 0.2, 0.3), 0.05))
 	_lights(-1.08, 0.96, 0.5, 0.3)
 	_number_decals(0.42, 0.51, -0.3, 0.68)
+	# Steering wheel in front of the driver.
+	var wheel := MeshInstance3D.new()
+	var tm := TorusMesh.new()
+	tm.inner_radius = 0.09
+	tm.outer_radius = 0.12
+	tm.rings = 12
+	tm.ring_segments = 6
+	wheel.mesh = tm
+	wheel.rotation.x = PI * 0.5 - 0.5
+	wheel.position = Vector3(0, 0.88, -0.12)
+	wheel.material_override = trim()
+	body_root.add_child(wheel)
+	_plate(0.45, 0.95)
 	_side = {"hw": 0.5, "y": 0.42, "len": 1.9, "h": 0.22}
 	for x: float in [-0.66, 0.66]:
 		_wheel(Vector3(x, 0.32, -0.7), 0.32, 0.26, true, car["accent"])
@@ -355,7 +535,7 @@ func _build_buggy() -> void:
 
 
 func _build_van() -> void:
-	var body := plastic(car["body"])
+	var body := paint(car["body"])
 	var accent := plastic(car["accent"])
 	var gl := glass()
 	_wheel_radius = 0.3
@@ -372,6 +552,13 @@ func _build_van() -> void:
 		_sphere(body_root, 0.12, Vector3(-0.58, 0.75, -0.5 + i * 0.5), plastic(Color.WHITE), Vector3(0.2, 1.0, 1.0))
 	_lights(-1.33, 1.11, 0.62, 0.4)
 	_number_decals(1.0, 0.6, 1.0, 1.33)
+	_seam(0.59, 0.36, 1.2, -0.6)
+	_seam(0.59, 0.36, 1.2, 0.35)
+	_handles(0.59, 0.88, -0.7)
+	_mirrors(0.52, 1.02, -0.9, accent)
+	_grille(0.5, 0.16, 0.42, -1.33)
+	_plate(0.48, 1.1)
+	_exhausts(0.35, 0.3, 1.14)
 	_side = {"hw": 0.59, "y": 0.75, "len": 2.1, "h": 0.5}
 	for x: float in [-0.6, 0.6]:
 		_wheel(Vector3(x, 0.3, -0.72), 0.3, 0.24, true, Color(0.95, 0.95, 0.95))
@@ -380,7 +567,7 @@ func _build_van() -> void:
 
 ## The secret car: a little rocket on wheels.
 func _build_rocket() -> void:
-	var body := plastic(car["body"])
+	var body := paint(car["body"])
 	var accent := plastic(car["accent"])
 	_wheel_radius = 0.3
 	var hull := MeshInstance3D.new()
@@ -439,6 +626,10 @@ func _build_rocket() -> void:
 		boost.position = Vector3(side * 0.62, 0.5, 0.4)
 		body_root.add_child(boost)
 	_number_decals(0.62, 0.51, 0.25, 1.13)
+	# Rows of rivets along the hull.
+	for side: float in [-1.0, 1.0]:
+		for i in 6:
+			_sphere(body_root, 0.028, Vector3(side * 0.43, 0.88, -0.65 + i * 0.25), chrome())
 	_side = {"hw": 0.5, "y": 0.62, "len": 1.8, "h": 0.25}
 	for x: float in [-0.55, 0.55]:
 		_wheel(Vector3(x, 0.28, -0.7), 0.28, 0.22, true, Color(0.9, 0.9, 0.95))

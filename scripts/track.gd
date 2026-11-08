@@ -1281,6 +1281,19 @@ func _build_road_details() -> void:
 			var d := tj.origin + tj.basis.x * (x - w) + tj.basis.y * 0.015
 			_add_tri(st, a, b, c, ti.basis.y, groove)
 			_add_tri(st, a, c, d, ti.basis.y, groove)
+	# A thin seam across the road where two track pieces snap together.
+	var seam := Color(0.62, 0.22, 0.01)
+	for i in range(0, count, CONNECTOR_EVERY):
+		var j := (i + 1) % count
+		if ((flags[i] | flags[j]) & (FLAG_GAP | FLAG_LOOP)) != 0:
+			continue
+		var t := sample(i * spacing)
+		var lift := t.basis.y * 0.016
+		var f := -t.basis.z * 0.05
+		var l := t.origin - t.basis.x * HALF_WIDTH + lift
+		var r := t.origin + t.basis.x * HALF_WIDTH + lift
+		_add_tri(st, l - f, r - f, r + f, t.basis.y, seam)
+		_add_tri(st, l - f, r + f, l + f, t.basis.y, seam)
 	var mi := MeshInstance3D.new()
 	mi.name = "Grooves"
 	mi.mesh = st.commit()
