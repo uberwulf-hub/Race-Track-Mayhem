@@ -88,6 +88,16 @@ const TRACKS: Array[Dictionary] = [
 		"stars": 2,
 		"color": Color(0.3, 0.7, 0.3),
 	},
+	{
+		"id": "workshop_wheelie",
+		"name": "Workshop Wheelie",
+		"room": "garage",
+		"room_name": "The Garage",
+		"blurb": "Race through Dad's garage: jump the toolbox, bounce the bumps and loop past the tyres!",
+		"features": ["Ramp jump", "Hill", "Bumps", "Big jump", "Loop-de-loop", "Slalom"],
+		"stars": 2,
+		"color": Color(0.85, 0.2, 0.15),
+	},
 ]
 
 var layout_id := 0
@@ -231,6 +241,8 @@ func _layout(stretch_a: float, stretch_b: float) -> void:
 			_layout_living_room(stretch_a, stretch_b)
 		5:
 			_layout_garden(stretch_a, stretch_b)
+		6:
+			_layout_garage(stretch_a, stretch_b)
 		_:
 			_layout_speedway(stretch_a, stretch_b)
 
@@ -387,6 +399,41 @@ func _layout_living_room(stretch_a: float, stretch_b: float) -> void:
 	_slalom(3, 30.0, 14.0)
 	_straight(4.0)
 	_jump()
+	_straight(6.0)
+	_turn(90.0, 16.0, 22.0)             # -> north
+	_straight(22.0)
+
+
+## Track 7: Workshop Wheelie, in the garage. A jump, a hill and bumps, a loop,
+## an S-bend and a big jump on the way home.
+func _layout_garage(stretch_a: float, stretch_b: float) -> void:
+	_mark("A")
+	_straight(stretch_a)                # north
+	_straight(8.0, FLAG_BOOST)
+	_straight(4.0)
+	_jump()
+	_straight(16.0)
+	_turn(90.0, 15.0, 22.0)             # -> east
+	_hill()
+	_straight(6.0)
+	_waves(3)
+	_straight(6.0)
+	_straight(8.0, FLAG_BOOST)
+	_straight(6.0)
+	_big_jump()                         # over the toolbox
+	_straight(20.0)
+	_turn(90.0, 15.0, 22.0)             # -> south
+	_straight(8.0, FLAG_BOOST)
+	_straight(4.0)
+	_loop(8.5, 10.0)
+	_straight(26.0)
+	_turn(45.0, 20.0, 12.0)             # S-bend
+	_turn(-45.0, 20.0, -12.0)
+	_straight(24.0)
+	_turn(90.0, 15.0, 22.0)             # -> west
+	_mark("B")
+	_straight(stretch_b)
+	_slalom(4, 30.0, 13.0)              # weave between the oil cans
 	_straight(6.0)
 	_turn(90.0, 16.0, 22.0)             # -> north
 	_straight(22.0)

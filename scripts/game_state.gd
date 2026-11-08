@@ -55,7 +55,7 @@ var last_unlocks: Array = []     # unlocks earned by the last race, shown on the
 
 # Track Builder
 const MAX_CUSTOM_TRACKS := 12
-const ROOM_THEMES := [["bedroom", "The Bedroom"], ["playroom", "The Playroom"], ["kitchen", "The Kitchen"], ["bathroom", "The Bathroom"], ["living_room", "The Living Room"], ["garden", "The Garden"]]
+const ROOM_THEMES := [["bedroom", "The Bedroom"], ["playroom", "The Playroom"], ["kitchen", "The Kitchen"], ["bathroom", "The Bathroom"], ["living_room", "The Living Room"], ["garden", "The Garden"], ["garage", "The Garage"]]
 var custom_tracks: Array = []    # [{"name": String, "room": String, "pieces": Array[String]}]
 var editing_slot := -1           # which custom track the builder is editing (-1 = a new one)
 var skip_track_select := false   # "Race It!" in the builder goes straight to the race
@@ -288,7 +288,13 @@ func _read_player(cfg: ConfigFile) -> void:
 	selected_car = int(cfg.get_value("player", "car", 0))
 	p2_car = int(cfg.get_value("player", "p2_car", 1))
 	custom_tracks = cfg.get_value("builder", "tracks", [])
-	selected_track = clampi(int(cfg.get_value("player", "track", 0)), 0, track_count() - 1)
+	# Saves remember how many built-in tracks there were, so a picked Track
+	# Builder track stays the same one when new built-in tracks are added.
+	var saved_track := int(cfg.get_value("player", "track", 0))
+	var built_in_then := int(cfg.get_value("player", "built_in_tracks", 6))
+	if saved_track >= built_in_then:
+		saved_track += Track.TRACKS.size() - built_in_then
+	selected_track = clampi(saved_track, 0, track_count() - 1)
 	laps = clampi(int(cfg.get_value("settings", "laps", 3)), 1, 9)
 	difficulty = clampi(int(cfg.get_value("settings", "difficulty", 0)), 0, 2)
 	steer_assist = bool(cfg.get_value("settings", "steer_assist", true))
@@ -337,6 +343,7 @@ func _write_player() -> void:
 	cfg.set_value("player", "car", selected_car)
 	cfg.set_value("player", "p2_car", p2_car)
 	cfg.set_value("player", "track", _own_prefs.get("track", selected_track))
+	cfg.set_value("player", "built_in_tracks", Track.TRACKS.size())
 	cfg.set_value("settings", "laps", _own_prefs.get("laps", laps))
 	cfg.set_value("settings", "difficulty", _own_prefs.get("difficulty", difficulty))
 	cfg.set_value("settings", "steer_assist", steer_assist)

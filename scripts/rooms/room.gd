@@ -57,6 +57,8 @@ static func create(theme: String) -> Room:
 			return LivingRoom.new()
 		"garden":
 			return GardenRoom.new()
+		"garage":
+			return GarageRoom.new()
 	return BedroomRoom.new()
 
 
@@ -182,6 +184,7 @@ func _build_floor() -> void:
 	img.generate_mipmaps()
 	var m := StandardMaterial3D.new()
 	m.albedo_texture = ImageTexture.create_from_image(img)
+	_add_depth(m, img, 4.0)
 	m.roughness = floor_roughness
 	m.uv1_scale = Vector3(room_rect.size.x / floor_tile_size, room_rect.size.y / floor_tile_size, 1.0)
 	m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
@@ -195,11 +198,28 @@ func _build_floor() -> void:
 	add_child(floor_mi)
 
 
+## Gives a floor or wall texture real depth: grout lines, plank seams and
+## carpet weave catch the light (a normal map made from the picture itself).
+static func _add_depth(m: StandardMaterial3D, img: Image, strength: float) -> void:
+	var bump := img.duplicate() as Image
+	if bump.is_compressed():
+		return
+	bump.clear_mipmaps()
+	bump.convert(Image.FORMAT_L8)
+	bump.convert(Image.FORMAT_RGBA8)
+	bump.bump_map_to_normal_map(strength)
+	bump.generate_mipmaps()
+	m.normal_enabled = true
+	m.normal_texture = ImageTexture.create_from_image(bump)
+	m.normal_scale = 0.8
+
+
 func _wall_material() -> StandardMaterial3D:
 	var img := _wall_image()
 	img.generate_mipmaps()
 	var m := StandardMaterial3D.new()
 	m.albedo_texture = ImageTexture.create_from_image(img)
+	_add_depth(m, img, 3.0)
 	m.roughness = 0.9
 	m.uv1_triplanar = true
 	m.uv1_world_triplanar = true

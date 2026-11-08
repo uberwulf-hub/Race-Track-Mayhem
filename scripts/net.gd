@@ -20,7 +20,9 @@ const PORT := 24680
 const DISCOVERY_PORT := 24681
 const MAX_CLIENTS := 5          # plus the host = 6 racers
 const MAX_RACERS := 6
-const PROTOCOL := 1             # bump when messages change, so old copies can't join
+const PROTOCOL := 2             # the game's version for racing together: bump when tracks,
+                                # cars or messages change, so mismatched copies can't join
+const RELAY_PROTOCOL := 1       # the race server's message format (server/relay)
 const SEND_RATE := 1.0 / 20.0
 const GAME_TAG := "RaceTrackMayhem"
 ## The internet race server (see server/relay). Set RACE_RELAY_URL to use another one.
@@ -176,7 +178,7 @@ func host_internet() -> void:
 		room_code = c
 		lobby_changed.emit())
 	relay.relay_error.connect(func(m: String): _fail(m))
-	var err := relay.create_room(relay_url(), PROTOCOL)
+	var err := relay.create_room(relay_url(), RELAY_PROTOCOL)
 	if err != OK:
 		_fail("Couldn't reach the internet race server.")
 		return
@@ -200,7 +202,7 @@ func join_internet(code: String) -> void:
 		return
 	var relay := RelayPeer.new()
 	relay.relay_error.connect(func(m: String): _fail(m))
-	var err := relay.join_room(relay_url(), code, PROTOCOL)
+	var err := relay.join_room(relay_url(), code, RELAY_PROTOCOL)
 	if err != OK:
 		_fail("Couldn't reach the internet race server.")
 		return
