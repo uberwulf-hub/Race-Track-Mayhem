@@ -156,6 +156,11 @@ func _ready() -> void:
 	get_track.tooltip_text = "Type a friend's track code"
 	get_track.add_theme_font_size_override("font_size", 22)
 	RaceHud.pin(get_track, Vector2(0, 0), Vector2(16, 16), Vector2(210, 52))
+	var gallery := _button(self, "Track Gallery", _open_gallery)
+	gallery.tooltip_text = "Race the most popular tracks other players made"
+	gallery.add_theme_font_size_override("font_size", 22)
+	gallery.add_theme_color_override("font_color", Color(0.75, 1.0, 1.0))
+	RaceHud.pin(gallery, Vector2(0, 0), Vector2(16, 76), Vector2(210, 52))
 	build.add_theme_font_size_override("font_size", 24)
 	bottom.add_child(RaceHud.make_label("   Laps:", 30))
 	var minus := _button(bottom, "-", func(): _change_laps(-1))
@@ -295,12 +300,15 @@ func _share() -> void:
 		t["by"] = Game.player_name if Game.player_name != "" else "a friend"
 	_show_popup("Share This Track")
 	_popup_text("Getting a code...", 26, Color.WHITE)
-	var res: Dictionary = await Net.share_track(t)
+	# Already shared (and not changed since): the same code again.
+	var res: Dictionary = {"code": t["code"]} if t.has("code") else await Net.share_track(t)
 	if not is_inside_tree():
 		return
 	_clear_popup()
 	if res.has("code"):
 		var code := String(res["code"])
+		Game.custom_tracks[slot]["code"] = code   # your races on it count in the gallery too
+		Game.save_settings()
 		_popup_text("Tell your friends this code:", 24, Color.WHITE)
 		_popup_text(code, 72, Color(1.0, 0.9, 0.3))
 		_popup_text("They tap Get a Track and type it in.", 20, Color(0.8, 0.9, 1.0))
@@ -354,17 +362,118 @@ func _fetch(edit: LineEdit, status: Label) -> void:
 		status.add_theme_color_override("font_color", Color(1.0, 0.75, 0.5))
 		Sfx.play("back")
 		return
+	Game.selected_track = _keep_shared(res)
+	Game.save_settings()
+	Sfx.play("voice_unlock")
+	Game.goto_track_select()   # reload, showing the new track
+
+
+## Saves a track from the server with your Track Builder tracks (once: the
+## same code again gives the one you already have). Returns its track number.
+func _keep_shared(res: Dictionary) -> int:
+	var code := String(res.get("code", ""))
+	if code != "":
+		for i in Game.custom_tracks.size():
+			if String(Game.custom_tracks[i].get("code", "")) == code:
+				return Track.TRACKS.size() + i
 	var pieces: Array = []
 	for p in res["pieces"]:
 		if not Track.piece_info(String(p)).is_empty():
 			pieces.append(String(p))
-	Game.custom_tracks.append({"name": String(res.get("name", "Shared Track")).substr(0, 24),
-		"room": String(res.get("room", "bedroom")), "pieces": pieces,
-		"by": String(res.get("by", "a friend")).substr(0, Game.NAME_LENGTH)})
-	Game.selected_track = Game.track_count() - 1
+	var room := String(res.get("room", "bedroom"))
+	if not Game.ROOM_THEMES.any(func(r: Array) -> bool: return r[0] == room):
+		room = "bedroom"
+	var t := {"name": String(res.get("name", "Shared Track")).substr(0, 24), "room": room, "pieces": pieces,
+		"by": String(res.get("by", "a friend")).substr(0, Game.NAME_LENGTH)}
+	if code != "":
+		t["code"] = code
+	Game.custom_tracks.append(t)
+	return Game.track_count() - 1
+
+
+# ---------------------------------------------------------------------------
+# Track Gallery: the most raced (and newest) tracks everyone has shared.
+# ---------------------------------------------------------------------------
+
+func _open_gallery(newest := false) -> void:
+	_show_popup("Track Gallery")
+	var tabs := _popup_row()
+	var top_tab := _button(tabs, "Most Raced", func(): _open_gallery(false))
+	var new_tab := _button(tabs, "Newest", func(): _open_gallery(true))
+	(new_tab if newest else top_tab).add_theme_color_override("font_color", Color(1.0, 0.9, 0.3))
+	var status := _popup_text("Getting the tracks...", 24, Color.WHITE)
+	var res: Dictionary = await Net.gallery()
+	if not is_inside_tree() or not _popup.visible or not is_instance_valid(status):
+		return
+	var list: Array = res.get("new" if newest else "top", [])
+	if res.has("error"):
+		status.text = String(res["error"])
+		status.add_theme_color_override("font_color", Color(1.0, 0.75, 0.5))
+	elif list.is_empty():
+		status.text = "No tracks here yet. Share one of yours!" if newest else "Nobody has raced a shared track yet. Try Newest!"
+	else:
+		status.text = "Tap Race! to try one:"
+	var grid := GridContainer.new()
+	grid.columns = 4
+	grid.add_theme_constant_override("h_separation", 18)
+	grid.add_theme_constant_override("v_separation", 6)
+	var scroll := ScrollContainer.new()
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.custom_minimum_size = Vector2(820, mini(list.size(), 6) * 58)
+	scroll.add_child(grid)
+	_popup_box.add_child(scroll)
+	var first: Button
+	for c in list:
+		if not c is Dictionary:
+			continue
+		var card: Dictionary = c
+		var room_name := String(card.get("room", ""))
+		for r in Game.ROOM_THEMES:
+			if r[0] == room_name:
+				room_name = String(r[1]).trim_prefix("The ")
+		var name_l := RaceHud.make_label(String(card.get("name", "?")).substr(0, 24), 24, Color(1.0, 0.85, 0.5), 6)
+		name_l.custom_minimum_size = Vector2(300, 0)
+		name_l.clip_text = true
+		grid.add_child(name_l)
+		grid.add_child(RaceHud.make_label("by %s  -  %s" % [String(card.get("by", "?")).substr(0, Game.NAME_LENGTH), room_name], 18, Color(0.85, 0.9, 1.0), 5))
+		var plays := int(card.get("plays", 0))
+		grid.add_child(RaceHud.make_label("%d race%s" % [plays, "" if plays == 1 else "s"], 18, Color(0.7, 1.0, 0.7), 5))
+		var code := String(card.get("code", ""))
+		var go := _button(grid, "Race!", func(): _race_gallery(code, status))
+		go.add_theme_font_size_override("font_size", 22)
+		if first == null:
+			first = go
+	_button(_popup_row(), "Close", _close_popup)
+	if first:
+		first.grab_focus()
+
+
+func _race_gallery(code: String, status: Label) -> void:
+	for i in Game.custom_tracks.size():
+		if String(Game.custom_tracks[i].get("code", "")) == code:
+			_race_now(Track.TRACKS.size() + i)
+			return
+	if Game.custom_tracks.size() >= Game.MAX_CUSTOM_TRACKS:
+		status.text = "You have %d tracks already! Delete one first." % Game.MAX_CUSTOM_TRACKS
+		status.add_theme_color_override("font_color", Color(1.0, 0.75, 0.5))
+		return
+	status.text = "Getting the track..."
+	var res: Dictionary = await Net.fetch_track(code)
+	if not is_inside_tree():
+		return
+	if not res.has("pieces"):
+		status.text = String(res.get("error", "Couldn't get that track."))
+		status.add_theme_color_override("font_color", Color(1.0, 0.75, 0.5))
+		return
+	res["code"] = code
+	_race_now(_keep_shared(res))
+
+
+func _race_now(index: int) -> void:
+	Game.selected_track = index
 	Game.save_settings()
-	Sfx.play("voice_unlock")
-	Game.goto_track_select()   # reload, showing the new track
+	Sfx.play("go")
+	Game.goto_race()
 
 
 func _show_popup(title: String) -> void:

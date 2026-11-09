@@ -146,6 +146,19 @@ func fetch_track(code: String) -> Dictionary:
 	return await _web("GET", "/tracks/" + code.uri_encode(), "")
 
 
+## The Track Gallery: {"top": [cards], "new": [cards]} or {"error": "..."}.
+## A card is {"code", "name", "room", "by", "plays", "length"}.
+func gallery() -> Dictionary:
+	return await _web("GET", "/tracks", "")
+
+
+## Counts one race on a shared track (for the gallery's "most raced" list).
+func count_play(code: String) -> void:
+	code = code.strip_edges().to_upper()
+	if code.length() >= 5 and code.is_valid_identifier():
+		_web("POST", "/tracks/%s/play" % code, "{}")
+
+
 func _web(method: String, path: String, body: String) -> Dictionary:
 	var req := HTTPRequest.new()
 	req.timeout = 12.0

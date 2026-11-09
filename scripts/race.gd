@@ -72,6 +72,11 @@ func _ready() -> void:
 	# everything that moves is pausable.
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	online = Net.active and Net.in_race
+	# A shared track from the gallery: count this race on it.
+	if Game.is_custom_track(Game.selected_track) and not online and Game.selected_track - Track.TRACKS.size() < Game.custom_tracks.size():
+		var code := String(Game.custom_tracks[Game.selected_track - Track.TRACKS.size()].get("code", ""))
+		if code != "":
+			Net.count_play(code)
 	track = Track.for_index(Game.selected_track)
 	track.name = "Track"
 	add_child(track)
