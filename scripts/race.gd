@@ -35,6 +35,7 @@ var _intro_from := Vector3.ZERO
 var _intro_look := Vector3.ZERO
 var _results_shown := false
 var _first_human_done := -1.0
+var _wall_bumps := 0              # the player's wall bumps this race (Smooth Driver badge)
 var _finish_order: Array[Racer] = []
 
 var _pause_menu: Control
@@ -465,6 +466,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		if powerups and state == State.RACING and event.is_action_pressed(h.action("use_item")) and h.item != "":
 			var used := h.item
 			powerups.use_item(h)
+			Game.add_stat("items")
 			var v := _view_for(h)
 			if v:
 				v.hud.flash_message(PowerUps.NAMES[used].to_upper() + "!", PowerUps.COLORS[used], 0.6)
@@ -523,6 +525,8 @@ const CRASH_MESSAGES := {
 
 func _on_crash(r: Racer, reason: String) -> void:
 	var v := _view_for(r)
+	if r == player:
+		_wall_bumps += 1
 	if reason.begins_with("wall"):
 		# Bounced off the rail: no fade, the car is still on the track.
 		if v:
@@ -596,6 +600,8 @@ func _on_item_hit(victim: Racer, kind: String, by: Racer) -> void:
 
 
 func _on_landed(r: Racer, h: float) -> void:
+	if r == player:
+		Game.add_stat("jumps")
 	var v := _view_for(r)
 	if v:
 		v.shake = maxf(v.shake, clampf(h * 0.12, 0.1, 0.45))
@@ -941,9 +947,11 @@ func _show_results() -> void:
 			Game.gp_points[nm] = int(Game.gp_points.get(nm, 0)) + int(Game.GP_POINTS[mini(i, Game.GP_POINTS.size() - 1)])
 
 	# Records and the ghost (single player only).
+	var beat_record := false
 	if humans.size() == 1:
 		var best := Game.best_time_for_current()
 		var new_record := player.has_finished and Game.submit_result(player.finish_time, player.best_lap)
+		beat_record = new_record and best > 0.0
 		var rec_text := ("NEW RECORD!  " + Game.format_time(player.finish_time)) if new_record else ("Record: " + Game.format_time(best))
 		var rec := RaceHud.make_label(rec_text, 26, Color(0.5, 1.0, 0.6) if new_record else Color(0.85, 0.85, 1.0), 8)
 		rec.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -962,10 +970,12 @@ func _show_results() -> void:
 	# Finishing the holiday track unlocks Santa's Sleigh.
 	if Game.selected_track == Game.HOLIDAY_TRACK and player.has_finished and Game.grant("car_sleigh"):
 		fresh.append("car_sleigh")
+	var new_badges := _count_badges(order, beat_record)
 	var star_line := RaceHud.make_label("+%d ★   (%d stars)" % [earned, Game.stars], 26, Color(1.0, 0.9, 0.3), 8)
 	star_line.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(star_line)
 	_add_unlock_lines(box, fresh)
+	_add_badge_lines(box, new_badges)
 	_online_times(box)
 
 	var buttons := HBoxContainer.new()
@@ -1064,6 +1074,54 @@ func _add_unlock_lines(box: Container, fresh: Array) -> void:
 		tw.tween_property(l, "modulate", Color.WHITE, 0.5)
 	if not fresh.is_empty():
 		Sfx.play("voice_unlock")
+
+
+## Counts this race toward the badges and returns the ones just earned.
+func _count_badges(order: Array, new_record: bool) -> Array:
+	if player == null or not player.has_finished:
+		return Game.check_badges(true)
+	var won := order.find(player) == 0
+	Game.add_stat("races")
+	if won:
+		Game.add_stat("wins")
+		if Game.difficulty == 2:
+			Game.add_stat("hard_wins")
+	if new_record:
+		Game.add_stat("records")
+	if _wall_bumps == 0:
+		Game.add_stat("clean_races")
+	if online:
+		Game.add_stat("online_races")
+		if won and racers.size() > 1:
+			Game.add_stat("online_wins")
+	match Game.selected_track:
+		Game.WEEKLY_TRACK:
+			Game.add_stat("weekly")
+		Game.HOLIDAY_TRACK:
+			Game.add_stat("holiday")
+		_:
+			if Game.selected_track < Track.TRACKS.size() and not online:
+				Game.note_track(Track.TRACKS[Game.selected_track]["id"])
+	return Game.check_badges(true)
+
+
+func _add_badge_lines(box: Container, ids: Array) -> void:
+	if ids.is_empty():
+		return
+	var row := HFlowContainer.new()
+	row.alignment = FlowContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("h_separation", 18)
+	box.add_child(row)
+	for id in ids:
+		var b := Badges.get_badge(id)
+		var item := HBoxContainer.new()
+		item.add_theme_constant_override("separation", 8)
+		item.add_child(BadgeMedal.make(b, true, 46))
+		var l := RaceHud.make_label("NEW BADGE!\n" + b["name"], 20, b["color"].lightened(0.3), 6)
+		l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		item.add_child(l)
+		row.add_child(item)
+	Sfx.play("voice_unlock")
 
 
 func _refresh_results() -> void:

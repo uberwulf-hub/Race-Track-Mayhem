@@ -523,9 +523,11 @@ func _save() -> bool:
 		Game.custom_tracks.append(data)
 		_slot = Game.custom_tracks.size() - 1
 		Game.editing_slot = _slot
+		Game.add_stat("tracks_built")
 	else:
 		Game.custom_tracks[_slot] = data
 	Game.save_settings()
+	Game.check_badges()
 	Sfx.play("select")
 	_say("Saved: %s!" % data["name"], Color(0.6, 1.0, 0.65))
 	return true

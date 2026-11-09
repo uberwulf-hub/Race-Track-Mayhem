@@ -48,6 +48,11 @@ var stars: int = 0               # earned by finishing races
 var trophies: Dictionary = {}    # difficulty (int) -> best Grand Prix place (1..3)
 var custom: Dictionary = {}      # car id -> {"paint": id, "sticker": id, "wheels": id}
 var extras: Array = []           # special unlocks earned by doing things (see grant())
+var stats: Dictionary = {}       # counters for badges: races, wins, jumps... (see Badges)
+var badges: Array = []           # badge ids this player has earned
+
+## A new badge was just earned (the Toast layer shows a pop-up).
+signal badge_earned(badge_id: String)
 
 # Game modes
 var gp_active := false
@@ -121,6 +126,7 @@ func _ready() -> void:
 	ui_theme = _make_theme()
 	get_tree().root.theme = ui_theme
 	apply_display()
+	get_tree().root.add_child.call_deferred(Toast.new())
 
 
 # --------------------------------------------------------------------------
@@ -310,6 +316,8 @@ func _read_player(cfg: ConfigFile) -> void:
 	trophies = cfg.get_value("progress", "trophies", {})
 	custom = cfg.get_value("progress", "custom", {})
 	extras = cfg.get_value("progress", "extras", [])
+	stats = cfg.get_value("progress", "stats", {})
+	badges = cfg.get_value("progress", "badges", [])
 	selected_car = clampi(selected_car, 0, CarData.count() - 1)
 
 
@@ -359,6 +367,8 @@ func _write_player() -> void:
 	cfg.set_value("progress", "trophies", trophies)
 	cfg.set_value("progress", "custom", custom)
 	cfg.set_value("progress", "extras", extras)
+	cfg.set_value("progress", "stats", stats)
+	cfg.set_value("progress", "badges", badges)
 	cfg.set_value("builder", "tracks", custom_tracks)
 	cfg.save(PLAYER_PATH % player_slot)
 
@@ -676,6 +686,40 @@ func grant(item_id: String) -> bool:
 	extras.append(item_id)
 	save_settings()
 	return true
+
+
+## Counts something toward badges (no save: call check_badges() after).
+func add_stat(key: String, amount: int = 1) -> void:
+	stats[key] = int(stats.get(key, 0)) + amount
+
+
+## Remembers that you finished this track (for the Tourist badge).
+func note_track(track_key: String) -> void:
+	var done: Array = stats.get("tracks", [])
+	if not done.has(track_key):
+		done.append(track_key)
+	stats["tracks"] = done
+
+
+## Awards any badges the stats have reached, saves, and returns the new ids.
+## quiet: don't pop up a toast (the results screen lists them itself).
+func check_badges(quiet := false) -> Array:
+	if player_slot < 0:
+		return []
+	stats["stars"] = stars
+	var fresh := Badges.newly_earned(stats, badges)
+	badges.append_array(fresh)
+	save_settings()
+	if not quiet:
+		for b in fresh:
+			badge_earned.emit(b)
+	return fresh
+
+
+## Counts one thing and awards its badge right away, with a pop-up.
+func add_stat_now(key: String, amount: int = 1) -> void:
+	add_stat(key, amount)
+	check_badges()
 
 
 ## The holidays: December 1st to January 6th.

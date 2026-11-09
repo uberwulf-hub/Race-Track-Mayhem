@@ -14,6 +14,7 @@ var _main_box: VBoxContainer
 var _options_panel: Control
 var _help_panel: Control
 var _credits_panel: Control
+var _badges_panel: Control
 var _title: Control
 var _option_buttons: Dictionary = {}
 var _laps_label: Label
@@ -168,7 +169,9 @@ func _build_ui() -> void:
 		holiday.add_theme_color_override("font_color", Color(1.0, 0.45, 0.45))
 		holiday.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var more := _row(_main_box)
-	var extras: Array = [_button(more, "Options", func(): _show_panel(_options_panel)), _button(more, "How to Play", func(): _show_panel(_help_panel))]
+	var badges_btn := _button(more, "Badges", _open_badges)
+	badges_btn.add_theme_color_override("font_color", Color(1.0, 0.85, 0.5))
+	var extras: Array = [badges_btn, _button(more, "Options", func(): _show_panel(_options_panel)), _button(more, "How to Play", func(): _show_panel(_help_panel))]
 	if OS.get_name() != "Web" and not Game.is_mobile():
 		extras.append(_button(more, "Quit", func(): get_tree().quit()))
 	for b: Button in extras:
@@ -205,6 +208,7 @@ func _build_ui() -> void:
 	_options_panel = _build_options(root)
 	_help_panel = _build_help(root)
 	_credits_panel = _build_credits(root)
+	_badges_panel = _build_badges(root)
 	_who_panel = _build_who(root)
 	_new_panel = _build_new_player(root)
 	var credits_btn := _button(root, "Credits", func(): _show_panel(_credits_panel))
@@ -295,6 +299,7 @@ func _show_panel(panel: Control) -> void:
 	_options_panel.visible = panel == _options_panel
 	_help_panel.visible = panel == _help_panel
 	_credits_panel.visible = panel == _credits_panel
+	_badges_panel.visible = panel == _badges_panel
 	_who_panel.visible = panel == _who_panel
 	_new_panel.visible = panel == _new_panel
 	if panel == null:
@@ -456,6 +461,58 @@ func _build_credits(root: Control) -> Control:
 		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		box.add_child(l)
 	_button(box, "Back", func(): _show_panel(null))
+	return parts[0]
+
+
+func _open_badges() -> void:
+	var root := _badges_panel.get_parent() as Control
+	_badges_panel.queue_free()
+	_badges_panel = _build_badges(root)   # fresh, with any badges just earned
+	_show_panel(_badges_panel)
+
+
+## The Badges room: every badge, shiny if you've earned it, grey with how
+## far along you are if not.
+func _build_badges(root: Control) -> Control:
+	var parts := _panel(root, "Badges")
+	var box: VBoxContainer = parts[1]
+	box.custom_minimum_size = Vector2(1060, 0)
+	var who := Game.player_name if Game.player_name != "" else "You"
+	var st := Game.stats
+	var summary := RaceHud.make_label("%s: %d of %d badges   |   %d races   %d wins   %d jumps" % [who, Game.badges.size(), Badges.LIST.size(),
+		int(st.get("races", 0)), int(st.get("wins", 0)), int(st.get("jumps", 0))], 22, Color(0.85, 0.95, 1.0), 6)
+	summary.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(summary)
+	var grid := GridContainer.new()
+	grid.columns = 5
+	grid.add_theme_constant_override("h_separation", 10)
+	grid.add_theme_constant_override("v_separation", 14)
+	box.add_child(grid)
+	var stats_now := Game.stats.duplicate()
+	stats_now["stars"] = Game.stars
+	for b in Badges.LIST:
+		var got: bool = Game.badges.has(b["id"])
+		var cell := VBoxContainer.new()
+		cell.custom_minimum_size = Vector2(200, 0)
+		cell.add_theme_constant_override("separation", 0)
+		cell.tooltip_text = b["desc"]
+		cell.mouse_filter = Control.MOUSE_FILTER_PASS
+		var medal := BadgeMedal.make(b, got, 64)
+		medal.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		cell.add_child(medal)
+		var n := RaceHud.make_label(b["name"], 19, Color.WHITE if got else Color(0.7, 0.7, 0.78), 5)
+		n.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		cell.add_child(n)
+		var p := Badges.progress(b, stats_now)
+		var info: String = b["desc"]
+		if not got and int(p[1]) > 1:
+			info += "  (%d/%d)" % [p[0], p[1]]
+		var d := RaceHud.make_label(info, 14, Color(1.0, 0.9, 0.5) if got else Color(0.75, 0.75, 0.85), 4)
+		d.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		d.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		d.custom_minimum_size = Vector2(200, 0)
+		cell.add_child(d)
+		grid.add_child(cell)
 	return parts[0]
 
 

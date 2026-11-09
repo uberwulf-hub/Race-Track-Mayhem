@@ -310,6 +310,7 @@ func _share() -> void:
 			Sfx.play("select"))
 		_button(row, "Done", _close_popup).grab_focus()
 		Sfx.play("voice_unlock")
+		Game.add_stat_now("shared")
 	else:
 		_popup_text(String(res.get("error", "Something went wrong.")), 22, Color(1.0, 0.7, 0.5))
 		_button(_popup_row(), "OK", _close_popup).grab_focus()

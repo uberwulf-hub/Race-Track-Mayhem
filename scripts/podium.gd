@@ -188,6 +188,8 @@ func _build_ui(standings: Array) -> void:
 	RaceHud.pin(right, Vector2(1, 1), Vector2(-560, -330), Vector2(540, 314))
 	root.add_child(right)
 	var fresh: Array = []
+	if best == 1:
+		Game.add_stat_now("gp_wins")
 	if best <= 3:
 		fresh.append_array(Game.award_trophy(best))
 		var bonus: int = [5, 3, 2][best - 1]
