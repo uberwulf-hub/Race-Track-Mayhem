@@ -183,7 +183,7 @@ server as internet races (`server/relay/tracks.mjs`).
   slow motion). Press Photo! to freeze it, drag to turn the camera, and SNAP! to save a picture in
   your Pictures folder under *Race Track Mayhem*.
 - **Track Gallery** (track picker): the most raced and newest tracks everyone has shared. Tap Race! to download one and race it.
-- **Badges:** 23 badges to collect, like Winner!, Big Air, Tourist, Sharing is Caring and Toy Box Hero. See them all
+- **Badges:** 22 badges to collect, like Winner!, Big Air, Tourist, Sharing is Caring and Toy Box Hero. See them all
   in the Badges room on the main menu.
 
 **Unlockables.** Finish races to earn stars (3 for 1st place, 2 for 2nd, 1 for finishing), plus bonus stars for Grand Prix trophies:
