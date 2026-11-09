@@ -37,6 +37,7 @@ var curtain_color := Color(0.95, 0.45, 0.55)
 var door_color := Color(0.98, 0.95, 0.9)
 var has_window := true
 var outdoor := false                  # garden: sky instead of walls and ceiling
+var sky_ground := Color(0.3, 0.55, 0.25)    # the far-away ground under an outdoor sky
 var sky_top := Color(0.25, 0.5, 0.95)
 var sky_horizon := Color(0.75, 0.88, 1.0)
 var evening := false               # cars switch their headlights on
@@ -59,6 +60,8 @@ static func create(theme: String) -> Room:
 			return GardenRoom.new()
 		"garage":
 			return GarageRoom.new()
+		"snowyard":
+			return SnowRoom.new()
 	return BedroomRoom.new()
 
 
@@ -133,7 +136,7 @@ func _build_environment() -> void:
 		sky_mat.sky_top_color = sky_top
 		sky_mat.sky_horizon_color = sky_horizon
 		sky_mat.ground_horizon_color = sky_horizon
-		sky_mat.ground_bottom_color = Color(0.3, 0.55, 0.25)
+		sky_mat.ground_bottom_color = sky_ground
 		sky_mat.sun_angle_max = 20.0
 		var sky := Sky.new()
 		sky.sky_material = sky_mat

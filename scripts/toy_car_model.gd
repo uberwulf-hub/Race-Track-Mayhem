@@ -48,6 +48,8 @@ func setup(car_def: Dictionary, with_shadow := true, look: Dictionary = {}) -> T
 			_build_fire()
 		"icecream":
 			_build_icecream()
+		"sleigh":
+			_build_sleigh()
 		_:
 			_build_sport()
 	if paint.get("metal", false):
@@ -657,6 +659,78 @@ func _build_icecream() -> void:
 	for x: float in [-0.6, 0.6]:
 		_wheel(Vector3(x, 0.3, -0.72), 0.3, 0.24, true, Color(1.0, 0.85, 0.95))
 		_wheel(Vector3(x, 0.3, 0.72), 0.3, 0.24, false, Color(1.0, 0.85, 0.95))
+
+
+## Santa's Sleigh: a red sleigh on gold runners with Santa, a sack of
+## presents and a reindeer with a glowing red nose out front.
+func _build_sleigh() -> void:
+	var red := paint(car["body"])
+	var gold := plastic(car["accent"], 0.15)
+	gold.metallic = 0.5
+	_wheel_radius = 0.28
+	_box(body_root, Vector3(1.05, 0.38, 1.7), Vector3(0, 0.6, 0.1), red)                           # tub
+	_box(body_root, Vector3(1.05, 0.55, 0.18), Vector3(0, 0.95, 0.9), red, Vector3(0.25, 0, 0))   # tall back
+	_box(body_root, Vector3(1.1, 0.06, 1.75), Vector3(0, 0.8, 0.1), gold)                         # gold trim
+	var nose := MeshInstance3D.new()                                                             # curly front
+	var tm := TorusMesh.new()
+	tm.inner_radius = 0.22
+	tm.outer_radius = 0.34
+	nose.mesh = tm
+	nose.rotation.z = PI * 0.5
+	nose.position = Vector3(0, 0.72, -0.82)
+	nose.material_override = red
+	body_root.add_child(nose)
+	for side: float in [-1.0, 1.0]:
+		_box(body_root, Vector3(0.06, 0.06, 2.1), Vector3(side * 0.45, 0.1, 0.0), gold)           # runners
+		var curl := MeshInstance3D.new()
+		var cm := TorusMesh.new()
+		cm.inner_radius = 0.1
+		cm.outer_radius = 0.16
+		curl.mesh = cm
+		curl.rotation.z = PI * 0.5
+		curl.position = Vector3(side * 0.45, 0.22, -1.08)
+		curl.material_override = gold
+		body_root.add_child(curl)
+		_box(body_root, Vector3(0.05, 0.42, 0.05), Vector3(side * 0.45, 0.32, -0.5), gold)        # struts
+		_box(body_root, Vector3(0.05, 0.42, 0.05), Vector3(side * 0.45, 0.32, 0.6), gold)
+	# Santa
+	var suit := plastic(Color(0.85, 0.1, 0.12), 0.5)
+	var white := plastic(Color(0.98, 0.98, 0.98), 0.8)
+	_sphere(body_root, 0.32, Vector3(0, 1.08, 0.3), suit, Vector3(1.0, 1.1, 0.9))
+	_sphere(body_root, 0.17, Vector3(0, 1.48, 0.24), plastic(Color(1.0, 0.82, 0.7), 0.5))
+	_sphere(body_root, 0.16, Vector3(0, 1.36, 0.12), white, Vector3(1.1, 1.0, 0.7))              # beard
+	var hat := MeshInstance3D.new()
+	var hc := CylinderMesh.new()
+	hc.top_radius = 0.02
+	hc.bottom_radius = 0.17
+	hc.height = 0.32
+	hat.mesh = hc
+	hat.position = Vector3(0, 1.72, 0.26)
+	hat.rotation.x = 0.35
+	hat.material_override = suit
+	body_root.add_child(hat)
+	_sphere(body_root, 0.06, Vector3(0, 1.86, 0.33), white)                                       # pom-pom
+	# Sack of presents
+	_sphere(body_root, 0.3, Vector3(0.18, 1.0, 0.72), plastic(Color(0.55, 0.38, 0.2), 0.8))
+	_box(body_root, Vector3(0.2, 0.2, 0.2), Vector3(-0.25, 0.95, 0.7), plastic(Color(0.2, 0.7, 0.3), 0.3))
+	# The reindeer out front.
+	var fur := plastic(Color(0.55, 0.36, 0.2), 0.7)
+	_capsule(body_root, 0.16, 0.55, Vector3(0, 0.55, -1.45), fur, Vector3(PI * 0.5, 0, 0))
+	_sphere(body_root, 0.13, Vector3(0, 0.82, -1.78), fur)
+	_sphere(body_root, 0.055, Vector3(0, 0.8, -1.92), glowing(Color(1.0, 0.1, 0.1), 2.5))          # Rudolph's nose
+	for side: float in [-1.0, 1.0]:
+		_bar(body_root, Vector3(side * 0.05, 0.92, -1.75), Vector3(side * 0.18, 1.12, -1.7), 0.02, plastic(Color(0.4, 0.28, 0.15), 0.8))
+		_box(body_root, Vector3(0.05, 0.4, 0.05), Vector3(side * 0.1, 0.25, -1.3), fur)
+		_box(body_root, Vector3(0.05, 0.4, 0.05), Vector3(side * 0.1, 0.25, -1.62), fur)
+		_bar(body_root, Vector3(side * 0.4, 0.6, -0.8), Vector3(side * 0.12, 0.6, -1.3), 0.015, gold)  # reins
+	_number_decals(0.62, 0.53, 0.1, 0.8)
+	_side = {"hw": 0.53, "y": 0.6, "len": 1.7, "h": 0.3}
+	for x: float in [-0.5, 0.5]:
+		_wheel(Vector3(x, 0.28, -0.6), 0.28, 0.2, true, Color.WHITE)
+		_wheel(Vector3(x, 0.28, 0.6), 0.28, 0.2, false, Color.WHITE)
+	# It glides on its runners: the wheels are there for driving but hidden.
+	for w in _wheels:
+		w.visible = false
 
 
 ## The secret car: a little rocket on wheels.

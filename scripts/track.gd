@@ -132,6 +132,9 @@ const PIECES: Array[Dictionary] = [
 static func for_index(index: int) -> Track:
 	var t := Track.new()
 	t.layout_id = index
+	if index == Game.HOLIDAY_TRACK:
+		t.layout_id = 5   # the garden's layout, under snow
+		return t
 	if index >= TRACKS.size():
 		t.custom = true
 		var slot := index - TRACKS.size()

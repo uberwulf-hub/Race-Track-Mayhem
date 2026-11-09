@@ -152,10 +152,21 @@ func _build_ui() -> void:
 	weekly.add_theme_color_override("font_color", Color(1.0, 0.92, 0.45))
 	for b: Button in [builder, weekly]:
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var online := _button(_main_box, "Race Online!", func():
+	var online_row := _row(_main_box)
+	var online := _button(online_row, "Race Online!", func():
 		Game.end_grand_prix()
 		Game.goto("res://scenes/online.tscn"))
 	online.add_theme_color_override("font_color", Color(0.75, 1.0, 1.0))
+	online.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	if Game.holiday_on():
+		var holiday := _button(online_row, "Holiday Race!", func():
+			Game.end_grand_prix()
+			Game.selected_track = Game.HOLIDAY_TRACK
+			Game.skip_track_select = true
+			Game.goto_garage())
+		holiday.tooltip_text = "Frosty Backyard: a snowy holiday track. Finish it to unlock Santa's Sleigh!"
+		holiday.add_theme_color_override("font_color", Color(1.0, 0.45, 0.45))
+		holiday.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var more := _row(_main_box)
 	var extras: Array = [_button(more, "Options", func(): _show_panel(_options_panel)), _button(more, "How to Play", func(): _show_panel(_help_panel))]
 	if OS.get_name() != "Web" and not Game.is_mobile():

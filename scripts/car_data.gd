@@ -90,6 +90,18 @@ const CARS: Array[Dictionary] = [
 		"secret": true,
 		"unlock": "car_icecream",
 	},
+	{
+		"id": "santa_sleigh",
+		"name": "Santa's Sleigh",
+		"blurb": "Ho ho ho! Santa's sleigh, pulled by a reindeer with a glowing red nose.",
+		"style": "sleigh",
+		"body": Color(0.85, 0.08, 0.1),
+		"accent": Color(1.0, 0.82, 0.25),
+		"number": 25,
+		"stats": {"speed": 4, "accel": 4, "handling": 4, "weight": 3},
+		"secret": true,
+		"unlock": "car_sleigh",
+	},
 ]
 
 const STAT_LABELS := {

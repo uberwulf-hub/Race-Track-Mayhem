@@ -30,6 +30,8 @@ const ITEMS: Array[Dictionary] = [
 	{"id": "car_rocket", "kind": "car", "name": "Rocket Rascal", "stars": 25, "trophy": true},
 	{"id": "car_fire", "kind": "car", "name": "Fire Engine Fred", "stars": 30},
 	{"id": "car_icecream", "kind": "car", "name": "Ice Cream Dream", "stars": 40},
+	# Special unlocks: earned by doing something, not with stars (see Game.grant()).
+	{"id": "car_sleigh", "kind": "car", "name": "Santa's Sleigh", "stars": 999999, "how": "Finish the holiday track (December only!)"},
 ]
 
 
@@ -64,6 +66,8 @@ static func available(stars: int, trophies: Dictionary) -> Array:
 
 ## A friendly line describing how to unlock an item.
 static func requirement_text(it: Dictionary) -> String:
+	if it.has("how"):
+		return String(it["how"])
 	if it.get("trophy", false):
 		return "Win a Grand Prix or earn %d stars" % int(it["stars"])
 	return "Earn %d stars" % int(it["stars"])

@@ -959,6 +959,9 @@ func _show_results() -> void:
 		if h.has_finished:
 			earned = maxi(earned, Game.stars_for_place(order.find(h) + 1))
 	var fresh := Game.award_stars(earned) if earned > 0 else []
+	# Finishing the holiday track unlocks Santa's Sleigh.
+	if Game.selected_track == Game.HOLIDAY_TRACK and player.has_finished and Game.grant("car_sleigh"):
+		fresh.append("car_sleigh")
 	var star_line := RaceHud.make_label("+%d ★   (%d stars)" % [earned, Game.stars], 26, Color(1.0, 0.9, 0.3), 8)
 	star_line.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(star_line)

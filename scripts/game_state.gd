@@ -13,6 +13,9 @@ const NAME_LENGTH := 12
 const ONLINE_TRACK := 999
 ## Track number used for this week's challenge track.
 const WEEKLY_TRACK := 998
+## The holiday track (Frosty Backyard), only around the holidays.
+const HOLIDAY_TRACK := 997
+var force_holiday := false        # for testing: show the holiday track any time
 const DIFFICULTY_NAMES := ["Easy", "Normal", "Hard"]
 const QUALITY_NAMES := ["Low", "Medium", "High"]
 const TOUCH_NAMES := ["Auto", "On", "Off"]
@@ -44,6 +47,7 @@ const TILT_NAMES := ["Off", "On", "On (flipped)"]
 var stars: int = 0               # earned by finishing races
 var trophies: Dictionary = {}    # difficulty (int) -> best Grand Prix place (1..3)
 var custom: Dictionary = {}      # car id -> {"paint": id, "sticker": id, "wheels": id}
+var extras: Array = []           # special unlocks earned by doing things (see grant())
 
 # Game modes
 var gp_active := false
@@ -54,7 +58,7 @@ var last_unlocks: Array = []     # unlocks earned by the last race, shown on the
 
 # Track Builder
 const MAX_CUSTOM_TRACKS := 12
-const ROOM_THEMES := [["bedroom", "The Bedroom"], ["playroom", "The Playroom"], ["kitchen", "The Kitchen"], ["bathroom", "The Bathroom"], ["living_room", "The Living Room"], ["garden", "The Garden"], ["garage", "The Garage"]]
+const ROOM_THEMES := [["bedroom", "The Bedroom"], ["playroom", "The Playroom"], ["kitchen", "The Kitchen"], ["bathroom", "The Bathroom"], ["living_room", "The Living Room"], ["garden", "The Garden"], ["garage", "The Garage"], ["snowyard", "The Snowy Yard"]]
 var custom_tracks: Array = []    # [{"name": String, "room": String, "pieces": Array[String]}]
 var editing_slot := -1           # which custom track the builder is editing (-1 = a new one)
 var skip_track_select := false   # "Race It!" in the builder goes straight to the race
@@ -305,6 +309,7 @@ func _read_player(cfg: ConfigFile) -> void:
 	stars = int(cfg.get_value("progress", "stars", 0))
 	trophies = cfg.get_value("progress", "trophies", {})
 	custom = cfg.get_value("progress", "custom", {})
+	extras = cfg.get_value("progress", "extras", [])
 	selected_car = clampi(selected_car, 0, CarData.count() - 1)
 
 
@@ -337,7 +342,7 @@ func _write_player() -> void:
 	cfg.set_value("player", "name", player_name)
 	cfg.set_value("player", "car", selected_car)
 	var keep_track: int = _own_prefs.get("track", selected_track)
-	if keep_track == WEEKLY_TRACK or keep_track == ONLINE_TRACK:
+	if keep_track == WEEKLY_TRACK or keep_track == ONLINE_TRACK or keep_track == HOLIDAY_TRACK:
 		keep_track = 0   # special tracks aren't remembered as "the last track"
 	cfg.set_value("player", "track", keep_track)
 	cfg.set_value("player", "built_in_tracks", Track.TRACKS.size())
@@ -353,6 +358,7 @@ func _write_player() -> void:
 	cfg.set_value("progress", "stars", stars)
 	cfg.set_value("progress", "trophies", trophies)
 	cfg.set_value("progress", "custom", custom)
+	cfg.set_value("progress", "extras", extras)
 	cfg.set_value("builder", "tracks", custom_tracks)
 	cfg.save(PLAYER_PATH % player_slot)
 
@@ -475,6 +481,8 @@ func board_key(index: int, lap_count: int) -> String:
 		return "%s_%d" % [Track.TRACKS[index]["id"], lap_count]
 	if index == WEEKLY_TRACK:
 		return "weekly%d_%d" % [int(weekly_track()["week"]), lap_count]
+	if index == HOLIDAY_TRACK:
+		return "frosty_backyard_%d" % lap_count
 	var pieces: Array = []
 	if index == ONLINE_TRACK:
 		pieces = Net.race_config.get("custom", {}).get("pieces", [])
@@ -657,7 +665,25 @@ func award_trophy(place: int) -> Array:
 
 
 func is_unlocked(item_id: String) -> bool:
-	return Unlocks.available(stars, trophies).has(item_id)
+	return extras.has(item_id) or Unlocks.available(stars, trophies).has(item_id)
+
+
+## Unlocks a special item (holiday car, badge rewards, story mode...).
+## Returns true the first time.
+func grant(item_id: String) -> bool:
+	if extras.has(item_id):
+		return false
+	extras.append(item_id)
+	save_settings()
+	return true
+
+
+## The holidays: December 1st to January 6th.
+func holiday_on() -> bool:
+	if force_holiday:
+		return true
+	var d := Time.get_date_dict_from_system()
+	return int(d["month"]) == 12 or (int(d["month"]) == 1 and int(d["day"]) <= 6)
 
 
 ## The paint/sticker/wheels picked for a car (ids), with defaults.
@@ -708,7 +734,7 @@ func track_count() -> int:
 
 
 func is_custom_track(index: int) -> bool:
-	return index >= Track.TRACKS.size() and index != WEEKLY_TRACK
+	return index >= Track.TRACKS.size() and index != WEEKLY_TRACK and index != HOLIDAY_TRACK
 
 
 # --------------------------------------------------------------------------
@@ -790,6 +816,11 @@ func track_info(index: int) -> Dictionary:
 		return Track.TRACKS[maxi(index, 0)]
 	if index == ONLINE_TRACK:
 		return custom_track_info(Net.race_config.get("custom", {}), "online_custom", "A track built by the host!")
+	if index == HOLIDAY_TRACK:
+		return {"id": "frosty_backyard", "name": "Frosty Backyard", "room": "snowyard", "room_name": "The Snowy Yard",
+			"blurb": "A holiday special! Race the garden under fresh snow, past snowmen and twinkly trees.",
+			"features": ["Big jump over the frozen pond", "Snowy bumps", "Loop", "Spiral", "Slalom"],
+			"stars": 2, "color": Color(0.55, 0.75, 1.0), "holiday": true}
 	if index == WEEKLY_TRACK:
 		var w := weekly_track()
 		var info := custom_track_info(w, "weekly_%d" % w["week"], "This week's challenge! A brand new track every Monday.")
