@@ -3,12 +3,13 @@
   "category": "Game",
   "description": "A toy-car racing game for kids. Pick a toy car and race around seven tracks set up in giant rooms of the house (the bedroom, playroom, kitchen, bathroom, living room and garage) and out in the garden, plus a new Weekly Challenge track every Monday. Loop-de-loops, corkscrews, spiral climbs, big jumps, power-ups and a Ready, Set, GO! countdown. Build and share your own tracks, race friends online with a race code, chase online best times, and unlock paint jobs and secret cars. Keyboard, controller or touch screen.",
   "icon": "store/icon.png",
-  "assets": { "windows": "RaceTrackMayhem-windows.zip" },
+  "assets": { "windows": "RaceTrackMayhem-windows.zip", "android": "RaceTrackMayhem-android.apk" },
   "requirements": [
-    "Windows 10 or 11 (64-bit)",
+    "On Windows: Windows 10 or 11 (64-bit)",
     "About 150 MB of disk space",
     "Graphics that support OpenGL 3.3 (almost any PC from the last 10 years)",
-    "Keyboard, or an Xbox-style game controller"
+    "Keyboard, or an Xbox-style game controller",
+    "On Android: Android 7.0 or newer, played with the touch screen"
   ],
   "rightsConfirmed": true,
   "credits": [
