@@ -15,6 +15,7 @@ var _options_panel: Control
 var _help_panel: Control
 var _credits_panel: Control
 var _badges_panel: Control
+var _story_panel: Control
 var _title: Control
 var _option_buttons: Dictionary = {}
 var _laps_label: Label
@@ -136,8 +137,10 @@ func _build_ui() -> void:
 	var cup := _button(modes, "Grand Prix", func():
 		Game.start_grand_prix()
 		Game.goto_garage())
-	for b: Button in [play, cup]:
-		b.add_theme_font_size_override("font_size", 38)
+	var story := _button(modes, "Story", _open_story)
+	story.tooltip_text = "Beat the boss car in every room of the house!"
+	for b: Button in [play, cup, story]:
+		b.add_theme_font_size_override("font_size", 34)
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var mid := _row(_main_box)
 	var builder := _button(mid, "Track Builder", func():
@@ -170,7 +173,6 @@ func _build_ui() -> void:
 		holiday.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var more := _row(_main_box)
 	var badges_btn := _button(more, "Badges", _open_badges)
-	badges_btn.add_theme_color_override("font_color", Color(1.0, 0.85, 0.5))
 	var extras: Array = [badges_btn, _button(more, "Options", func(): _show_panel(_options_panel)), _button(more, "How to Play", func(): _show_panel(_help_panel))]
 	if OS.get_name() != "Web" and not Game.is_mobile():
 		extras.append(_button(more, "Quit", func(): get_tree().quit()))
@@ -209,6 +211,7 @@ func _build_ui() -> void:
 	_help_panel = _build_help(root)
 	_credits_panel = _build_credits(root)
 	_badges_panel = _build_badges(root)
+	_story_panel = _build_story(root)
 	_who_panel = _build_who(root)
 	_new_panel = _build_new_player(root)
 	var credits_btn := _button(root, "Credits", func(): _show_panel(_credits_panel))
@@ -225,6 +228,9 @@ func _build_ui() -> void:
 	# First time in this session (or nobody saved yet): ask who's racing.
 	if Game.player_slot < 0 or not Game.player_chosen:
 		_open_who.call_deferred()
+	elif Game.open_story:
+		_open_story.call_deferred()
+	Game.open_story = false
 
 
 func _title_row(text: String, size: int, colors: Array) -> HBoxContainer:
@@ -300,6 +306,7 @@ func _show_panel(panel: Control) -> void:
 	_help_panel.visible = panel == _help_panel
 	_credits_panel.visible = panel == _credits_panel
 	_badges_panel.visible = panel == _badges_panel
+	_story_panel.visible = panel == _story_panel
 	_who_panel.visible = panel == _who_panel
 	_new_panel.visible = panel == _new_panel
 	if panel == null:
@@ -461,6 +468,56 @@ func _build_credits(root: Control) -> Control:
 		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		box.add_child(l)
 	_button(box, "Back", func(): _show_panel(null))
+	return parts[0]
+
+
+func _open_story() -> void:
+	var root := _story_panel.get_parent() as Control
+	_story_panel.queue_free()
+	_story_panel = _build_story(root)   # fresh, with the latest progress
+	_show_panel(_story_panel)
+
+
+## The story map: one boss per room, opened in order.
+func _build_story(root: Control) -> Control:
+	var parts := _panel(root, "Story Mode")
+	var box: VBoxContainer = parts[1]
+	box.custom_minimum_size = Vector2(900, 0)
+	var intro := RaceHud.make_label("Each room has a boss car. Finish ahead of the boss to open the next room!", 20, Color(0.85, 0.95, 1.0), 6)
+	intro.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(intro)
+	var grid := GridContainer.new()
+	grid.columns = 4
+	grid.add_theme_constant_override("h_separation", 22)
+	grid.add_theme_constant_override("v_separation", 6)
+	box.add_child(grid)
+	var focus: Button
+	for i in Story.count():
+		var ch := Story.chapter(i)
+		var open := i <= Game.story_beaten
+		var beaten := i < Game.story_beaten
+		var where := RaceHud.make_label("%d.  %s" % [i + 1, Story.room_name(i)], 22, Color.WHITE if open else Color(0.6, 0.6, 0.68), 6)
+		grid.add_child(where)
+		var who := RaceHud.make_label(String(ch["boss"]) if open else "? ? ?", 22, Color(1.0, 0.75, 0.45) if open else Color(0.6, 0.6, 0.68), 6)
+		who.custom_minimum_size = Vector2(230, 0)
+		grid.add_child(who)
+		var status := RaceHud.make_label("Beaten! ★" if beaten else ("Your next race!" if open else "Locked"), 20,
+			Color(0.5, 1.0, 0.55) if beaten else (Color(1.0, 0.9, 0.3) if open else Color(0.55, 0.55, 0.62)), 6)
+		status.custom_minimum_size = Vector2(170, 0)
+		grid.add_child(status)
+		var idx := i
+		var b := _button(grid, "Race!" if open else "  ?  ", func(): Game.start_story(idx))
+		b.add_theme_font_size_override("font_size", 22)
+		b.disabled = not open
+		if open and not beaten:
+			focus = b
+	if Game.story_beaten >= Story.count():
+		var champ := RaceHud.make_label("You beat every boss! You're the champion of the whole house!", 22, Color(1.0, 0.85, 0.3), 8)
+		champ.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		box.add_child(champ)
+	if focus:
+		focus.set_meta("story_focus", true)
 	return parts[0]
 
 

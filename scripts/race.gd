@@ -27,6 +27,7 @@ var skid_marks: SkidMarks
 var ghost: GhostCar
 var powerups: PowerUps
 var replay: Replay
+var boss: Racer                   # Story Mode: the boss car to beat
 
 var state := State.INTRO
 var _state_time := 0.0
@@ -181,6 +182,9 @@ func _make_roster() -> Array:
 	var names := AI_NAMES.filter(func(n): return String(n).to_lower() != me.to_lower())
 	names.shuffle()
 	var k := 0
+	if Game.story_active:
+		var ch := Story.chapter(Game.story_chapter)
+		roster.append({"name": ch["boss"], "car": int(ch["car"]), "player": 0, "look": ch["look"], "boss": true})
 	while roster.size() < 5:
 		roster.append({"name": names[k % names.size()], "car": pool[k % pool.size()], "player": 0})
 		k += 1
@@ -234,6 +238,10 @@ func _spawn_racers() -> void:
 		_add_flame(r)
 		if pnum > 0:
 			humans.append(r)
+		if entry.get("boss", false):
+			boss = r
+			r.ai_skill = 1.0
+			_crown(r)
 	humans.sort_custom(func(a: Racer, b: Racer) -> bool: return a.player_index < b.player_index)
 
 
@@ -326,6 +334,9 @@ func _set_state(s: State) -> void:
 				v.cam_mode = CamMode.CHASE
 				v.hud.hide_title()
 				v.hud.set_race_ui_visible(true)
+			if boss:
+				var ch := Story.chapter(Game.story_chapter)
+				_all_huds(func(h: RaceHud): h.flash_message("%s:\n\"%s\"" % [ch["boss"], ch["hello"]], Color(1.0, 0.6, 0.3), 2.6))
 		State.RACING:
 			for r in racers:
 				r.controls_enabled = true
@@ -445,6 +456,8 @@ func _update_rubber_band(delta: float) -> void:
 			continue
 		var gap := r.total - lead.total
 		var target := base
+		if r == boss:
+			target = base + 0.04 + 0.01 * Game.story_chapter
 		if all_done:
 			target = 1.0
 		elif gap > 30.0:
@@ -980,10 +993,29 @@ func _show_results() -> void:
 	# Finishing the holiday track unlocks Santa's Sleigh.
 	if Game.selected_track == Game.HOLIDAY_TRACK and player.has_finished and Game.grant("car_sleigh"):
 		fresh.append("car_sleigh")
+	# Story Mode: did you finish ahead of the boss?
+	var story_line := ""
+	var beat_boss := false
+	if Game.story_active and boss:
+		var ch := Story.chapter(Game.story_chapter)
+		beat_boss = player.has_finished and order.find(player) < order.find(boss)
+		if beat_boss:
+			var first_time := Game.beat_boss(Game.story_chapter)
+			if first_time:
+				fresh.append_array(Game.award_stars(Story.BONUS_STARS))
+			story_line = "You beat %s!%s\n%s: \"%s\"" % [ch["boss"], ("  +%d ★ bonus!" % Story.BONUS_STARS) if first_time else "", ch["boss"], ch["won"]]
+		else:
+			story_line = "%s: \"%s\"" % [ch["boss"], ch["lost"]]
 	var new_badges := _count_badges(order, beat_record)
 	var star_line := RaceHud.make_label("+%d ★   (%d stars)" % [earned, Game.stars], 26, Color(1.0, 0.9, 0.3), 8)
 	star_line.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(star_line)
+	if story_line != "":
+		var sl := RaceHud.make_label(story_line, 22, Color(0.6, 1.0, 0.6) if beat_boss else Color(1.0, 0.7, 0.45), 8)
+		sl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		sl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		sl.custom_minimum_size = Vector2(680, 0)
+		box.add_child(sl)
 	_add_unlock_lines(box, fresh)
 	_add_badge_lines(box, new_badges)
 	_online_times(box)
@@ -1029,6 +1061,15 @@ func _show_results() -> void:
 			var e := _add_button(cheers, Net.EMOTES[i], func(): Net.send_emote(idx))
 			e.add_theme_font_size_override("font_size", 18)
 			e.add_theme_color_override("font_color", Net.EMOTE_COLORS[i])
+	elif Game.story_active:
+		if beat_boss and Game.story_chapter + 1 < Story.count():
+			var next := Game.story_chapter + 1
+			first = _add_button(buttons, "Next Boss  >", func(): Game.start_story(next))
+		else:
+			first = _add_button(buttons, "Try Again!" if not beat_boss else "Race Again!", func(): Game.goto_race())
+		_add_button(buttons, "Story Map", func():
+			Game.open_story = true
+			Game.goto_menu())
 	else:
 		first = _add_button(buttons, "Race Again!", func(): Game.goto_race())
 		_add_button(buttons, "Change Car", func(): Game.goto_garage())
@@ -1041,6 +1082,24 @@ func _show_results() -> void:
 	for v in views:
 		v.hud.set_race_ui_visible(false)
 	_refresh_results()
+
+
+## A gold "BOSS" sign floating over the boss car.
+func _crown(r: Racer) -> void:
+	var l := Label3D.new()
+	l.text = "BOSS"
+	l.font_size = 64
+	l.outline_size = 16
+	l.modulate = Color(1.0, 0.82, 0.2)
+	l.outline_modulate = Color(0.35, 0.1, 0.0)
+	l.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	l.pixel_size = 0.012
+	l.position = Vector3(0, 2.3, 0)
+	l.no_depth_test = false
+	r.add_child(l)
+	var tw := l.create_tween().set_loops()
+	tw.tween_property(l, "position:y", 2.6, 0.6).set_trans(Tween.TRANS_SINE)
+	tw.tween_property(l, "position:y", 2.3, 0.6).set_trans(Tween.TRANS_SINE)
 
 
 func _watch_replay() -> void:

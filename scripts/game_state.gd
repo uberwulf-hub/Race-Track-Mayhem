@@ -50,6 +50,12 @@ var custom: Dictionary = {}      # car id -> {"paint": id, "sticker": id, "wheel
 var extras: Array = []           # special unlocks earned by doing things (see grant())
 var stats: Dictionary = {}       # counters for badges: races, wins, jumps... (see Badges)
 var badges: Array = []           # badge ids this player has earned
+var story_beaten := 0            # Story Mode: how many bosses beaten (rooms open = this + 1)
+
+# Story Mode race in progress
+var story_active := false
+var story_chapter := 0
+var open_story := false          # the main menu opens the story map when it loads
 
 ## A new badge was just earned (the Toast layer shows a pop-up).
 signal badge_earned(badge_id: String)
@@ -318,6 +324,7 @@ func _read_player(cfg: ConfigFile) -> void:
 	extras = cfg.get_value("progress", "extras", [])
 	stats = cfg.get_value("progress", "stats", {})
 	badges = cfg.get_value("progress", "badges", [])
+	story_beaten = int(cfg.get_value("progress", "story", 0))
 	selected_car = clampi(selected_car, 0, CarData.count() - 1)
 
 
@@ -369,6 +376,7 @@ func _write_player() -> void:
 	cfg.set_value("progress", "extras", extras)
 	cfg.set_value("progress", "stats", stats)
 	cfg.set_value("progress", "badges", badges)
+	cfg.set_value("progress", "story", story_beaten)
 	cfg.set_value("builder", "tracks", custom_tracks)
 	cfg.save(PLAYER_PATH % player_slot)
 
@@ -763,6 +771,26 @@ func start_grand_prix() -> void:
 func end_grand_prix() -> void:
 	gp_active = false
 	gp_roster.clear()
+	story_active = false   # leaving for another mode ends a story race too
+
+
+## Story Mode: race the boss of chapter i (pick your car first).
+func start_story(i: int) -> void:
+	end_grand_prix()
+	story_active = true
+	story_chapter = clampi(i, 0, Story.count() - 1)
+	selected_track = story_chapter
+	skip_track_select = true
+	goto_garage()
+
+
+## You finished ahead of the boss. Returns true the first time.
+func beat_boss(i: int) -> bool:
+	if i < story_beaten:
+		return false
+	story_beaten = i + 1
+	add_stat("bosses")
+	return true
 
 
 ## Racers sorted by Grand Prix points (most first).
