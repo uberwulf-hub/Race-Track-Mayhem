@@ -162,15 +162,17 @@ func _build_ui() -> void:
 		Game.goto("res://scenes/online.tscn"))
 	online.add_theme_color_override("font_color", Color(0.75, 1.0, 1.0))
 	online.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	if Game.holiday_on():
-		var holiday := _button(online_row, "Holiday Race!", func():
+	# Seasonal event tracks (holidays, Halloween, summer) at their time of year.
+	for ev: int in Game.events_on():
+		var info: Dictionary = Game.EVENTS[ev]
+		var ev_button := _button(online_row, String(info["button"]), func():
 			Game.end_grand_prix()
-			Game.selected_track = Game.HOLIDAY_TRACK
+			Game.selected_track = ev
 			Game.skip_track_select = true
 			Game.goto_garage())
-		holiday.tooltip_text = "Frosty Backyard: a snowy holiday track. Finish it to unlock Santa's Sleigh!"
-		holiday.add_theme_color_override("font_color", Color(1.0, 0.45, 0.45))
-		holiday.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		ev_button.tooltip_text = info["tip"]
+		ev_button.add_theme_color_override("font_color", info["button_color"])
+		ev_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var more := _row(_main_box)
 	var badges_btn := _button(more, "Badges", _open_badges)
 	var extras: Array = [badges_btn, _button(more, "Options", func(): _show_panel(_options_panel)), _button(more, "How to Play", func(): _show_panel(_help_panel))]

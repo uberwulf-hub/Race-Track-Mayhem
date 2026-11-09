@@ -30,6 +30,10 @@ Made by Andrew Saulls with Suno. All rights reserved; included here for Race Tra
 | `music/race_bathroom.ogg` | Pebblemoon (second take) | Bubble Bath Bash (and builder tracks in the bathroom) |
 | `music/race_living_room.ogg` | Server Room | Sofa Slalom (and builder tracks in the living room) |
 | `music/race_garden.ogg` | Sonoran Mesa | Backyard Blast (and builder tracks in the garden) |
+| `music/race_garage.ogg` | Server Room (second take) | Workshop Wheelie (and builder tracks in the garage) |
+| `music/race_snowyard.ogg` | Sonoran Mesa (second take) | Frosty Backyard, the holiday track |
+| `music/race_spooky.ogg` | Copper Pit (second take) | Pumpkin Patch Panic, the Halloween track |
+| `music/race_beach.ogg` | The Lab (second take) | Sandy Shores Splash, the summer beach track |
 | `music/results.ogg` | Triumphant Fanfare | Results and podium (plays once, then the menu song returns) |
 
 The songs were converted from MP3 to Ogg Vorbis and their loudness was evened out (-16 LUFS).

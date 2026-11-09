@@ -62,6 +62,10 @@ static func create(theme: String) -> Room:
 			return GarageRoom.new()
 		"snowyard":
 			return SnowRoom.new()
+		"spooky":
+			return SpookyRoom.new()
+		"beach":
+			return BeachRoom.new()
 	return BedroomRoom.new()
 
 
@@ -423,6 +427,20 @@ func _free_spots(count: int, radius: float, area: Rect2 = Rect2()) -> Array[Vect
 
 
 ## The area well inside the room but away from the walls (for scattered toys).
+## Turns a prop (whose front is -Z) at p to face the nearest bit of track.
+func _face_track_angle(p: Vector3) -> float:
+	var best := 1e9
+	var best_pos := p
+	for i in 40:
+		var o := track.sample(track.length * i / 40.0).origin
+		var d := Vector2(o.x - p.x, o.z - p.z).length()
+		if d < best:
+			best = d
+			best_pos = o
+	var dir := best_pos - p
+	return atan2(-dir.x, -dir.z)
+
+
 func _inner_area(margin: float = 8.0) -> Rect2:
 	return room_rect.grow(-margin)
 

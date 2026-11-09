@@ -32,6 +32,8 @@ const ITEMS: Array[Dictionary] = [
 	{"id": "car_icecream", "kind": "car", "name": "Ice Cream Dream", "stars": 40},
 	# Special unlocks: earned by doing something, not with stars (see Game.grant()).
 	{"id": "car_sleigh", "kind": "car", "name": "Santa's Sleigh", "stars": 999999, "how": "Finish the holiday track (December only!)"},
+	{"id": "car_pumpkin", "kind": "car", "name": "Pumpkin Rider", "stars": 999999, "how": "Finish the Halloween track (October only!)"},
+	{"id": "car_surf", "kind": "car", "name": "Surf Buggy", "stars": 999999, "how": "Finish the summer beach track (June to August!)"},
 ]
 
 

@@ -132,8 +132,8 @@ const PIECES: Array[Dictionary] = [
 static func for_index(index: int) -> Track:
 	var t := Track.new()
 	t.layout_id = index
-	if index == Game.HOLIDAY_TRACK:
-		t.layout_id = 5   # the garden's layout, under snow
+	if Game.EVENTS.has(index):
+		t.layout_id = int(Game.EVENTS[index]["layout"])   # a seasonal re-theme of a built-in layout
 		return t
 	if index >= TRACKS.size():
 		t.custom = true

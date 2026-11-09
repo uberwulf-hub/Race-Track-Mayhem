@@ -58,6 +58,10 @@ func setup(car_def: Dictionary, with_shadow := true, look: Dictionary = {}) -> T
 			_build_icecream()
 		"sleigh":
 			_build_sleigh()
+		"pumpkin":
+			_build_pumpkin()
+		"surf":
+			_build_surf()
 		_:
 			_build_sport()
 	if paint.get("metal", false):
@@ -751,6 +755,61 @@ func _build_sleigh() -> void:
 
 
 ## The secret car: a little rocket on wheels.
+## Pumpkin Rider: a jack-o'-lantern on wheels with a glowing grin.
+func _build_pumpkin() -> void:
+	var body := paint(car["body"])
+	var stem := plastic(car["accent"], 0.6)
+	var glow := glowing(Color(1.0, 0.78, 0.2), 2.5)
+	_wheel_radius = 0.34
+	var c := Vector3(0, 0.8, 0)
+	_sphere(body_root, 0.62, c, body, Vector3(1.0, 0.85, 1.25))
+	for k in 6:   # ribs
+		var a := k * TAU / 6.0
+		_sphere(body_root, 0.5, c + Vector3(cos(a) * 0.32, 0.0, sin(a) * 0.4), body, Vector3(0.75, 0.88, 1.0))
+	# The carved face on the front (-Z): triangle eyes, a nose and a toothy grin.
+	for side: float in [-1.0, 1.0]:
+		_box(body_root, Vector3(0.22, 0.22, 0.1), Vector3(side * 0.24, 0.98, -0.9), glow, Vector3(0, 0, PI * 0.25), 0.0)
+	_box(body_root, Vector3(0.11, 0.11, 0.1), Vector3(0, 0.82, -0.94), glow, Vector3(0, 0, PI * 0.25), 0.0)
+	_box(body_root, Vector3(0.56, 0.13, 0.1), Vector3(0, 0.64, -0.88), glow, Vector3.ZERO, 0.05)
+	for k in 3:
+		_box(body_root, Vector3(0.09, 0.09, 0.1), Vector3(-0.17 + k * 0.17, 0.73, -0.9), glow, Vector3.ZERO, 0.0)
+	# Curly stem and a leaf on top.
+	_capsule(body_root, 0.08, 0.35, Vector3(0, 1.42, 0.05), stem, Vector3(0.3, 0, 0.2))
+	_box(body_root, Vector3(0.35, 0.03, 0.22), Vector3(0.18, 1.35, 0.15), stem, Vector3(0, 0.4, -0.3), 0.05)
+	# A little purple witch hat, tipped to one side.
+	var hat := plastic(Color(0.45, 0.2, 0.7), 0.4)
+	var brim := _box(body_root, Vector3(0.6, 0.04, 0.6), Vector3(-0.25, 1.38, 0.25), hat, Vector3(0, 0, 0.25), 0.05)
+	brim.name = "HatBrim"
+	var cone := MeshInstance3D.new()
+	var cm := CylinderMesh.new()
+	cm.top_radius = 0.0
+	cm.bottom_radius = 0.22
+	cm.height = 0.5
+	cone.mesh = cm
+	cone.material_override = hat
+	cone.position = Vector3(-0.3, 1.62, 0.25)
+	cone.rotation.z = 0.25
+	body_root.add_child(cone)
+	_lights(-0.9, 0.95, 0.55, 0.3)
+	_side = {"hw": 0.62, "y": 0.8, "len": 1.5, "h": 0.4}
+	for x: float in [-0.6, 0.6]:
+		_wheel(Vector3(x, 0.34, -0.55), 0.34, 0.26, true, Color(0.2, 0.7, 0.3))
+		_wheel(Vector3(x, 0.34, 0.55), 0.34, 0.26, false, Color(0.2, 0.7, 0.3))
+
+
+## Surf Buggy: the beach buggy with a surfboard on its roll bar.
+func _build_surf() -> void:
+	_build_buggy()
+	var board := plastic(car["accent"], 0.2)
+	_box(body_root, Vector3(0.55, 0.07, 2.3), Vector3(0, 1.45, 0.15), board, Vector3(0.05, 0, 0), 0.5)
+	_box(body_root, Vector3(0.1, 0.075, 2.0), Vector3(0, 1.455, 0.15), plastic(Color(1, 1, 1), 0.2), Vector3(0.05, 0, 0), 0.0)
+	_box(body_root, Vector3(0.04, 0.22, 0.25), Vector3(0, 1.32, 1.1), board, Vector3.ZERO, 0.0)   # fin
+	# A flower garland on the nose.
+	for k in 5:
+		var col: Color = [Color(1.0, 0.4, 0.6), Color(1.0, 0.85, 0.2), Color(0.95, 0.95, 0.95)][k % 3]
+		_sphere(body_root, 0.07, Vector3(-0.3 + k * 0.15, 0.7, -0.98), plastic(col, 0.5))
+
+
 func _build_rocket() -> void:
 	var body := paint(car["body"])
 	var accent := plastic(car["accent"])

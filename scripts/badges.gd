@@ -29,6 +29,8 @@ const LIST: Array[Dictionary] = [
 	{"id": "photo", "name": "Shutterbug", "desc": "Snap a photo in a replay", "stat": "photos", "goal": 1, "symbol": "PIC", "color": Color(0.95, 0.65, 0.9)},
 	{"id": "boss", "name": "Boss Buster", "desc": "Beat a Story Mode boss", "stat": "bosses", "goal": 1, "symbol": "KO", "color": Color(0.75, 0.3, 0.9)},
 	{"id": "story_done", "name": "Toy Box Hero", "desc": "Beat every Story Mode boss", "stat": "bosses", "goal": 7, "symbol": "!!", "color": Color(0.95, 0.45, 0.2)},
+	{"id": "halloween", "name": "Trick or Treat", "desc": "Finish Pumpkin Patch Panic", "stat": "halloween", "goal": 1, "symbol": "BOO", "color": Color(1.0, 0.55, 0.15)},
+	{"id": "summer", "name": "Beach Bum", "desc": "Finish Sandy Shores Splash", "stat": "summer", "goal": 1, "symbol": "SUN", "color": Color(1.0, 0.85, 0.3)},
 	{"id": "holiday", "name": "Holiday Spirit", "desc": "Finish Frosty Backyard", "stat": "holiday", "goal": 1, "symbol": "JOY", "color": Color(0.7, 0.88, 1.0)},
 ]
 

@@ -13,9 +13,35 @@ const NAME_LENGTH := 12
 const ONLINE_TRACK := 999
 ## Track number used for this week's challenge track.
 const WEEKLY_TRACK := 998
-## The holiday track (Frosty Backyard), only around the holidays.
-const HOLIDAY_TRACK := 997
+## Seasonal event tracks, each only at its time of year (see EVENTS).
+const HOLIDAY_TRACK := 997        # Frosty Backyard, December
+const HALLOWEEN_TRACK := 996      # Pumpkin Patch Panic, October
+const SUMMER_TRACK := 995         # Sandy Shores Splash, June to August
 var force_holiday := false        # for testing: show the holiday track any time
+var force_event := -1             # for testing: switch on this event track any time
+
+## Seasonal events: the track card, which built-in layout it uses, the
+## secret car you win by finishing it, its badge stat and its menu button.
+const EVENTS := {
+	HOLIDAY_TRACK: {"id": "frosty_backyard", "name": "Frosty Backyard", "room": "snowyard", "room_name": "The Snowy Yard",
+		"blurb": "A holiday special! Race the garden under fresh snow, past snowmen and twinkly trees.",
+		"features": ["Big jump over the frozen pond", "Snowy bumps", "Loop", "Spiral", "Slalom"],
+		"stars": 2, "color": Color(0.55, 0.75, 1.0), "layout": 5, "car": "car_sleigh", "stat": "holiday",
+		"button": "Holiday Race!", "button_color": Color(1.0, 0.45, 0.45),
+		"tip": "Frosty Backyard: a snowy holiday track. Finish it to unlock Santa's Sleigh!"},
+	HALLOWEEN_TRACK: {"id": "pumpkin_patch_panic", "name": "Pumpkin Patch Panic", "room": "spooky", "room_name": "The Spooky Garden",
+		"blurb": "A Halloween special! Race the garden at night past glowing pumpkins, a friendly ghost and bats.",
+		"features": ["Loop-de-loop under the moon", "Ramp jump", "Hill", "Chicane"],
+		"stars": 1, "color": Color(1.0, 0.55, 0.15), "layout": 0, "car": "car_pumpkin", "stat": "halloween",
+		"button": "Halloween Race!", "button_color": Color(1.0, 0.6, 0.2),
+		"tip": "Pumpkin Patch Panic: a spooky night race. Finish it to unlock the Pumpkin Rider!"},
+	SUMMER_TRACK: {"id": "sandy_shores_splash", "name": "Sandy Shores Splash", "room": "beach", "room_name": "The Beach",
+		"blurb": "A summer special! Race along the beach past sand castles, palm trees and crabs, with the waves rolling in.",
+		"features": ["Double loop", "Wavy bumps", "Zig-zags", "Jump"],
+		"stars": 2, "color": Color(0.3, 0.8, 0.95), "layout": 3, "car": "car_surf", "stat": "summer",
+		"button": "Beach Race!", "button_color": Color(0.5, 0.95, 1.0),
+		"tip": "Sandy Shores Splash: a sunny summer beach track. Finish it to unlock the Surf Buggy!"},
+}
 const DIFFICULTY_NAMES := ["Easy", "Normal", "Hard"]
 const QUALITY_NAMES := ["Low", "Medium", "High"]
 const TOUCH_NAMES := ["Auto", "On", "Off"]
@@ -69,7 +95,7 @@ var last_unlocks: Array = []     # unlocks earned by the last race, shown on the
 
 # Track Builder
 const MAX_CUSTOM_TRACKS := 12
-const ROOM_THEMES := [["bedroom", "The Bedroom"], ["playroom", "The Playroom"], ["kitchen", "The Kitchen"], ["bathroom", "The Bathroom"], ["living_room", "The Living Room"], ["garden", "The Garden"], ["garage", "The Garage"], ["snowyard", "The Snowy Yard"]]
+const ROOM_THEMES := [["bedroom", "The Bedroom"], ["playroom", "The Playroom"], ["kitchen", "The Kitchen"], ["bathroom", "The Bathroom"], ["living_room", "The Living Room"], ["garden", "The Garden"], ["garage", "The Garage"], ["snowyard", "The Snowy Yard"], ["spooky", "The Spooky Garden"], ["beach", "The Beach"]]
 var custom_tracks: Array = []    # [{"name": String, "room": String, "pieces": Array[String]}]
 var editing_slot := -1           # which custom track the builder is editing (-1 = a new one)
 var skip_track_select := false   # "Race It!" in the builder goes straight to the race
@@ -357,7 +383,7 @@ func _write_player() -> void:
 	cfg.set_value("player", "name", player_name)
 	cfg.set_value("player", "car", selected_car)
 	var keep_track: int = _own_prefs.get("track", selected_track)
-	if keep_track == WEEKLY_TRACK or keep_track == ONLINE_TRACK or keep_track == HOLIDAY_TRACK:
+	if keep_track == WEEKLY_TRACK or keep_track == ONLINE_TRACK or EVENTS.has(keep_track):
 		keep_track = 0   # special tracks aren't remembered as "the last track"
 	cfg.set_value("player", "track", keep_track)
 	cfg.set_value("player", "built_in_tracks", Track.TRACKS.size())
@@ -499,8 +525,8 @@ func board_key(index: int, lap_count: int) -> String:
 		return "%s_%d" % [Track.TRACKS[index]["id"], lap_count]
 	if index == WEEKLY_TRACK:
 		return "weekly%d_%d" % [int(weekly_track()["week"]), lap_count]
-	if index == HOLIDAY_TRACK:
-		return "frosty_backyard_%d" % lap_count
+	if EVENTS.has(index):
+		return "%s_%d" % [EVENTS[index]["id"], lap_count]
 	var pieces: Array = []
 	if index == ONLINE_TRACK:
 		pieces = Net.race_config.get("custom", {}).get("pieces", [])
@@ -732,10 +758,31 @@ func add_stat_now(key: String, amount: int = 1) -> void:
 
 ## The holidays: December 1st to January 6th.
 func holiday_on() -> bool:
-	if force_holiday:
+	return event_on(HOLIDAY_TRACK)
+
+
+## Is this seasonal event on today?
+##   Holiday: December 1st to January 6th.  Halloween: all of October and
+##   November 1st.  Summer: June, July and August.
+func event_on(index: int) -> bool:
+	if index == force_event or (index == HOLIDAY_TRACK and force_holiday):
 		return true
 	var d := Time.get_date_dict_from_system()
-	return int(d["month"]) == 12 or (int(d["month"]) == 1 and int(d["day"]) <= 6)
+	var m := int(d["month"])
+	var day := int(d["day"])
+	match index:
+		HOLIDAY_TRACK:
+			return m == 12 or (m == 1 and day <= 6)
+		HALLOWEEN_TRACK:
+			return m == 10 or (m == 11 and day == 1)
+		SUMMER_TRACK:
+			return m >= 6 and m <= 8
+	return false
+
+
+## The seasonal event tracks that are on today.
+func events_on() -> Array:
+	return EVENTS.keys().filter(func(i): return event_on(i))
 
 
 ## The paint/sticker/wheels picked for a car (ids), with defaults.
@@ -811,7 +858,7 @@ func track_count() -> int:
 
 
 func is_custom_track(index: int) -> bool:
-	return index >= Track.TRACKS.size() and index != WEEKLY_TRACK and index != HOLIDAY_TRACK
+	return index >= Track.TRACKS.size() and index != WEEKLY_TRACK and not EVENTS.has(index)
 
 
 # --------------------------------------------------------------------------
@@ -893,11 +940,11 @@ func track_info(index: int) -> Dictionary:
 		return Track.TRACKS[maxi(index, 0)]
 	if index == ONLINE_TRACK:
 		return custom_track_info(Net.race_config.get("custom", {}), "online_custom", "A track built by the host!")
-	if index == HOLIDAY_TRACK:
-		return {"id": "frosty_backyard", "name": "Frosty Backyard", "room": "snowyard", "room_name": "The Snowy Yard",
-			"blurb": "A holiday special! Race the garden under fresh snow, past snowmen and twinkly trees.",
-			"features": ["Big jump over the frozen pond", "Snowy bumps", "Loop", "Spiral", "Slalom"],
-			"stars": 2, "color": Color(0.55, 0.75, 1.0), "holiday": true}
+	if EVENTS.has(index):
+		var info: Dictionary = EVENTS[index].duplicate()
+		info["event"] = true
+		info["holiday"] = index == HOLIDAY_TRACK
+		return info
 	if index == WEEKLY_TRACK:
 		var w := weekly_track()
 		var info := custom_track_info(w, "weekly_%d" % w["week"], "This week's challenge! A brand new track every Monday.")

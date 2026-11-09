@@ -104,6 +104,30 @@ const CARS: Array[Dictionary] = [
 		"secret": true,
 		"unlock": "car_sleigh",
 	},
+	{
+		"id": "pumpkin_rider",
+		"name": "Pumpkin Rider",
+		"blurb": "A jack-o'-lantern on wheels, wearing a witch hat. Its grin glows in the dark!",
+		"style": "pumpkin",
+		"body": Color(1.0, 0.5, 0.08),
+		"accent": Color(0.25, 0.55, 0.2),
+		"number": 31,
+		"stats": {"speed": 4, "accel": 3, "handling": 4, "weight": 4},
+		"secret": true,
+		"unlock": "car_pumpkin",
+	},
+	{
+		"id": "surf_buggy",
+		"name": "Surf Buggy",
+		"blurb": "Surf's up! A sandy beach buggy with a surfboard on top and flowers on the nose.",
+		"style": "surf",
+		"body": Color(0.15, 0.75, 0.85),
+		"accent": Color(1.0, 0.55, 0.3),
+		"number": 7,
+		"stats": {"speed": 4, "accel": 4, "handling": 3, "weight": 2},
+		"secret": true,
+		"unlock": "car_surf",
+	},
 ]
 
 const STAT_LABELS := {

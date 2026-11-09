@@ -991,9 +991,11 @@ func _show_results() -> void:
 		if h.has_finished:
 			earned = maxi(earned, Game.stars_for_place(order.find(h) + 1))
 	var fresh := Game.award_stars(earned) if earned > 0 else []
-	# Finishing the holiday track unlocks Santa's Sleigh.
-	if Game.selected_track == Game.HOLIDAY_TRACK and player.has_finished and Game.grant("car_sleigh"):
-		fresh.append("car_sleigh")
+	# Finishing a seasonal event track unlocks its secret car.
+	if Game.EVENTS.has(Game.selected_track) and player.has_finished:
+		var prize := String(Game.EVENTS[Game.selected_track]["car"])
+		if Game.grant(prize):
+			fresh.append(prize)
 	# Story Mode: did you finish ahead of the boss?
 	var story_line := ""
 	var beat_boss := false
@@ -1193,8 +1195,8 @@ func _count_badges(order: Array, new_record: bool) -> Array:
 	match Game.selected_track:
 		Game.WEEKLY_TRACK:
 			Game.add_stat("weekly")
-		Game.HOLIDAY_TRACK:
-			Game.add_stat("holiday")
+		Game.HOLIDAY_TRACK, Game.HALLOWEEN_TRACK, Game.SUMMER_TRACK:
+			Game.add_stat(String(Game.EVENTS[Game.selected_track]["stat"]))
 		_:
 			if Game.selected_track < Track.TRACKS.size() and not online:
 				Game.note_track(Track.TRACKS[Game.selected_track]["id"])
