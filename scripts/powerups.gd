@@ -7,6 +7,9 @@ extends Node3D
 ##   Water Balloon  - drops a slippery puddle behind you
 ##   Rocket Boost   - a big burst of speed
 ##   Bubble Shield  - blocks the next hit
+##   Toy Magnet     - pulls you along to the car ahead
+##   Banana Peel    - drops a peel behind you; cars that hit it spin round
+##   Toy Parachute  - your jumps float down gently and land safely
 ## Cars further back get better power-ups, and the computer cars use them too.
 ## Everything moves along the track (distance + sideways), just like the cars,
 ## so it works through loops and corkscrews.
@@ -17,9 +20,13 @@ signal item_used(racer: Racer, kind: String, side: float)   # for online races
 
 var online := false   # online: hits only count for cars driven on this computer
 
-const KINDS := ["bubble", "ball", "balloon", "rocket", "shield"]
-const NAMES := {"bubble": "Bubble Blaster", "ball": "Bouncy Ball", "balloon": "Water Balloon", "rocket": "Rocket Boost", "shield": "Bubble Shield"}
-const COLORS := {"bubble": Color(0.55, 0.85, 1.0), "ball": Color(1.0, 0.35, 0.3), "balloon": Color(0.3, 0.6, 1.0), "rocket": Color(1.0, 0.6, 0.15), "shield": Color(0.6, 1.0, 0.7)}
+const KINDS := ["bubble", "ball", "balloon", "rocket", "shield", "magnet", "banana", "parachute"]
+const NAMES := {"bubble": "Bubble Blaster", "ball": "Bouncy Ball", "balloon": "Water Balloon", "rocket": "Rocket Boost", "shield": "Bubble Shield",
+	"magnet": "Toy Magnet", "banana": "Banana Peel", "parachute": "Toy Parachute"}
+const COLORS := {"bubble": Color(0.55, 0.85, 1.0), "ball": Color(1.0, 0.35, 0.3), "balloon": Color(0.3, 0.6, 1.0), "rocket": Color(1.0, 0.6, 0.15), "shield": Color(0.6, 1.0, 0.7),
+	"magnet": Color(0.95, 0.25, 0.35), "banana": Color(1.0, 0.88, 0.25), "parachute": Color(0.75, 0.55, 1.0)}
+const MAGNET_TIME := 3.5
+const PARACHUTE_TIME := 12.0
 const BOX_RESPAWN := 4.0
 const BOX_LANES := [-2.2, 0.0, 2.2]
 
@@ -104,6 +111,7 @@ func update(delta: float) -> void:
 	_update_boxes(delta)
 	_update_shots(delta)
 	_update_puddles(delta)
+	_update_magnets(delta)
 	_ai(delta)
 
 
@@ -118,7 +126,7 @@ func _update_boxes(delta: float) -> void:
 				node.scale = Vector3.ONE * 0.1
 		node.scale = node.scale.lerp(Vector3.ONE, minf(1.0, delta * 6.0))
 		var bob := sin(_time * 3.0 + float(b["lat"])) * 0.25
-		node.global_transform = Transform3D(f.basis.rotated(f.basis.y, _time * 2.0), f.origin + f.basis.x * float(b["lat"]) + f.basis.y * (1.5 + bob))
+		node.global_transform = Transform3D(f.basis.rotated(f.basis.y.normalized(), _time * 2.0), f.origin + f.basis.x * float(b["lat"]) + f.basis.y * (1.5 + bob))
 		var mat: StandardMaterial3D = node.get_meta("mat")
 		var col := Color.from_hsv(fmod(_time * 0.3 + float(b["lat"]) * 0.1, 1.0), 0.7, 1.0, 0.85)
 		mat.albedo_color = col
@@ -140,11 +148,13 @@ func _update_boxes(delta: float) -> void:
 
 ## Better power-ups for cars further back.
 func _roll_item(r: Racer) -> String:
-	var weights := {"bubble": 3.0, "ball": 3.0, "balloon": 3.0, "rocket": 2.0, "shield": 2.0}
+	var weights := {"bubble": 3.0, "ball": 3.0, "balloon": 2.0, "rocket": 2.0, "shield": 2.0, "magnet": 1.5, "banana": 2.0, "parachute": 1.0}
 	if r.place <= 1:
-		weights = {"bubble": 1.0, "ball": 1.5, "balloon": 4.0, "rocket": 0.5, "shield": 4.0}
+		weights = {"bubble": 1.0, "ball": 1.5, "balloon": 3.0, "rocket": 0.5, "shield": 4.0, "magnet": 0.0, "banana": 3.0, "parachute": 1.0}
 	elif r.place >= 4:
-		weights = {"bubble": 4.0, "ball": 3.0, "balloon": 1.0, "rocket": 4.0, "shield": 1.0}
+		weights = {"bubble": 4.0, "ball": 3.0, "balloon": 1.0, "rocket": 4.0, "shield": 1.0, "magnet": 4.0, "banana": 0.5, "parachute": 1.0}
+	if track.gaps.is_empty():
+		weights["parachute"] = 0.0   # no jumps on this track
 	var total := 0.0
 	for k in weights:
 		total += weights[k]
@@ -194,12 +204,23 @@ func _use(r: Racer, kind: String, side: float) -> void:
 		"ball":
 			_shoot(r, "ball", maxf(r.speed, 20.0) + 14.0, side * 9.0, 7.0)
 			Sfx.play("throw", 0.9)
-		"balloon":
+		"balloon", "banana":
 			var s := fposmod(r.s - 3.0, track.length)
-			var node := _make_puddle()
+			var node := _make_puddle() if kind == "balloon" else _make_peel()
 			add_child(node)
-			_puddles.append({"s": s, "lat": r.lateral, "life": 18.0, "node": node, "owner": r})
-			Sfx.play("splash", 1.2, -4.0)
+			_puddles.append({"s": s, "lat": r.lateral, "life": 18.0 if kind == "balloon" else 25.0, "node": node, "owner": r, "kind": kind})
+			if kind == "balloon":
+				Sfx.play("splash", 1.2, -4.0)
+			else:
+				Sfx.play("throw", 0.7, -4.0)
+		"magnet":
+			if not r.remote:
+				r.magnet_timer = MAGNET_TIME
+			Sfx.play("pickup", 0.6)
+		"parachute":
+			if not r.remote:
+				r.parachute_timer = PARACHUTE_TIME
+			Sfx.play("shield", 1.3)
 		"rocket":
 			if not r.remote:
 				r.boost_timer = 2.4
@@ -324,6 +345,63 @@ func _update_shots(delta: float) -> void:
 			_shots.remove_at(i)
 
 
+## A banana peel: a yellow star of floppy bits lying on the track.
+func _make_peel() -> Node3D:
+	var root := Node3D.new()
+	var yellow := StandardMaterial3D.new()
+	yellow.albedo_color = Color(1.0, 0.86, 0.2)
+	yellow.roughness = 0.5
+	var brown := StandardMaterial3D.new()
+	brown.albedo_color = Color(0.45, 0.3, 0.12)
+	for k in 4:
+		var flap := MeshInstance3D.new()
+		var cm := CapsuleMesh.new()
+		cm.radius = 0.28
+		cm.height = 1.6
+		flap.mesh = cm
+		flap.material_override = yellow
+		var a := k * TAU / 4.0 + 0.4
+		flap.position = Vector3(cos(a) * 0.6, 0.18, sin(a) * 0.6)
+		flap.rotation = Vector3(0, -a, PI * 0.5 - 0.25)
+		flap.scale = Vector3(1.0, 1.0, 0.45)
+		root.add_child(flap)
+	var middle := MeshInstance3D.new()
+	var sm := SphereMesh.new()
+	sm.radius = 0.4
+	sm.height = 0.6
+	middle.mesh = sm
+	middle.material_override = yellow
+	middle.position.y = 0.25
+	root.add_child(middle)
+	var stem := MeshInstance3D.new()
+	var st := CylinderMesh.new()
+	st.top_radius = 0.1
+	st.bottom_radius = 0.12
+	st.height = 0.4
+	stem.mesh = st
+	stem.material_override = brown
+	stem.position.y = 0.6
+	root.add_child(stem)
+	return root
+
+
+## Magnets: a car with the Toy Magnet is pulled along to the car ahead.
+func _update_magnets(delta: float) -> void:
+	for r in racers:
+		if r.magnet_timer <= 0.0 or r.remote or r.mode != Racer.Mode.DRIVING:
+			continue
+		var target := _nearest_ahead(r, r.s, 80.0)
+		if target == null:
+			continue
+		var gap := _ahead(r.s, target.s)
+		if gap < 3.5:
+			r.magnet_timer = minf(r.magnet_timer, 0.3)   # caught them!
+			continue
+		var top := float(r.stats["top_speed"])
+		r.speed = move_toward(r.speed, minf(maxf(target.speed + 10.0, top * 1.1), top * 1.3), delta * 40.0)
+		r.lateral = move_toward(r.lateral, target.lateral * 0.6, delta * 2.0)
+
+
 func _update_puddles(delta: float) -> void:
 	for i in range(_puddles.size() - 1, -1, -1):
 		var p: Dictionary = _puddles[i]
@@ -331,14 +409,15 @@ func _update_puddles(delta: float) -> void:
 		var f := track.sample(p["s"])
 		var node: Node3D = p["node"]
 		node.global_transform = Transform3D(f.basis, f.origin + f.basis.x * float(p["lat"]) + f.basis.y * 0.05)
+		var kind := String(p.get("kind", "balloon"))
 		var gone: bool = float(p["life"]) <= 0.0
 		for r in racers:
 			if r.mode != Racer.Mode.DRIVING:
 				continue
-			if r == p["owner"] and p["life"] > 16.5:
+			if r == p["owner"] and p["life"] > (16.5 if kind == "balloon" else 23.5):
 				continue
 			if _track_gap(r.s, p["s"]) < 1.8 and absf(r.lateral - float(p["lat"])) < 1.8:
-				_hit(r, "balloon", p["owner"])
+				_hit(r, kind, p["owner"])
 				gone = true
 				break
 		if gone:
@@ -369,6 +448,10 @@ func _hit(r: Racer, kind: String, by: Racer) -> void:
 			r.spin_vel += (1.0 if randf() < 0.5 else -1.0) * 7.0
 			r.speed *= 0.6
 			Sfx.play("splash")
+		"banana":
+			r.spin_vel += (1.0 if randf() < 0.5 else -1.0) * 12.0   # a full spin
+			r.speed *= 0.5
+			Sfx.play("skid", 1.2)
 	item_hit.emit(r, kind, by)
 
 
@@ -416,7 +499,7 @@ func _ai(delta: float) -> void:
 		match r.item:
 			"bubble", "ball":
 				use = _nearest_ahead(r, r.s, 35.0) != null or _ai_wait[r] < -6.0
-			"balloon":
+			"balloon", "banana":
 				for o in racers:
 					var d := _ahead(r.s, o.s)
 					if o != r and d < -2.0 and d > -18.0:
@@ -426,5 +509,14 @@ func _ai(delta: float) -> void:
 				use = absf(track.curvature_at(r.s + 15.0)) < 0.02
 			"shield":
 				use = true
+			"magnet":
+				var ahead := _nearest_ahead(r, r.s, 70.0)
+				use = ahead != null and _ahead(r.s, ahead.s) > 15.0
+			"parachute":
+				for g: Array in track.gaps:
+					var d := _ahead(r.s, float(g[0]))
+					if d > 5.0 and d < 60.0:
+						use = true
+				use = use or _ai_wait[r] < -10.0
 		if use:
 			use_item(r)

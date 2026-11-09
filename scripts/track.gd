@@ -759,7 +759,7 @@ func _corkscrew(length: float, radius: float) -> void:
 		var e := t * t * (3.0 - 2.0 * t)          # ease in and out
 		var de := 6.0 * t * (1.0 - t)             # how fast it's twisting
 		var a := TAU * e
-		var d := (-u0).rotated(f0, a)             # from the axis out to the road
+		var d := (-u0).rotated(f0.normalized(), a)             # from the axis out to the road
 		_pos = axis + f0 * length * t + d * radius
 		_fwd = (f0 * length + f0.cross(d) * TAU * radius * de).normalized()
 		_up = -d
@@ -817,9 +817,9 @@ func _turn(deg: float, radius: float, bank: float = 0.0, flag: int = 0) -> void:
 	var step := arc / n
 	var dtheta := -deg_to_rad(deg) / n
 	for i in n:
-		_fwd = _fwd.rotated(_up, dtheta * 0.5).normalized()
+		_fwd = _fwd.rotated(_up.normalized(), dtheta * 0.5).normalized()
 		_pos += _fwd * step
-		_fwd = _fwd.rotated(_up, dtheta * 0.5).normalized()
+		_fwd = _fwd.rotated(_up.normalized(), dtheta * 0.5).normalized()
 		var t := float(i + 1) / n
 		_roll = bank * sin(PI * t)
 		_emit(flag)
@@ -833,11 +833,11 @@ func _pitch(deg: float, radius: float, flag: int = 0) -> void:
 	var dtheta := deg_to_rad(deg) / n
 	var right := _fwd.cross(_up).normalized()
 	for i in n:
-		_fwd = _fwd.rotated(right, dtheta * 0.5).normalized()
-		_up = _up.rotated(right, dtheta * 0.5).normalized()
+		_fwd = _fwd.rotated(right.normalized(), dtheta * 0.5).normalized()
+		_up = _up.rotated(right.normalized(), dtheta * 0.5).normalized()
 		_pos += _fwd * step
-		_fwd = _fwd.rotated(right, dtheta * 0.5).normalized()
-		_up = _up.rotated(right, dtheta * 0.5).normalized()
+		_fwd = _fwd.rotated(right.normalized(), dtheta * 0.5).normalized()
+		_up = _up.rotated(right.normalized(), dtheta * 0.5).normalized()
 		_emit(flag)
 
 
@@ -853,11 +853,11 @@ func _loop(radius: float, shift: float) -> void:
 	for i in n:
 		var t := float(i + 1) / n
 		var s := smoothstep(0.0, 1.0, t)
-		_fwd = _fwd.rotated(right, dtheta * 0.5).normalized()
-		_up = _up.rotated(right, dtheta * 0.5).normalized()
+		_fwd = _fwd.rotated(right.normalized(), dtheta * 0.5).normalized()
+		_up = _up.rotated(right.normalized(), dtheta * 0.5).normalized()
 		_pos += _fwd * step + right * shift * (s - prev_s)
-		_fwd = _fwd.rotated(right, dtheta * 0.5).normalized()
-		_up = _up.rotated(right, dtheta * 0.5).normalized()
+		_fwd = _fwd.rotated(right.normalized(), dtheta * 0.5).normalized()
+		_up = _up.rotated(right.normalized(), dtheta * 0.5).normalized()
 		prev_s = s
 		_emit(FLAG_LOOP)
 	# Snap away tiny rounding errors so the road is perfectly level again.

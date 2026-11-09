@@ -73,6 +73,10 @@ var skipped_ahead := false     # set when a car was helped past a spot it kept f
 var item := ""                 # the power-up this car is holding
 var shield_timer := 0.0        # bubble shield blocks the next hit
 var bubble_timer := 0.0        # trapped in a soap bubble: floats along slowly
+var magnet_timer := 0.0        # Toy Magnet: pulled along to the car ahead
+var parachute_timer := 0.0     # Toy Parachute: jumps float down and land safely
+var _magnet_mesh: Node3D
+var _chute_mesh: Node3D
 var _shield_mesh: MeshInstance3D
 var _bubble_mesh: MeshInstance3D
 var _same_spot_falls := 0
@@ -171,6 +175,9 @@ func _physics_process(delta: float) -> void:
 	_invuln = maxf(0.0, _invuln - delta)
 	shield_timer = maxf(0.0, shield_timer - delta)
 	bubble_timer = maxf(0.0, bubble_timer - delta)
+	magnet_timer = maxf(0.0, magnet_timer - delta)
+	if not in_air:
+		parachute_timer = maxf(0.0, parachute_timer - delta)
 	_update_item_visuals(delta)
 	if mode == Mode.FALLING:
 		_process_falling(delta)
@@ -383,6 +390,8 @@ const NET_SHIELD := 8
 const NET_BUBBLE := 16
 const NET_FINISHED := 32
 const NET_BRAKING := 64
+const NET_MAGNET := 128
+const NET_CHUTE := 256
 
 
 ## This car's state, to send to the other computers.
@@ -402,6 +411,10 @@ func net_state() -> Array:
 		f |= NET_FINISHED
 	if braking:
 		f |= NET_BRAKING
+	if magnet_timer > 0.0:
+		f |= NET_MAGNET
+	if parachute_timer > 0.0:
+		f |= NET_CHUTE
 	return [net_key, global_position, global_transform.basis.get_rotation_quaternion(),
 		speed, s, total, lateral, steer_input, f, lap, finish_time, best_lap]
 
@@ -424,6 +437,8 @@ func apply_net_state(st: Array) -> void:
 	shield_timer = 1.0 if f & NET_SHIELD else 0.0
 	bubble_timer = 1.0 if f & NET_BUBBLE else 0.0
 	braking = (f & NET_BRAKING) != 0
+	magnet_timer = 1.0 if f & NET_MAGNET else 0.0
+	parachute_timer = 1.0 if f & NET_CHUTE else 0.0
 	if not _net_seen:
 		_net_seen = true
 		global_transform = Transform3D(Basis(_net_rot), _net_pos)
@@ -473,11 +488,11 @@ func _update_transform(delta: float, snap: bool) -> void:
 	var yaw := -spin
 	if absf(speed) > 1.0:
 		yaw -= atan2(lateral_vel + knock, absf(speed)) * 0.9
-	var b := frame.basis.rotated(up, yaw)
+	var b := frame.basis.rotated(up.normalized(), yaw)
 	if in_air:
 		# nose up on take-off, nose down on landing
 		var t := Track.range_progress(track.gaps, s)
-		b = b.rotated(b.x, lerpf(0.15, -0.25, t))
+		b = b.rotated(b.x.normalized(), lerpf(0.15, -0.25, t))
 	if snap:
 		_visual_basis = b.orthonormalized()
 	else:
@@ -547,7 +562,16 @@ func _launch(frame: Transform3D) -> void:
 func _process_air(delta: float, steer: float) -> void:
 	# A little air control so you can line up the landing.
 	_air_vel += _air_right * steer * 7.0 * delta
-	_air_vel.y -= AIR_GRAVITY * delta
+	if parachute_timer > 0.0:
+		# Toy Parachute: drift down slowly, keep moving forward, aim for the middle.
+		_air_vel.y -= AIR_GRAVITY * (0.25 if _air_vel.y < 0.0 else 1.0) * delta
+		_air_vel.y = maxf(_air_vel.y, -5.0)
+		var fwd := _air_vel.dot(_air_dir)
+		if fwd < 20.0:
+			_air_vel += _air_dir * (20.0 - fwd) * minf(1.0, delta * 3.0)
+		_air_vel += _air_right * (-lateral) * 3.0 * delta
+	else:
+		_air_vel.y -= AIR_GRAVITY * delta
 	_air_pos += _air_vel * delta
 	var rel := _air_pos - _air_launch
 	var along := rel.dot(_air_dir)
@@ -916,6 +940,21 @@ func _update_item_visuals(delta: float) -> void:
 		_bubble_mesh = _glass_ball(1.7, Color(0.75, 0.9, 1.0, 0.3))
 	if _bubble_mesh:
 		_bubble_mesh.visible = bubble_timer > 0.0
+	# Toy Magnet: a big red horseshoe over the car while it pulls.
+	if magnet_timer > 0.0 and _magnet_mesh == null:
+		_magnet_mesh = _make_magnet()
+	if _magnet_mesh:
+		_magnet_mesh.visible = magnet_timer > 0.0
+		_magnet_mesh.scale = Vector3.ONE * (0.7 + 0.06 * sin(Time.get_ticks_msec() * 0.02))
+	# Toy Parachute: a little pack on the roof that opens into a canopy in the air.
+	if parachute_timer > 0.0 and _chute_mesh == null:
+		_chute_mesh = _make_chute()
+	if _chute_mesh:
+		_chute_mesh.visible = parachute_timer > 0.0
+		var open := in_air and parachute_timer > 0.0
+		var canopy: Node3D = _chute_mesh.get_node("Canopy")
+		canopy.scale = canopy.scale.lerp(Vector3.ONE if open else Vector3.ONE * 0.05, minf(1.0, delta * 8.0))
+		(_chute_mesh.get_node("Pack") as Node3D).visible = not open
 	# Bubbled cars float up and wobble.
 	var lift := 1.4 if bubble_timer > 0.0 else 0.0
 	model.position.y = lerpf(model.position.y, lift, minf(1.0, delta * 6.0))
@@ -923,6 +962,99 @@ func _update_item_visuals(delta: float) -> void:
 		model.rotation.z = sin(Time.get_ticks_msec() * 0.006) * 0.25
 	else:
 		model.rotation.z = lerpf(model.rotation.z, 0.0, minf(1.0, delta * 8.0))
+
+
+## A red horseshoe magnet with silver tips, held up over the car.
+func _make_magnet() -> Node3D:
+	var root := Node3D.new()
+	root.position = Vector3(0, 1.9, 0.0)
+	var red := ToyCarModel.plastic(Color(0.9, 0.15, 0.2), 0.25)
+	var steel := ToyCarModel.chrome()
+	var r := 0.55
+	for k in 9:
+		var a := PI * k / 8.0                 # the top half of a circle
+		var seg := MeshInstance3D.new()
+		var bm := BoxMesh.new()
+		bm.size = Vector3(0.36, 0.3, 0.36)
+		seg.mesh = bm
+		seg.material_override = red
+		seg.position = Vector3(cos(a) * r, sin(a) * r, 0)
+		seg.rotation.z = a
+		root.add_child(seg)
+	for side: float in [-1.0, 1.0]:
+		var arm := MeshInstance3D.new()
+		var am := BoxMesh.new()
+		am.size = Vector3(0.36, 0.5, 0.36)
+		arm.mesh = am
+		arm.material_override = red
+		arm.position = Vector3(side * r, -0.25, 0)
+		root.add_child(arm)
+		var tip := MeshInstance3D.new()
+		var tm := BoxMesh.new()
+		tm.size = Vector3(0.38, 0.22, 0.38)
+		tip.mesh = tm
+		tip.material_override = steel
+		tip.position = Vector3(side * r, -0.6, 0)
+		root.add_child(tip)
+	root.rotation.x = -0.5   # tipped forward, pointing at the car ahead
+	model.add_child(root)
+	return root
+
+
+## A purple pack on the roof, with a striped canopy that pops open in the air.
+func _make_chute() -> Node3D:
+	var root := Node3D.new()
+	var pack := MeshInstance3D.new()
+	var pb := BoxMesh.new()
+	pb.size = Vector3(0.7, 0.35, 0.6)
+	pack.mesh = pb
+	pack.material_override = ToyCarModel.plastic(Color(0.6, 0.4, 0.95), 0.4)
+	pack.position = Vector3(0, 1.25, 0.3)
+	pack.name = "Pack"
+	root.add_child(pack)
+	var canopy := Node3D.new()
+	canopy.name = "Canopy"
+	canopy.scale = Vector3.ONE * 0.05
+	root.add_child(canopy)
+	var dome := MeshInstance3D.new()
+	var sm := SphereMesh.new()
+	sm.radius = 2.4
+	sm.height = 1.6
+	sm.is_hemisphere = true
+	dome.mesh = sm
+	dome.material_override = ToyCarModel.plastic(Color(1.0, 0.95, 0.9), 0.5)
+	dome.position = Vector3(0, 3.4, 0)
+	canopy.add_child(dome)
+	var cols := [Color(0.95, 0.3, 0.35), Color(0.55, 0.4, 1.0), Color(1.0, 0.8, 0.2), Color(0.3, 0.8, 0.5)]
+	for k in 4:
+		var stripe := MeshInstance3D.new()
+		var sm2 := SphereMesh.new()
+		sm2.radius = 2.43
+		sm2.height = 1.63
+		sm2.is_hemisphere = true
+		stripe.mesh = sm2
+		stripe.material_override = ToyCarModel.plastic(cols[k], 0.5)
+		stripe.position = Vector3(0, 3.4, 0)
+		stripe.rotation.y = k * PI / 4.0
+		stripe.scale = Vector3(0.2, 1.0, 1.0)
+		canopy.add_child(stripe)
+	for x: float in [-1.0, 1.0]:
+		for z: float in [-1.0, 1.0]:
+			var top := Vector3(x * 1.7, 3.4, z * 1.7)
+			var bottom := Vector3(x * 0.4, 1.0, z * 0.6)
+			var line := MeshInstance3D.new()
+			var cm := CylinderMesh.new()
+			cm.top_radius = 0.03
+			cm.bottom_radius = 0.03
+			cm.height = top.distance_to(bottom)
+			line.mesh = cm
+			line.material_override = ToyCarModel.plastic(Color(0.95, 0.95, 0.95), 0.6)
+			var ly := (top - bottom).normalized()
+			var lx := ly.cross(Vector3.FORWARD).normalized()
+			line.transform = Transform3D(Basis(lx, ly, lx.cross(ly).normalized()), (top + bottom) * 0.5)
+			canopy.add_child(line)
+	model.add_child(root)
+	return root
 
 
 func _glass_ball(radius: float, col: Color) -> MeshInstance3D:

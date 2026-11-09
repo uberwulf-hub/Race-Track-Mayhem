@@ -607,6 +607,7 @@ const HIT_MESSAGES := {
 	"bubble": "BUBBLED!",
 	"ball": "BONK!",
 	"balloon": "SPLASH!",
+	"banana": "SLIPPED ON A BANANA!",
 	"shield": "Your shield saved you!",
 }
 
