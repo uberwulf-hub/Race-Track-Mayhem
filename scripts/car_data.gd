@@ -3,6 +3,8 @@ extends RefCounted
 ## All the toy cars you can pick. Stats are 1..5 (shown as bars in the garage)
 ## and get turned into real driving numbers by `physics_for()`.
 
+const NICKNAME_LENGTH := 14
+
 const CARS: Array[Dictionary] = [
 	{
 		"id": "red_rocket",
@@ -136,3 +138,12 @@ static func physics_for(car: Dictionary) -> Dictionary:
 		"grip": 0.55 + float(s["handling"]) * 0.09,      # resists sliding out in turns
 		"mass": 0.8 + float(s["weight"]) * 0.35,         # used for bumping
 	}
+
+
+## The name given to a car in the Car Designer ("" if none). Cleaned up,
+## since online it comes from someone else's game.
+static func nickname(look: Variant) -> String:
+	if not look is Dictionary:
+		return ""
+	var n := String((look as Dictionary).get("nickname", "")).strip_edges().replace("\n", " ")
+	return n.substr(0, NICKNAME_LENGTH)

@@ -124,6 +124,10 @@ var _dust: CPUParticles3D
 func setup(p_track: Track, car_def: Dictionary, p_is_player: bool, p_name: String, look: Dictionary = {}) -> Racer:
 	track = p_track
 	car = car_def
+	var nick := CarData.nickname(look)
+	if nick != "":
+		car = car_def.duplicate()
+		car["name"] = nick   # the name you gave it in the Car Designer
 	stats = CarData.physics_for(car_def)
 	is_player = p_is_player
 	racer_name = p_name

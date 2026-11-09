@@ -348,7 +348,10 @@ func _refresh_lobby() -> void:
 		var p: Dictionary = Net.players[id]
 		var tag := "  (host)" if int(id) == 1 else ""
 		var me := int(id) == Net.my_id()
-		var l := RaceHud.make_label("%s  -  %s%s%s" % [p["name"], CarData.get_car(int(p["car"]))["name"], tag, "   < you" if me else ""],
+		var car_name: String = CarData.nickname(p.get("look", {}))
+		if car_name == "":
+			car_name = CarData.get_car(int(p["car"]))["name"]
+		var l := RaceHud.make_label("%s  -  %s%s%s" % [p["name"], car_name, tag, "   < you" if me else ""],
 			24, Color(1.0, 0.9, 0.4) if me else Color.WHITE, 6)
 		_players_box.add_child(l)
 	_car_label.text = CarData.get_car(_my_car())["name"]

@@ -733,10 +733,15 @@ func holiday_on() -> bool:
 ## The paint/sticker/wheels picked for a car (ids), with defaults.
 func custom_for(car_id: String) -> Dictionary:
 	var c: Dictionary = custom.get(car_id, {})
-	return {"paint": c.get("paint", "paint_original"), "sticker": c.get("sticker", "sticker_none"), "wheels": c.get("wheels", "wheels_classic")}
+	return {"paint": c.get("paint", "paint_original"), "sticker": c.get("sticker", "sticker_none"), "wheels": c.get("wheels", "wheels_classic"),
+		# Car Designer: your own colours ("" = the paint job's), where the
+		# sticker sits (-1 front .. 1 back), how big it is, and the car's name.
+		"color": String(c.get("color", "")), "accent": String(c.get("accent", "")),
+		"sticker_at": float(c.get("sticker_at", 0.0)), "sticker_size": float(c.get("sticker_size", 1.0)),
+		"nickname": String(c.get("nickname", ""))}
 
 
-func set_custom(car_id: String, slot: String, item_id: String) -> void:
+func set_custom(car_id: String, slot: String, item_id: Variant) -> void:
 	var c := custom_for(car_id)
 	c[slot] = item_id
 	custom[car_id] = c

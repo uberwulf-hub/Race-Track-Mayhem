@@ -27,6 +27,14 @@ func setup(car_def: Dictionary, with_shadow := true, look: Dictionary = {}) -> T
 	var paint := Unlocks.get_item(String(look.get("paint", "paint_original")))
 	if paint.has("color"):
 		car["body"] = paint["color"]
+	# Car Designer colours win over the paint job.
+	var own_body := _html_color(look.get("color", ""))
+	if own_body.a > 0.0:
+		car["body"] = own_body
+		paint = {}
+	var own_accent := _html_color(look.get("accent", ""))
+	if own_accent.a > 0.0:
+		car["accent"] = own_accent
 	_wheel_style = String(look.get("wheels", "wheels_classic"))
 	if with_shadow:
 		shadow = MeshKit.shadow_quad(1.9, 2.9, 0.6)
@@ -54,8 +62,17 @@ func setup(car_def: Dictionary, with_shadow := true, look: Dictionary = {}) -> T
 			_build_sport()
 	if paint.get("metal", false):
 		_make_metallic(body_root, car["body"])
-	_add_sticker(String(look.get("sticker", "sticker_none")))
+	_add_sticker(String(look.get("sticker", "sticker_none")), clampf(float(look.get("sticker_at", 0.0)), -1.0, 1.0),
+		clampf(float(look.get("sticker_size", 1.0)), 0.6, 1.4))
 	return self
+
+
+## A colour saved as "rrggbb" (anything else gives a see-through "none").
+static func _html_color(v: Variant) -> Color:
+	var s := String(v) if v is String else ""
+	if s.length() != 6 or not s.is_valid_hex_number():
+		return Color(0, 0, 0, 0)
+	return Color.html(s)
 
 
 ## Shiny metal paint: every part painted the body colour gets a mirror finish.
@@ -808,9 +825,25 @@ func _build_rocket() -> void:
 # Stickers
 # ---------------------------------------------------------------------------
 
-func _add_sticker(id: String) -> void:
+## at: slide it toward the front (-1) or back (1). size: 0.6 .. 1.4.
+func _add_sticker(id: String, at := 0.0, size_k := 1.0) -> void:
 	if id == "sticker_none" or id == "":
 		return
+	# Everything goes on a holder so the designer can slide and scale it.
+	var real_root := body_root
+	var holder := Node3D.new()
+	holder.name = "Sticker"
+	body_root.add_child(holder)
+	body_root = holder
+	_place_sticker(id)
+	body_root = real_root
+	var y: float = _side["y"]
+	var len: float = _side["len"]
+	holder.scale = Vector3(1.0, size_k, size_k)
+	holder.position = Vector3(0.0, y * (1.0 - size_k), at * len * 0.28)
+
+
+func _place_sticker(id: String) -> void:
 	var hw: float = _side["hw"]
 	var y: float = _side["y"]
 	var len: float = _side["len"]
