@@ -23,6 +23,10 @@ down to your car for **3… 2… 1… GO!**
 **Weekly Challenge** (main menu): a brand-new track every Monday, the same for everyone, with its own
 online top 10 for the week.
 
+**Holiday event** (December 1st to January 6th): a Holiday Race button on the main menu takes you to
+**Frosty Backyard**, the garden under fresh snow with snowmen, twinkly pine trees, presents, a frozen pond with
+a skating penguin and falling snow. Finish it to unlock **Santa's Sleigh**.
+
 **Cars:** Red Rocket, Blue Bolt, Monster Max, Sunny Buggy and Bubblegum Van, plus unlockable Rocket Rascal
 (25 stars or a Grand Prix win), Fire Engine Fred (30 stars) and Ice Cream Dream (40 stars).
 
@@ -172,13 +176,24 @@ server as internet races (`server/relay/tracks.mjs`).
 - **Quick Race:** pick a car and any of the 7 tracks.
 - **Grand Prix:** race all 7 tracks in a row for points (10, 8, 6, 5, 4), then a trophy ceremony on the podium.
   Gold, silver and bronze trophies are kept on the shelf in the bedroom (one per difficulty).
+- **Story Mode:** each room has a boss car (Teddy Thunder, Block Boss Bella, Captain Crumbs, Bubbles McSplash,
+  Couch King Carl, Gnome Gus and Big Wrench Wendy). Finish ahead of the boss to open the next room and get 5 bonus stars.
 - **Ghost car:** a see-through replay of your best clean lap on each track drives alongside you.
+- **Replays and photos:** after a race, press Replay to watch it like TV (chase, trackside and swooping cameras,
+  slow motion). Press Photo! to freeze it, drag to turn the camera, and SNAP! to save a picture in
+  your Pictures folder under *Race Track Mayhem*.
+- **Track Gallery** (track picker): the most raced and newest tracks everyone has shared. Tap Race! to download one and race it.
+- **Badges:** 23 badges to collect, like Winner!, Big Air, Tourist, Sharing is Caring and Toy Box Hero. See them all
+  in the Badges room on the main menu.
 
 **Unlockables.** Finish races to earn stars (3 for 1st place, 2 for 2nd, 1 for finishing), plus bonus stars for Grand Prix trophies:
 - **Paint:** Sky Blue, Lime Zest, Midnight, Shiny Gold, Chrome, Galaxy.
 - **Stickers:** Racing Stripes, Flames, Stars, Lightning, Checkers.
 - **Wheels:** Gold Rims, Fat Slicks, Glow Wheels.
 - **The secret car, Rocket Rascal:** win any Grand Prix (or collect 25 stars).
+
+**Car Designer** (in the garage): pick your own body and trim colours, slide the sticker toward the front or back,
+make it bigger or smaller, and give your car a name. Its name shows in the results and in online lobbies.
 
 **Looks.**
 - Godot's full renderer: soft shadows, contact shadows, bounce lighting, sunbeams and reflections, with Low, Medium and High settings.
@@ -232,5 +247,8 @@ The version number is shown faintly in the bottom-right corner of the main menu.
 | `scripts/rooms/*_room.gd` | One file per room theme (bedroom, playroom, kitchen, bathroom, living room, garden). Each one sets its colours and builds its furniture. Set `outdoor = true` for a sky instead of walls. |
 | `scripts/main_menu.gd`, `scripts/vehicle_select.gd` | Main menu, and the garage (car picking and paint jobs). |
 | `scripts/game_state.gd`, `scripts/sfx.gd` | Settings and saving, controls, UI theme, sound effects and music. |
+| `scripts/badges.gd`, `scripts/badge_medal.gd`, `scripts/toast.gd` | The badges, the medal drawing and the "Badge earned!" pop-up. |
+| `scripts/story.gd` | Story Mode chapters: each room's boss, their car and what they say. |
+| `scripts/replay.gd` | Records races, plays them back with TV cameras, and photo mode. |
 
-Ideas for next time: online leaderboards, and an Android version.
+Ideas for next time: more rooms, more boss races and seasonal events.
