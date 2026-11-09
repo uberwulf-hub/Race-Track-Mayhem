@@ -26,6 +26,7 @@ var camera: Camera3D            # player 1's camera
 var skid_marks: SkidMarks
 var ghost: GhostCar
 var powerups: PowerUps
+var replay: Replay
 
 var state := State.INTRO
 var _state_time := 0.0
@@ -91,6 +92,8 @@ func _ready() -> void:
 	Spectators.build(room, track)
 
 	_spawn_racers()
+	replay = Replay.new().setup(self, racers)
+	add_child(replay)
 	_intro_from = room.overview_position()
 	var tr := track.get_aabb_xz()
 	_intro_look = Vector3(tr.get_center().x, 0.0, tr.get_center().y)
@@ -342,7 +345,7 @@ func _process(delta: float) -> void:
 	for v in views:
 		v.audio.update(quiet, state == State.RACING)
 	_update_ai_sounds()
-	if get_tree().paused:
+	if get_tree().paused or (replay and replay.playing):
 		return
 	_state_time += delta
 	match state:
@@ -392,8 +395,10 @@ func _process(delta: float) -> void:
 
 
 func _physics_process(delta: float) -> void:
-	if get_tree().paused:
+	if get_tree().paused or (replay and replay.playing):
 		return
+	if replay and state != State.INTRO and state != State.COUNTDOWN:
+		replay.record(delta)
 	if state == State.RACING or state == State.FINISHED:
 		_race_clock += delta
 		for r in racers:
@@ -1028,10 +1033,36 @@ func _show_results() -> void:
 		first = _add_button(buttons, "Race Again!", func(): Game.goto_race())
 		_add_button(buttons, "Change Car", func(): Game.goto_garage())
 		_add_button(buttons, "Menu", func(): Game.goto_menu())
+	# Watch the race again like on TV (and take photos).
+	if not online and replay and replay.can_play() and not views.is_empty():
+		var rb := _add_button(buttons, "Replay", _watch_replay)
+		rb.add_theme_color_override("font_color", Color(0.75, 1.0, 1.0))
 	first.grab_focus()
 	for v in views:
 		v.hud.set_race_ui_visible(false)
 	_refresh_results()
+
+
+func _watch_replay() -> void:
+	var layer: Node = _results_panel
+	while layer and not layer is CanvasLayer:
+		layer = layer.get_parent()
+	layer.visible = false
+	for v in views:
+		v.hud.visible = false
+	if ghost:
+		ghost.visible = false
+	if touch:
+		touch.visible = false
+	replay.start(views[0], func():
+		layer.visible = true
+		for v in views:
+			v.hud.visible = true
+		if ghost:
+			ghost.visible = true
+		var b := _results_panel.find_children("*", "Button", true, false)
+		if not b.is_empty():
+			(b[0] as Button).grab_focus())
 
 
 ## Sends your time to the track's online top 10 and shows where you placed.
