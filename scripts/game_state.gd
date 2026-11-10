@@ -77,6 +77,10 @@ var extras: Array = []           # special unlocks earned by doing things (see g
 var stats: Dictionary = {}       # counters for badges: races, wins, jumps... (see Badges)
 var badges: Array = []           # badge ids this player has earned
 var story_beaten := 0            # Story Mode: how many bosses beaten (rooms open = this + 1)
+var friend_id := ""              # this player's friend code, like K7QM2XPA
+var friends: Array = []          # [{"id": friend code, "name": their name}]
+var pending_join := ""           # a friend's race code to join when the online screen opens
+const MAX_FRIENDS := 20
 
 # Story Mode race in progress
 var story_active := false
@@ -351,6 +355,8 @@ func _read_player(cfg: ConfigFile) -> void:
 	stats = cfg.get_value("progress", "stats", {})
 	badges = cfg.get_value("progress", "badges", [])
 	story_beaten = int(cfg.get_value("progress", "story", 0))
+	friend_id = String(cfg.get_value("friends", "id", ""))
+	friends = cfg.get_value("friends", "list", [])
 	selected_car = clampi(selected_car, 0, CarData.count() - 1)
 
 
@@ -403,6 +409,8 @@ func _write_player() -> void:
 	cfg.set_value("progress", "stats", stats)
 	cfg.set_value("progress", "badges", badges)
 	cfg.set_value("progress", "story", story_beaten)
+	cfg.set_value("friends", "id", friend_id)
+	cfg.set_value("friends", "list", friends)
 	cfg.set_value("builder", "tracks", custom_tracks)
 	cfg.save(PLAYER_PATH % player_slot)
 
@@ -819,6 +827,48 @@ func end_grand_prix() -> void:
 	gp_active = false
 	gp_roster.clear()
 	story_active = false   # leaving for another mode ends a story race too
+
+
+## This player's friend code (made the first time it's needed).
+func my_friend_code() -> String:
+	if player_slot < 0:
+		return ""
+	if friend_id == "":
+		const LETTERS := "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+		for i in 8:
+			friend_id += LETTERS[randi() % LETTERS.length()]
+		save_settings()
+	return friend_id
+
+
+func is_friend(code: String) -> bool:
+	return friends.any(func(f: Dictionary) -> bool: return f["id"] == code)
+
+
+## Adds a friend by their code. Returns "" or a message saying what's wrong.
+func add_friend(code: String, friend_name: String = "") -> String:
+	code = code.strip_edges().to_upper().replace(" ", "")
+	var ok := code.length() == 8
+	for ch in code:
+		if not ((ch >= "A" and ch <= "Z") or (ch >= "0" and ch <= "9")):
+			ok = false
+	if not ok:
+		return "Friend codes have 8 letters and numbers."
+	if code == my_friend_code():
+		return "That's your own code!"
+	if is_friend(code):
+		return "Already your friend!"
+	if friends.size() >= MAX_FRIENDS:
+		return "You have %d friends already! Remove one first." % MAX_FRIENDS
+	friends.append({"id": code, "name": friend_name.substr(0, NAME_LENGTH) if friend_name != "" else "New friend"})
+	save_settings()
+	add_stat_now("friends")
+	return ""
+
+
+func remove_friend(code: String) -> void:
+	friends = friends.filter(func(f: Dictionary) -> bool: return f["id"] != code)
+	save_settings()
 
 
 ## Story Mode: race the boss of chapter i (pick your car first).

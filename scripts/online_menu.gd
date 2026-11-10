@@ -18,6 +18,12 @@ var _lobby_cols: Control
 var _code: LineEdit
 var _feed: Label
 var _feed_lines: Array = []
+var _friends_button: Button
+var _friends_panel: Control
+var _friends_list: VBoxContainer
+var _friend_code_edit: LineEdit
+var _friend_msg: Label
+var _invite_note := ""   # "Invited Noah..." while waiting for a friend to join
 
 
 func _ready() -> void:
@@ -45,6 +51,9 @@ func _ready() -> void:
 
 	_build_browse()
 	_build_lobby()
+	_build_friends()
+	Net.friends_changed.connect(_refresh_friends)
+	Net.check_friends_soon()
 	Net.lobby_changed.connect(_refresh_lobby)
 	Net.games_found_changed.connect(_refresh_games)
 	Net.join_failed.connect(func(reason: String):
@@ -59,6 +68,11 @@ func _ready() -> void:
 		_show_lobby()   # back from a race
 	else:
 		_show_browse()
+	# Joining a friend's race from a "Race me!" invite.
+	if Game.pending_join != "":
+		_code.text = Game.pending_join
+		Game.pending_join = ""
+		_join_code()
 
 
 func _exit_tree() -> void:
@@ -68,7 +82,9 @@ func _exit_tree() -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("ui_cancel"):
 		Sfx.play("back")
-		if _lobby.visible:
+		if _friends_panel.visible:
+			_friends_panel.visible = false
+		elif _lobby.visible:
 			Net.leave("")
 			_show_browse()
 		else:
@@ -172,9 +188,11 @@ func _refresh_games() -> void:
 		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		_games_box.add_child(l)
 		return
-	for ip in Net.found:
+	var ips := Net.found.keys()
+	ips.sort_custom(func(a, b) -> bool: return _is_friend_name(Net.found[a]["name"]) and not _is_friend_name(Net.found[b]["name"]))
+	for ip in ips:
 		var g: Dictionary = Net.found[ip]
-		var text := "%s's race   (%d racing)" % [g["name"], g["players"]]
+		var text := "%s%s's race   (%d racing)" % ["★ " if _is_friend_name(g["name"]) else "", g["name"], g["players"]]
 		if not g["same_version"]:
 			text += "  - different version"
 		elif not g["open"]:
@@ -182,6 +200,10 @@ func _refresh_games() -> void:
 		var b := _button(_games_box, text, func(): _join(ip))
 		b.disabled = not g["same_version"] or not g["open"]
 		b.add_theme_font_size_override("font_size", 26)
+
+
+func _is_friend_name(n: String) -> bool:
+	return Game.friends.any(func(f: Dictionary) -> bool: return String(f["name"]).to_lower() == n.to_lower())
 
 
 func _host() -> void:
@@ -333,6 +355,10 @@ func _refresh_lobby() -> void:
 	if Net.internet and Net.is_host:
 		_address_label.text = ("Race code:  %s     Tell your cousins to type it in Race Online!" % Net.room_code) if Net.room_code != "" \
 			else "Getting a race code..."
+		if Net.players.size() > 1:
+			_invite_note = ""
+		if _invite_note != "":
+			_address_label.text += "\nInvited %s! Waiting for them to join..." % _invite_note
 		_address_label.add_theme_font_size_override("font_size", 28)
 		_address_label.add_theme_color_override("font_color", Color(0.6, 1.0, 1.0))
 	elif Net.is_host:
@@ -351,9 +377,21 @@ func _refresh_lobby() -> void:
 		var car_name: String = CarData.nickname(p.get("look", {}))
 		if car_name == "":
 			car_name = CarData.get_car(int(p["car"]))["name"]
-		var l := RaceHud.make_label("%s  -  %s%s%s" % [p["name"], car_name, tag, "   < you" if me else ""],
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 10)
+		_players_box.add_child(row)
+		var fid := String(p.get("fid", ""))
+		var star := "★ " if fid != "" and Game.is_friend(fid) else ""
+		var l := RaceHud.make_label("%s%s  -  %s%s%s" % [star, p["name"], car_name, tag, "   < you" if me else ""],
 			24, Color(1.0, 0.9, 0.4) if me else Color.WHITE, 6)
-		_players_box.add_child(l)
+		row.add_child(l)
+		if not me and fid != "" and not Game.is_friend(fid) and fid != Game.my_friend_code():
+			var pname := String(p["name"])
+			var add := _button(row, "+ Friend", func():
+				Game.add_friend(fid, pname)
+				Net.check_friends_soon()
+				_refresh_lobby())
+			add.add_theme_font_size_override("font_size", 18)
 	_car_label.text = CarData.get_car(_my_car())["name"]
 	_fill_settings()
 	_start_button.visible = Net.is_host
@@ -422,3 +460,145 @@ class TrackSelectDots extends Control:
 		for i in 40:
 			var c := Color.from_hsv(rng.randf(), 0.5, 1.0, 0.15)
 			draw_circle(Vector2(rng.randf() * size.x, rng.randf() * size.y), rng.randf_range(20.0, 70.0), c)
+
+
+# ---------------------------------------------------------------------------
+# Friends: your friend code, adding friends, and "Race me!"
+# ---------------------------------------------------------------------------
+
+func _build_friends() -> void:
+	_friends_button = _button(self, "Friends", func():
+		_friends_panel.visible = not _friends_panel.visible
+		if _friends_panel.visible:
+			_refresh_friends()
+			Net.check_friends_soon())
+	_friends_button.add_theme_font_size_override("font_size", 24)
+	_friends_button.add_theme_color_override("font_color", Color(0.6, 1.0, 0.7))
+	RaceHud.pin(_friends_button, Vector2(1, 0), Vector2(-330, 16), Vector2(310, 56))
+
+	var dim := ColorRect.new()
+	dim.color = Color(0, 0, 0, 0.55)
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	dim.visible = false
+	add_child(dim)
+	_friends_panel = dim
+	var center := CenterContainer.new()
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	dim.add_child(center)
+	var panel := PanelContainer.new()
+	center.add_child(panel)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 10)
+	box.custom_minimum_size = Vector2(760, 0)
+	panel.add_child(box)
+	var title := RaceHud.make_label("Friends", 44, Color(0.6, 1.0, 0.7), 12)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(title)
+
+	var mine := HBoxContainer.new()
+	mine.alignment = BoxContainer.ALIGNMENT_CENTER
+	mine.add_theme_constant_override("separation", 12)
+	box.add_child(mine)
+	mine.add_child(RaceHud.make_label("Your friend code:", 24, Color.WHITE, 6))
+	var code := Game.my_friend_code()
+	mine.add_child(RaceHud.make_label(code, 34, Color(1.0, 0.9, 0.3), 8))
+	_button(mine, "Copy", func():
+		DisplayServer.clipboard_set(code)
+		_friend_msg.text = "Copied! Send it to your friend.")
+	var tip := RaceHud.make_label("Swap codes with your friends, or tap + Friend next to someone in a race lobby.", 18, Color(0.8, 0.9, 1.0), 4)
+	tip.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	tip.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(tip)
+
+	var add_row := HBoxContainer.new()
+	add_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	add_row.add_theme_constant_override("separation", 10)
+	box.add_child(add_row)
+	add_row.add_child(RaceHud.make_label("Add a friend:", 24))
+	_friend_code_edit = LineEdit.new()
+	_friend_code_edit.placeholder_text = "THEIR CODE"
+	_friend_code_edit.max_length = 8
+	_friend_code_edit.custom_minimum_size = Vector2(240, 54)
+	_friend_code_edit.add_theme_font_size_override("font_size", 28)
+	_friend_code_edit.text_changed.connect(func(t: String):
+		var up := t.to_upper()
+		if up != t:
+			var caret := _friend_code_edit.caret_column
+			_friend_code_edit.text = up
+			_friend_code_edit.caret_column = caret)
+	_friend_code_edit.text_submitted.connect(func(_t: String): _add_friend_code())
+	add_row.add_child(_friend_code_edit)
+	_button(add_row, "Add", _add_friend_code)
+	_friend_msg = RaceHud.make_label("", 20, Color(1.0, 0.85, 0.5), 6)
+	_friend_msg.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(_friend_msg)
+
+	var list_panel := PanelContainer.new()
+	list_panel.custom_minimum_size = Vector2(0, 220)
+	box.add_child(list_panel)
+	var scroll := ScrollContainer.new()
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	list_panel.add_child(scroll)
+	_friends_list = VBoxContainer.new()
+	_friends_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_friends_list.add_theme_constant_override("separation", 6)
+	scroll.add_child(_friends_list)
+	var close := _button(box, "Close", func(): _friends_panel.visible = false)
+	close.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	_refresh_friends()
+
+
+func _add_friend_code() -> void:
+	var err := Game.add_friend(_friend_code_edit.text)
+	if err != "":
+		_friend_msg.text = err
+		Sfx.play("back")
+		return
+	_friend_code_edit.text = ""
+	_friend_msg.text = "Friend added! Their name shows up once they're playing."
+	Net.check_friends_soon()
+	_refresh_friends()
+
+
+## The friends list (playing now first) and the Friends button's count.
+func _refresh_friends() -> void:
+	if _friends_list == null:
+		return
+	var playing := Game.friends.filter(func(f: Dictionary) -> bool: return Net.is_online(f["id"]))
+	_friends_button.text = ("Friends (%d playing!)" % playing.size()) if not playing.is_empty() else "Friends"
+	for c in _friends_list.get_children():
+		_friends_list.remove_child(c)
+		c.queue_free()
+	if Game.friends.is_empty():
+		var l := RaceHud.make_label("No friends yet. Add one with their code!", 22, Color(1, 1, 1, 0.7), 4)
+		_friends_list.add_child(l)
+		return
+	var sorted := Game.friends.duplicate()
+	sorted.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return Net.is_online(a["id"]) and not Net.is_online(b["id"]))
+	for f: Dictionary in sorted:
+		var on := Net.is_online(f["id"])
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 12)
+		_friends_list.add_child(row)
+		var dot := RaceHud.make_label("●", 26, Color(0.35, 1.0, 0.45) if on else Color(0.5, 0.5, 0.58), 4)
+		row.add_child(dot)
+		var n := RaceHud.make_label(String(f["name"]), 26, Color.WHITE if on else Color(0.75, 0.75, 0.82), 6)
+		n.custom_minimum_size = Vector2(230, 0)
+		row.add_child(n)
+		var status := RaceHud.make_label("playing now!" if on else "not playing", 20, Color(0.6, 1.0, 0.65) if on else Color(0.6, 0.6, 0.68), 4)
+		status.custom_minimum_size = Vector2(150, 0)
+		row.add_child(status)
+		var fid := String(f["id"])
+		var fname := String(f["name"])
+		var race := _button(row, "Race me!", func():
+			_friends_panel.visible = false
+			_invite_note = fname
+			Net.race_friend(fid)
+			_show_lobby())
+		race.disabled = not on
+		race.add_theme_font_size_override("font_size", 22)
+		var remove := _button(row, "x", func():
+			Game.remove_friend(fid)
+			_refresh_friends())
+		remove.tooltip_text = "Remove this friend"
+		remove.add_theme_font_size_override("font_size", 18)

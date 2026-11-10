@@ -15,6 +15,10 @@ class_name = "TrackShelf"
 name = "TIMES"
 class_name = "TimesBoard"
 
+[[durable_objects.bindings]]
+name = "FRIENDS"
+class_name = "FriendHub"
+
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["RaceRoom"]
@@ -30,3 +34,7 @@ new_sqlite_classes = ["TimesBoard"]
 [[migrations]]
 tag = "v4"
 deleted_classes = ["Vault"]
+
+[[migrations]]
+tag = "v5"
+new_sqlite_classes = ["FriendHub"]

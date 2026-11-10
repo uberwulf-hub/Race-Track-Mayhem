@@ -11,6 +11,7 @@ func _ready() -> void:
 	layer = 50
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	Game.badge_earned.connect(func(id: String): show_badge(id))
+	Net.invite_received.connect(show_invite)
 
 
 func show_badge(badge_id: String) -> void:
@@ -62,3 +63,67 @@ func _next() -> void:
 	tw.tween_callback(func():
 		panel.queue_free()
 		_next())
+
+
+## "Noah wants to race you!" with Join and Not Now. Stays up for 20 seconds.
+func show_invite(from_name: String, room: String) -> void:
+	if room == "":
+		return
+	var panel := PanelContainer.new()
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.1, 0.18, 0.35, 0.96)
+	sb.border_color = Color(0.5, 1.0, 0.6)
+	sb.set_border_width_all(5)
+	sb.set_corner_radius_all(22)
+	sb.content_margin_left = 24
+	sb.content_margin_right = 24
+	sb.content_margin_top = 12
+	sb.content_margin_bottom = 12
+	panel.add_theme_stylebox_override("panel", sb)
+	panel.theme = Game.ui_theme
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 8)
+	panel.add_child(box)
+	var title := RaceHud.make_label("%s wants to race you!" % from_name, 34, Color(0.6, 1.0, 0.7), 10)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(title)
+	var row := HBoxContainer.new()
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", 16)
+	box.add_child(row)
+	var join := Button.new()
+	join.text = "Join!"
+	join.add_theme_font_size_override("font_size", 34)
+	row.add_child(join)
+	var no := Button.new()
+	no.text = "Not Now"
+	no.add_theme_font_size_override("font_size", 24)
+	row.add_child(no)
+	add_child(panel)
+	join.pressed.connect(func():
+		Sfx.play("go")
+		panel.queue_free()
+		_join_friend(room))
+	no.pressed.connect(func():
+		Sfx.play("back")
+		panel.queue_free())
+	await get_tree().process_frame
+	var vs := get_viewport().get_visible_rect().size
+	panel.position = Vector2((vs.x - panel.size.x) * 0.5, vs.y * 0.3)
+	join.grab_focus()
+	Sfx.play("voice_unlock")
+	Sfx.play("pickup")
+	panel.pivot_offset = panel.size * 0.5
+	panel.scale = Vector2(0.4, 0.4)
+	panel.create_tween().tween_property(panel, "scale", Vector2.ONE, 0.3).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	get_tree().create_timer(20.0).timeout.connect(func():
+		if is_instance_valid(panel):
+			panel.queue_free())
+
+
+func _join_friend(room: String) -> void:
+	if Net.active:
+		Net.leave("")
+	Game.end_grand_prix()
+	Game.pending_join = room
+	Game.goto("res://scenes/online.tscn")

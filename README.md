@@ -27,6 +27,12 @@ online top 10 for the week.
 **Frosty Backyard**, the garden under fresh snow with snowmen, twinkly pine trees, presents, a frozen pond with
 a skating penguin and falling snow. Finish it to unlock **Santa's Sleigh**.
 
+**Halloween** (October): **Pumpkin Patch Panic**, the garden at night under a full moon with glowing
+jack-o'-lanterns, friendly tombstones, a floating ghost, bats and spider webs. Finish it to unlock the **Pumpkin Rider**.
+
+**Summer** (June to August): **Sandy Shores Splash**, a sunny beach with rolling waves, umbrellas, sand castles,
+palm trees and scuttling crabs. Finish it to unlock the **Surf Buggy**.
+
 **Cars:** Red Rocket, Blue Bolt, Monster Max, Sunny Buggy and Bubblegum Van, plus unlockable Rocket Rascal
 (25 stars or a Grand Prix win), Fire Engine Fred (30 stars) and Ice Cream Dream (40 stars).
 
@@ -98,6 +104,9 @@ Whenever you come off the track, the screen fades and you're put back where you 
 - **Water Balloon:** drops a slippery puddle behind you.
 - **Rocket Boost:** a big burst of speed.
 - **Bubble Shield:** blocks the next hit.
+- **Toy Magnet:** pulls you along to the car ahead.
+- **Banana Peel:** drop it behind you; whoever hits it spins right round.
+- **Toy Parachute:** your jumps float down gently and always land on the track.
 
 Cars further back get better power-ups, and the computer cars use them too. Switch them off in Options.
 A blinking **INCOMING!** warning (with an arrow for the side) shows when a bubble or ball is about to hit you.
@@ -125,6 +134,9 @@ for a **Rematch!**
   shots appear on every screen, and hits count on the computer of the car that got hit.
 - The first time you host, Windows may ask whether to let the game use the network: choose **Allow**
   (tick "Private networks").
+- **Friends:** tap Friends on the Race Online screen. Swap friend codes (or tap + Friend next to someone in
+  a lobby). You can see when friends are playing, and **Race me!** opens an internet race and sends them an
+  invite that pops up in their game with a Join button. Friends' races on your Wi-Fi show first, with a ★.
 - **Fix Firewall** (Windows, on the Race Online screen): if races don't show up or joining fails, tap it on BOTH
   computers and choose Yes on the Windows prompt. It removes any block rule (from clicking "Cancel" on the first
   network prompt) and lets the game through. Or just use Host on the Internet, which needs no firewall changes.
@@ -183,7 +195,7 @@ server as internet races (`server/relay/tracks.mjs`).
   slow motion). Press Photo! to freeze it, drag to turn the camera, and SNAP! to save a picture in
   your Pictures folder under *Race Track Mayhem*.
 - **Track Gallery** (track picker): the most raced and newest tracks everyone has shared. Tap Race! to download one and race it.
-- **Badges:** 22 badges to collect, like Winner!, Big Air, Tourist, Sharing is Caring and Toy Box Hero. See them all
+- **Badges:** 25 badges to collect, like Winner!, Big Air, Tourist, Sharing is Caring and Toy Box Hero. See them all
   in the Badges room on the main menu.
 
 **Unlockables.** Finish races to earn stars (3 for 1st place, 2 for 2nd, 1 for finishing), plus bonus stars for Grand Prix trophies:

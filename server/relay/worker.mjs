@@ -6,6 +6,7 @@
 import { Room, newCode, PROTOCOL } from "./relay-core.mjs";
 export { TrackShelf } from "./tracks.mjs";
 export { TimesBoard } from "./times.mjs";
+export { FriendHub } from "./friends.mjs";
 import { boardName } from "./times.mjs";
 
 export default {
@@ -15,6 +16,10 @@ export default {
     if (url.pathname === "/tracks" || url.pathname.startsWith("/tracks/")) {
       const shelf = env.TRACKS.get(env.TRACKS.idFromName("shelf"));
       return shelf.fetch(request);
+    }
+    // Friends online and "Race me!" invites: one hub for everyone.
+    if (url.pathname === "/friends/hello" || url.pathname === "/friends/invite") {
+      return env.FRIENDS.get(env.FRIENDS.idFromName("hub")).fetch(request);
     }
     // Online best times: one little object per track board.
     if (url.pathname.startsWith("/times/")) {

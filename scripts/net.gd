@@ -20,7 +20,7 @@ const PORT := 24680
 const DISCOVERY_PORT := 24681
 const MAX_CLIENTS := 5          # plus the host = 6 racers
 const MAX_RACERS := 6
-const PROTOCOL := 3             # the game's version for racing together: bump when tracks,
+const PROTOCOL := 4             # the game's version for racing together: bump when tracks,
                                 # cars or messages change, so mismatched copies can't join
 const RELAY_PROTOCOL := 1       # the race server's message format (server/relay)
 const SEND_RATE := 1.0 / 20.0
@@ -39,6 +39,8 @@ signal go_received                         # host says: start the countdown!
 signal player_left(peer_id: int)
 signal emote_received(peer_id: int, text: String)
 signal rematch_voted(peer_id: int)
+signal friends_changed                     # who's online changed (or their names)
+signal invite_received(from_name: String, room: String)   # a friend said "Race me!"
 
 ## Quick messages players can send (no typing, so they're kid-safe).
 const EMOTES := ["Nice!", "Wow!", "Haha!", "GG!", "Go go go!", "Oops!"]
@@ -62,6 +64,13 @@ var _listen: PacketPeerUDP
 var _shout_timer := 0.0
 var _loaded := {}          # peer id -> true once their race scene is ready
 
+# Friends
+const FRIEND_POLL := 10.0  # seconds between check-ins with the friends hub
+var friends_online := {}   # friend code -> true while they're playing
+var _friend_timer := 2.0
+var _friend_busy := false
+var _invite_to := ""       # friend to invite once our internet race has its code
+
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -73,6 +82,10 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
+	_friend_timer -= delta
+	if _friend_timer <= 0.0:
+		_friend_timer = FRIEND_POLL
+		_friend_hello()
 	if is_host and active:
 		_shout_timer -= delta
 		if _shout_timer <= 0.0:
@@ -90,7 +103,7 @@ func my_info() -> Dictionary:
 	if not CarData.is_available(car):
 		car = 0
 	return {"name": Game.player_name if Game.player_name != "" else "Racer",
-		"car": car, "look": Game.custom_for(CarData.get_car(car)["id"])}
+		"car": car, "look": Game.custom_for(CarData.get_car(car)["id"]), "fid": Game.my_friend_code()}
 
 
 # ---------------------------------------------------------------------------
@@ -178,6 +191,74 @@ func _web(method: String, path: String, body: String) -> Dictionary:
 	return data
 
 
+# ---------------------------------------------------------------------------
+# Friends: who's playing, and "Race me!" invites (through the race server)
+# ---------------------------------------------------------------------------
+
+## Checks in with the friends hub: says we're playing, learns which friends
+## are, and picks up any invites. Not during a race (invites wait till after).
+func _friend_hello() -> void:
+	if _friend_busy or Game.player_slot < 0 or in_race or OS.get_environment("RACE_NO_FRIENDS") != "":
+		return
+	var tree := get_tree()
+	if tree.current_scene and tree.current_scene.has_method("_on_net_states"):
+		return   # racing on your own: don't interrupt
+	_friend_busy = true
+	var ids: Array = Game.friends.map(func(f: Dictionary) -> String: return f["id"])
+	var res: Dictionary = await _web("POST", "/friends/hello", JSON.stringify({"id": Game.my_friend_code(),
+		"name": Game.player_name, "friends": ids}))
+	_friend_busy = false
+	if res.has("error"):
+		return
+	var changed := false
+	var online: Dictionary = res.get("online", {}) if res.get("online") is Dictionary else {}
+	for id in online:
+		if bool(friends_online.get(id, false)) != bool(online[id]):
+			changed = true
+		friends_online[id] = bool(online[id])
+	# Friends added by code learn their real names.
+	var names: Dictionary = res.get("names", {}) if res.get("names") is Dictionary else {}
+	for f: Dictionary in Game.friends:
+		var n := String(names.get(f["id"], "")).substr(0, Game.NAME_LENGTH)
+		if n != "" and n != f["name"]:
+			f["name"] = n
+			changed = true
+	if changed:
+		Game.save_settings()
+		friends_changed.emit()
+	var invites: Array = res.get("invites", []) if res.get("invites") is Array else []
+	for inv in invites:
+		if inv is Dictionary and Game.is_friend(String(inv.get("from", ""))):
+			invite_received.emit(String(inv.get("name", "A friend")).substr(0, Game.NAME_LENGTH), String(inv.get("room", "")))
+
+
+## Asks the friends hub again soon (after adding a friend, say).
+func check_friends_soon() -> void:
+	_friend_timer = minf(_friend_timer, 0.5)
+
+
+func is_online(friend_code: String) -> bool:
+	return bool(friends_online.get(friend_code, false))
+
+
+## "Race me!": opens an internet race and invites the friend to it (as soon
+## as the race code arrives from the server).
+func race_friend(friend_code: String) -> void:
+	host_internet()
+	_invite_to = friend_code
+	if room_code != "":
+		_send_invite()
+
+
+func _send_invite() -> void:
+	if _invite_to == "" or room_code == "":
+		return
+	var to := _invite_to
+	_invite_to = ""
+	await _web("POST", "/friends/invite", JSON.stringify({"id": Game.my_friend_code(), "name": Game.player_name,
+		"to": to, "room": room_code}))
+
+
 ## Sends a finished race time to a track's online top 10.
 ## Returns {"rank": N (0 = not in the top 10), "top": [...]} or {"error": "..."}.
 func submit_time(board: String, racer: String, time: float, car: String) -> Dictionary:
@@ -195,7 +276,8 @@ func host_internet() -> void:
 	var relay := RelayPeer.new()
 	relay.room_ready.connect(func(c: String):
 		room_code = c
-		lobby_changed.emit())
+		lobby_changed.emit()
+		_send_invite())
 	relay.relay_error.connect(func(m: String): _fail(m))
 	var err := relay.create_room(relay_url(), RELAY_PROTOCOL)
 	if err != OK:
@@ -359,7 +441,8 @@ func _scene_loaded() -> void:
 func _clean_info(info: Dictionary) -> Dictionary:
 	var car := clampi(int(info.get("car", 0)), 0, CarData.count() - 1)
 	return {"name": Game.clean_name(String(info.get("name", "Racer"))), "car": car,
-		"look": info.get("look", {}) if info.get("look", {}) is Dictionary else {}}
+		"look": info.get("look", {}) if info.get("look", {}) is Dictionary else {},
+		"fid": String(info.get("fid", "")).substr(0, 10)}
 
 
 func _kick_later(id: int) -> void:
