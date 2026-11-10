@@ -198,10 +198,13 @@ func _build_ui(standings: Array) -> void:
 		t.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		t.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 		right.add_child(t)
-	for id in fresh:
-		var it := Unlocks.get_item(id)
-		var l := RaceHud.make_label("NEW!  %s unlocked!" % it.get("name", id), 26, Color(1.0, 0.6, 0.95), 8)
+	if not fresh.is_empty():
+		# One wrapping line, however many things unlocked at once.
+		var names: Array = fresh.map(func(id): return String(Unlocks.get_item(id).get("name", id)))
+		var l := RaceHud.make_label("NEW!  " + ", ".join(names) + " unlocked!", 22 if names.size() > 2 else 26, Color(1.0, 0.6, 0.95), 8)
 		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		l.custom_minimum_size = Vector2(540, 0)
 		right.add_child(l)
 	var buttons := HBoxContainer.new()
 	buttons.alignment = BoxContainer.ALIGNMENT_END

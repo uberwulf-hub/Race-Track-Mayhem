@@ -399,6 +399,8 @@ func _process(delta: float) -> void:
 				_show_results()
 			elif _results_shown:
 				_refresh_results()
+	if _results_panel and is_instance_valid(_results_panel):
+		_fit_results()
 	_update_flames()
 	for v in views:
 		_update_view_extras(v, delta)
@@ -1158,20 +1160,58 @@ func _online_times(box: Container) -> void:
 		line.text = "Online top 10: not this time.%s" % leader
 
 
+## New unlocks as one heading and small chips that wrap onto more lines, so
+## a race that unlocks lots of things still fits on the screen.
 func _add_unlock_lines(box: Container, fresh: Array) -> void:
+	var items: Array = []
 	for id in fresh:
 		var it := Unlocks.get_item(id)
-		if it.is_empty():
-			continue
-		var kind: String = {"paint": "paint", "sticker": "sticker", "wheels": "wheels", "car": "SECRET CAR"}.get(it["kind"], "")
-		var l := RaceHud.make_label("NEW!  %s %s unlocked!" % [it["name"], kind], 26, Color(1.0, 0.6, 0.95), 8)
-		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		box.add_child(l)
-		var tw := l.create_tween().set_loops()
-		tw.tween_property(l, "modulate", Color(1, 1, 1, 0.55), 0.5)
-		tw.tween_property(l, "modulate", Color.WHITE, 0.5)
-	if not fresh.is_empty():
-		Sfx.play("voice_unlock")
+		if not it.is_empty():
+			items.append(it)
+	if items.is_empty():
+		return
+	var head := RaceHud.make_label("NEW UNLOCKS!" if items.size() > 1 else "NEW UNLOCK!", 24, Color(1.0, 0.6, 0.95), 8)
+	head.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(head)
+	var tw := head.create_tween().set_loops()
+	tw.tween_property(head, "modulate", Color(1, 1, 1, 0.55), 0.5)
+	tw.tween_property(head, "modulate", Color.WHITE, 0.5)
+	var flow := HFlowContainer.new()
+	flow.alignment = FlowContainer.ALIGNMENT_CENTER
+	flow.add_theme_constant_override("h_separation", 8)
+	flow.add_theme_constant_override("v_separation", 6)
+	flow.custom_minimum_size = Vector2(680, 0)
+	box.add_child(flow)
+	for it: Dictionary in items:
+		var kind: String = {"paint": "paint", "sticker": "sticker", "wheels": "wheels", "car": "SECRET CAR!"}.get(it["kind"], "")
+		var chip := PanelContainer.new()
+		var sb := StyleBoxFlat.new()
+		sb.bg_color = Color(0.55, 0.2, 0.6, 0.85) if it["kind"] != "car" else Color(0.75, 0.45, 0.1, 0.9)
+		sb.set_corner_radius_all(14)
+		sb.content_margin_left = 12
+		sb.content_margin_right = 12
+		sb.content_margin_top = 3
+		sb.content_margin_bottom = 3
+		chip.add_theme_stylebox_override("panel", sb)
+		chip.add_child(RaceHud.make_label("%s %s" % [it["name"], kind], 19, Color.WHITE, 5))
+		flow.add_child(chip)
+	Sfx.play("voice_unlock")
+
+
+## Shrinks the results panel if it's taller (or wider) than the screen, so
+## the buttons at the bottom can always be reached.
+func _fit_results() -> void:
+	var center := _results_panel.get_child(0) as Control
+	if center == null or center.get_child_count() == 0:
+		return
+	var panel := center.get_child(0) as Control
+	var screen := get_viewport().get_visible_rect().size
+	var room := screen - Vector2(20, 20)
+	var k := minf(1.0, minf(room.y / maxf(1.0, panel.size.y), room.x / maxf(1.0, panel.size.x)))
+	panel.pivot_offset = Vector2.ZERO
+	panel.scale = Vector2(k, k)
+	# Centre it on the screen ourselves: the container centres the unscaled size.
+	panel.global_position = ((screen - panel.size * k) * 0.5).floor()
 
 
 ## Counts this race toward the badges and returns the ones just earned.
@@ -1225,6 +1265,7 @@ func _add_badge_lines(box: Container, ids: Array) -> void:
 func _refresh_results() -> void:
 	if _results_panel == null:
 		return
+	_fit_results()
 	var grid: GridContainer = _results_panel.get_meta("grid")
 	var rows := _final_order()
 	var cols := grid.columns
