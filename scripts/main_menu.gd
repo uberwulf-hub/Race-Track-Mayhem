@@ -17,6 +17,11 @@ var _credits_panel: Control
 var _badges_panel: Control
 var _story_panel: Control
 var _daily_panel: Control
+var _album_panel: Control
+var _album_photos: Array[String] = []
+var _album_view: TextureRect
+var _album_index := 0
+var _album_caption: Label
 var _title: Control
 var _option_buttons: Dictionary = {}
 var _laps_label: Label
@@ -182,7 +187,8 @@ func _build_ui() -> void:
 		ev_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var more := _row(_main_box)
 	var badges_btn := _button(more, "Badges", _open_badges)
-	var extras: Array = [badges_btn, _button(more, "Options", func(): _show_panel(_options_panel)), _button(more, "How to Play", func(): _show_panel(_help_panel))]
+	var photos_btn := _button(more, "Photos", _open_album)
+	var extras: Array = [badges_btn, photos_btn, _button(more, "Options", func(): _show_panel(_options_panel)), _button(more, "Help", func(): _show_panel(_help_panel))]
 	if OS.get_name() != "Web" and not Game.is_mobile():
 		extras.append(_button(more, "Quit", func(): get_tree().quit()))
 	for b: Button in extras:
@@ -222,6 +228,7 @@ func _build_ui() -> void:
 	_badges_panel = _build_badges(root)
 	_story_panel = _build_story(root)
 	_daily_panel = _build_daily(root)
+	_album_panel = _build_album(root)
 	_who_panel = _build_who(root)
 	_new_panel = _build_new_player(root)
 	var credits_btn := _button(root, "Credits", func(): _show_panel(_credits_panel))
@@ -318,6 +325,7 @@ func _show_panel(panel: Control) -> void:
 	_badges_panel.visible = panel == _badges_panel
 	_story_panel.visible = panel == _story_panel
 	_daily_panel.visible = panel == _daily_panel
+	_album_panel.visible = panel == _album_panel
 	_who_panel.visible = panel == _who_panel
 	_new_panel.visible = panel == _new_panel
 	if panel == null:
@@ -480,6 +488,100 @@ func _build_credits(root: Control) -> Control:
 		box.add_child(l)
 	_button(box, "Back", func(): _show_panel(null))
 	return parts[0]
+
+
+# ---------------------------------------------------------------------------
+# Photo album: the pictures you snapped in replays
+# ---------------------------------------------------------------------------
+
+func _open_album() -> void:
+	var root := _album_panel.get_parent() as Control
+	_album_panel.queue_free()
+	_album_panel = _build_album(root)
+	_show_panel(_album_panel)
+
+
+func _build_album(root: Control) -> Control:
+	var parts := _panel(root, "Photo Album")
+	var box: VBoxContainer = parts[1]
+	box.custom_minimum_size = Vector2(980, 0)
+	_album_photos = Replay.list_photos()
+	if _album_photos.is_empty():
+		var l := RaceHud.make_label("No photos yet! After a race, press Replay, then Photo! and SNAP!", 24, Color(0.85, 0.95, 1.0), 6)
+		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		box.add_child(l)
+		return parts[0]
+	# Big picture on top, thumbnails underneath.
+	_album_view = TextureRect.new()
+	_album_view.custom_minimum_size = Vector2(720, 405)
+	_album_view.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_album_view.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	box.add_child(_album_view)
+	var row := HBoxContainer.new()
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", 12)
+	box.add_child(row)
+	_button(row, "<", func(): _album_show(_album_index - 1))
+	_album_caption = RaceHud.make_label("", 20, Color(0.85, 0.95, 1.0), 6)
+	_album_caption.custom_minimum_size = Vector2(260, 0)
+	_album_caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	row.add_child(_album_caption)
+	_button(row, ">", func(): _album_show(_album_index + 1))
+	var del := _button(row, "Delete", _album_delete)
+	del.modulate = Color(1.0, 0.75, 0.7)
+	if not Game.is_mobile():
+		_button(row, "Open Folder", func(): OS.shell_open(_album_photos[_album_index].get_base_dir()))
+	var strip := ScrollContainer.new()
+	strip.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	strip.custom_minimum_size = Vector2(960, 100)
+	box.add_child(strip)
+	var thumbs := HBoxContainer.new()
+	thumbs.add_theme_constant_override("separation", 8)
+	strip.add_child(thumbs)
+	for i in mini(_album_photos.size(), 30):
+		var b := TextureButton.new()
+		b.texture_normal = _thumb(_album_photos[i])
+		b.ignore_texture_size = true
+		b.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
+		b.custom_minimum_size = Vector2(150, 84)
+		var idx := i
+		b.pressed.connect(func():
+			Sfx.play("click")
+			_album_show(idx))
+		thumbs.add_child(b)
+	_album_show(0)
+	return parts[0]
+
+
+## A small copy of a photo for the strip of thumbnails.
+func _thumb(path: String) -> ImageTexture:
+	var img := Image.load_from_file(path)
+	if img == null or img.is_empty():
+		img = Image.create(16, 9, false, Image.FORMAT_RGB8)
+	img.resize(240, int(240.0 * img.get_height() / maxf(1.0, img.get_width())), Image.INTERPOLATE_BILINEAR)
+	return ImageTexture.create_from_image(img)
+
+
+func _album_show(i: int) -> void:
+	if _album_photos.is_empty() or _album_view == null:
+		return
+	_album_index = wrapi(i, 0, _album_photos.size())
+	var img := Image.load_from_file(_album_photos[_album_index])
+	if img and not img.is_empty():
+		_album_view.texture = ImageTexture.create_from_image(img)
+	var when := _album_photos[_album_index].get_file().trim_prefix("race_").trim_suffix(".png").replace("_", "  ")
+	_album_caption.text = "%d of %d   %s" % [_album_index + 1, _album_photos.size(), when.substr(0, 17)]
+
+
+func _album_delete() -> void:
+	if _album_photos.is_empty():
+		return
+	DirAccess.remove_absolute(_album_photos[_album_index])
+	Sfx.play("pop")
+	var keep := _album_index
+	_open_album()
+	_album_show(keep)
 
 
 func _open_daily() -> void:

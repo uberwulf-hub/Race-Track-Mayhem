@@ -309,15 +309,35 @@ func _snap() -> void:
 	_say(("Saved!  " + path) if path != "" else "Couldn't save the photo, sorry!")
 
 
-## Saves a photo in your Pictures folder (or the game's own folder if that
-## doesn't work). Returns where it went, "" if it failed.
-static func save_photo(img: Image) -> String:
-	var name := "race_%s.png" % Time.get_datetime_string_from_system().replace(":", "-").replace("T", "_")
+## Where photos are saved: your Pictures folder first, then the game's own.
+static func photo_dirs() -> Array[String]:
 	var dirs: Array[String] = []
 	var pics := OS.get_system_dir(OS.SYSTEM_DIR_PICTURES)
 	if pics != "":
 		dirs.append(pics.path_join("Race Track Mayhem"))
 	dirs.append(ProjectSettings.globalize_path("user://photos"))
+	return dirs
+
+
+## Every saved photo (full paths), newest first.
+static func list_photos() -> Array[String]:
+	var out: Array[String] = []
+	for d in photo_dirs():
+		if not DirAccess.dir_exists_absolute(d):
+			continue
+		for f in DirAccess.get_files_at(d):
+			if f.begins_with("race_") and f.ends_with(".png"):
+				out.append(d.path_join(f))
+	# Names hold the date and time, so sorting the names sorts by when.
+	out.sort_custom(func(a: String, b: String) -> bool: return a.get_file() > b.get_file())
+	return out
+
+
+## Saves a photo in your Pictures folder (or the game's own folder if that
+## doesn't work). Returns where it went, "" if it failed.
+static func save_photo(img: Image) -> String:
+	var name := "race_%s.png" % Time.get_datetime_string_from_system().replace(":", "-").replace("T", "_")
+	var dirs := photo_dirs()
 	for d in dirs:
 		if DirAccess.make_dir_recursive_absolute(d) != OK and not DirAccess.dir_exists_absolute(d):
 			continue
