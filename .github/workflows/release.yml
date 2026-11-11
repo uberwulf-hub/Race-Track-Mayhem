@@ -51,14 +51,17 @@ jobs:
             rm /tmp/templates.tpz
           fi
 
+      # Optional: if Ubuntu's package servers are down the release still ships, just with Godot's
+      # default icon on the .exe (the check step below warns about it).
       - name: Set up rcedit (puts the game's icon into the .exe)
-        timeout-minutes: 10
+        timeout-minutes: 6
+        continue-on-error: true
         run: |
           set -e
           sudo dpkg --add-architecture i386 >/dev/null 2>&1 || true
           export DEBIAN_FRONTEND=noninteractive
-          sudo timeout 240 apt-get update -qq || true
-          sudo -E timeout 300 apt-get install -y -qq wine64 >/dev/null || sudo -E timeout 300 apt-get install -y -qq wine >/dev/null
+          sudo timeout 90 apt-get update -qq || true
+          sudo DEBIAN_FRONTEND=noninteractive timeout 150 apt-get install -y -qq wine64 >/dev/null || sudo DEBIAN_FRONTEND=noninteractive timeout 150 apt-get install -y -qq wine >/dev/null
           WINE=$(command -v wine64 || command -v wine)
           mkdir -p ~/tools
           curl -sSL --retry 3 --max-time 120 -o ~/tools/rcedit.exe https://github.com/electron/rcedit/releases/download/v2.0.0/rcedit-x64.exe
