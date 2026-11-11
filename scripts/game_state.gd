@@ -78,6 +78,7 @@ var stats: Dictionary = {}       # counters for badges: races, wins, jumps... (s
 var badges: Array = []           # badge ids this player has earned
 var story_beaten := 0            # Story Mode: how many bosses beaten (rooms open = this + 1)
 var friend_id := ""              # this player's friend code, like K7QM2XPA
+var daily := {}                  # daily challenges: {"day", "progress": {id: n}, "done": [ids], "streak", "streak_day"}
 var friends: Array = []          # [{"id": friend code, "name": their name}]
 var pending_join := ""           # a friend's race code to join when the online screen opens
 const MAX_FRIENDS := 20
@@ -360,6 +361,7 @@ func _read_player(cfg: ConfigFile) -> void:
 	badges = cfg.get_value("progress", "badges", [])
 	story_beaten = int(cfg.get_value("progress", "story", 0))
 	friend_id = String(cfg.get_value("friends", "id", ""))
+	daily = cfg.get_value("progress", "daily", {})
 	friends = cfg.get_value("friends", "list", [])
 	selected_car = clampi(selected_car, 0, CarData.count() - 1)
 
@@ -415,6 +417,7 @@ func _write_player() -> void:
 	cfg.set_value("progress", "badges", badges)
 	cfg.set_value("progress", "story", story_beaten)
 	cfg.set_value("friends", "id", friend_id)
+	cfg.set_value("progress", "daily", daily)
 	cfg.set_value("friends", "list", friends)
 	cfg.set_value("builder", "tracks", custom_tracks)
 	cfg.save(PLAYER_PATH % player_slot)
@@ -832,6 +835,65 @@ func end_grand_prix() -> void:
 	gp_active = false
 	gp_roster.clear()
 	story_active = false   # leaving for another mode ends a story race too
+
+
+# --------------------------------------------------------------------------
+# Daily challenges (see Daily)
+# --------------------------------------------------------------------------
+
+## Today's goals, starting a fresh day's progress if the date changed.
+func daily_goals() -> Array:
+	var day := Daily.today()
+	if int(daily.get("day", -1)) != day:
+		daily["day"] = day
+		daily["progress"] = {}
+		daily["done"] = []
+	return Daily.goals_for(day)
+
+
+func daily_progress(g: Dictionary) -> int:
+	return mini(int((daily.get("progress", {}) as Dictionary).get(g["id"], 0)), int(g["goal"]))
+
+
+func daily_streak() -> int:
+	# The streak ends if a whole day went by with nothing done.
+	if Daily.today() - int(daily.get("streak_day", -10)) > 1:
+		return 0
+	return int(daily.get("streak", 0))
+
+
+## Counts a finished race toward today's goals. Returns the goals just
+## completed ({"text", "stars"}); the caller hands out the stars (award_stars).
+func daily_race(race: Dictionary) -> Array:
+	if player_slot < 0:
+		return []
+	var goals := daily_goals()
+	var progress: Dictionary = daily.get("progress", {})
+	var done: Array = daily.get("done", [])
+	var fresh: Array = []
+	for g in goals:
+		if done.has(g["id"]):
+			continue
+		var n := Daily.amount(g, race)
+		if n <= 0:
+			continue
+		progress[g["id"]] = int(progress.get(g["id"], 0)) + n
+		if int(progress[g["id"]]) >= int(g["goal"]):
+			done.append(g["id"])
+			fresh.append({"text": g["text"], "stars": Daily.STARS_EACH})
+	daily["progress"] = progress
+	daily["done"] = done
+	if not fresh.is_empty():
+		var today := Daily.today()
+		if int(daily.get("streak_day", -10)) != today:
+			daily["streak"] = daily_streak() + 1
+			daily["streak_day"] = today
+		add_stat("daily", fresh.size())
+		if done.size() >= goals.size():
+			fresh.append({"text": "All three done today!", "stars": Daily.ALL_BONUS})
+		stats["streak_best"] = maxi(int(stats.get("streak_best", 0)), int(daily["streak"]))
+	save_settings()
+	return fresh
 
 
 ## This player's friend code (made the first time it's needed).

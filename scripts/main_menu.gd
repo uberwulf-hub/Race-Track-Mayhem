@@ -16,6 +16,7 @@ var _help_panel: Control
 var _credits_panel: Control
 var _badges_panel: Control
 var _story_panel: Control
+var _daily_panel: Control
 var _title: Control
 var _option_buttons: Dictionary = {}
 var _laps_label: Label
@@ -162,6 +163,12 @@ func _build_ui() -> void:
 		Game.goto("res://scenes/online.tscn"))
 	online.add_theme_color_override("font_color", Color(0.75, 1.0, 1.0))
 	online.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	# Today's three goals (a ★ when there's something left to do).
+	var goals := Game.daily_goals()
+	var left := goals.filter(func(g): return not (Game.daily.get("done", []) as Array).has(g["id"])).size()
+	var daily_btn := _button(online_row, ("Daily Goals (%d)" % left) if left > 0 else "Daily Goals ✓", _open_daily)
+	daily_btn.add_theme_color_override("font_color", Color(0.7, 1.0, 0.7))
+	daily_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	# Seasonal event tracks (holidays, Halloween, summer) at their time of year.
 	for ev: int in Game.events_on():
 		var info: Dictionary = Game.EVENTS[ev]
@@ -214,6 +221,7 @@ func _build_ui() -> void:
 	_credits_panel = _build_credits(root)
 	_badges_panel = _build_badges(root)
 	_story_panel = _build_story(root)
+	_daily_panel = _build_daily(root)
 	_who_panel = _build_who(root)
 	_new_panel = _build_new_player(root)
 	var credits_btn := _button(root, "Credits", func(): _show_panel(_credits_panel))
@@ -309,6 +317,7 @@ func _show_panel(panel: Control) -> void:
 	_credits_panel.visible = panel == _credits_panel
 	_badges_panel.visible = panel == _badges_panel
 	_story_panel.visible = panel == _story_panel
+	_daily_panel.visible = panel == _daily_panel
 	_who_panel.visible = panel == _who_panel
 	_new_panel.visible = panel == _new_panel
 	if panel == null:
@@ -470,6 +479,62 @@ func _build_credits(root: Control) -> Control:
 		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		box.add_child(l)
 	_button(box, "Back", func(): _show_panel(null))
+	return parts[0]
+
+
+func _open_daily() -> void:
+	var root := _daily_panel.get_parent() as Control
+	_daily_panel.queue_free()
+	_daily_panel = _build_daily(root)
+	_show_panel(_daily_panel)
+
+
+## Today's three daily goals with how far along you are, and your streak.
+func _build_daily(root: Control) -> Control:
+	var parts := _panel(root, "Daily Goals")
+	var box: VBoxContainer = parts[1]
+	box.custom_minimum_size = Vector2(760, 0)
+	var intro := RaceHud.make_label("New goals every day! Each one is worth %d ★, and doing all three gets %d more." % [Daily.STARS_EACH, Daily.ALL_BONUS], 20, Color(0.85, 0.95, 1.0), 6)
+	intro.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(intro)
+	var done: Array = Game.daily.get("done", [])
+	for g in Game.daily_goals():
+		var finished := done.has(g["id"])
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 14)
+		box.add_child(row)
+		var tick := RaceHud.make_label("✓" if finished else "•", 34, Color(0.4, 1.0, 0.5) if finished else Color(1.0, 0.9, 0.4), 8)
+		tick.custom_minimum_size = Vector2(40, 0)
+		row.add_child(tick)
+		var text := RaceHud.make_label(String(g["text"]), 26, Color(0.75, 1.0, 0.75) if finished else Color.WHITE, 8)
+		text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		row.add_child(text)
+		var have := Game.daily_progress(g)
+		var bar := ProgressBar.new()
+		bar.max_value = int(g["goal"])
+		bar.value = have
+		bar.show_percentage = false
+		bar.custom_minimum_size = Vector2(150, 24)
+		bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		var fill := StyleBoxFlat.new()
+		fill.bg_color = Color(0.35, 0.9, 0.45)
+		fill.set_corner_radius_all(8)
+		var back := StyleBoxFlat.new()
+		back.bg_color = Color(1, 1, 1, 0.15)
+		back.set_corner_radius_all(8)
+		bar.add_theme_stylebox_override("fill", fill)
+		bar.add_theme_stylebox_override("background", back)
+		row.add_child(bar)
+		row.add_child(RaceHud.make_label("%d/%d" % [have, int(g["goal"])], 22, Color(1.0, 0.9, 0.5), 6))
+	var streak := Game.daily_streak()
+	var s := RaceHud.make_label(("Streak: %d day%s in a row!" % [streak, "" if streak == 1 else "s"]) if streak > 0 else "Do a goal today to start a streak!", 24, Color(1.0, 0.6, 0.25), 8)
+	s.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(s)
+	_button(box, "Let's Race!", func():
+		Game.end_grand_prix()
+		Game.goto_garage())
 	return parts[0]
 
 

@@ -38,6 +38,7 @@ var _intro_look := Vector3.ZERO
 var _results_shown := false
 var _first_human_done := -1.0
 var _wall_bumps := 0              # the player's wall bumps this race (Smooth Driver badge)
+var _race_count := {"jumps": 0, "items": 0, "hits": 0, "laps": 0}   # for daily challenges
 var _finish_order: Array[Racer] = []
 
 var _pause_menu: Control
@@ -492,6 +493,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			var used := h.item
 			powerups.use_item(h)
 			Game.add_stat("items")
+			_race_count["items"] += 1
 			var v := _view_for(h)
 			if v:
 				v.hud.flash_message(PowerUps.NAMES[used].to_upper() + "!", PowerUps.COLORS[used], 0.6)
@@ -502,6 +504,8 @@ func _unhandled_input(event: InputEvent) -> void:
 # ---------------------------------------------------------------------------
 
 func _on_lap(r: Racer, lap: int, lap_time: float) -> void:
+	if r == player:
+		_race_count["laps"] += 1
 	if r == player and ghost:
 		ghost.lap_finished(lap_time)
 	var v := _view_for(r)
@@ -615,6 +619,8 @@ const HIT_MESSAGES := {
 
 
 func _on_item_hit(victim: Racer, kind: String, by: Racer) -> void:
+	if by == player and victim != player and kind != "shield":
+		_race_count["hits"] += 1
 	var v := _view_for(victim)
 	if v:
 		v.hud.flash_message(HIT_MESSAGES.get(kind, "WHOA!"), Color(0.6, 0.9, 1.0) if kind == "shield" else Color(1.0, 0.5, 0.4), 1.0)
@@ -628,6 +634,7 @@ func _on_item_hit(victim: Racer, kind: String, by: Racer) -> void:
 func _on_landed(r: Racer, h: float) -> void:
 	if r == player:
 		Game.add_stat("jumps")
+		_race_count["jumps"] += 1
 	var v := _view_for(r)
 	if v:
 		v.shake = maxf(v.shake, clampf(h * 0.12, 0.1, 0.45))
@@ -1011,6 +1018,18 @@ func _show_results() -> void:
 			story_line = "You beat %s!%s\n%s: \"%s\"" % [ch["boss"], ("  +%d ★ bonus!" % Story.BONUS_STARS) if first_time else "", ch["boss"], ch["won"]]
 		else:
 			story_line = "%s: \"%s\"" % [ch["boss"], ch["lost"]]
+	# Daily challenges.
+	var daily_done: Array = []
+	if player and player.has_finished:
+		daily_done = Game.daily_race({"finished": true, "place": order.find(player) + 1,
+			"jumps": _race_count["jumps"], "items": _race_count["items"], "hits": _race_count["hits"],
+			"laps": _race_count["laps"], "wall_bumps": _wall_bumps, "track": Game.track_id(),
+			"car": String(player.car.get("id", "")), "boss": boss != null})
+		var daily_stars := 0
+		for d in daily_done:
+			daily_stars += int(d["stars"])
+		if daily_stars > 0:
+			fresh.append_array(Game.award_stars(daily_stars))
 	var new_badges := _count_badges(order, beat_record)
 	var star_line := RaceHud.make_label("+%d ★   (%d stars)" % [earned, Game.stars], 26, Color(1.0, 0.9, 0.3), 8)
 	star_line.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -1021,6 +1040,10 @@ func _show_results() -> void:
 		sl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		sl.custom_minimum_size = Vector2(680, 0)
 		box.add_child(sl)
+	for d in daily_done:
+		var dl := RaceHud.make_label("DAILY GOAL!  %s  +%d ★" % [d["text"], d["stars"]], 21, Color(0.55, 1.0, 0.6), 6)
+		dl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		box.add_child(dl)
 	_add_unlock_lines(box, fresh)
 	_add_badge_lines(box, new_badges)
 	_online_times(box)
