@@ -32,7 +32,14 @@ var _sel := -1                  # picked tile (-1 = none)
 var _held := {}                 # {"id", "yaw", "offset": Vector3, "from": Transform3D or null}
 var _held_pose := Transform3D()
 var _held_snap := false
-var _held_node: MeshInstance3D
+var _held_node: Node3D
+var _decor: Array = []          # decorations: [{"id", "pos": Vector3, "yaw"}]
+var _decor_nodes: Array[Node] = []
+var _press_decor := -1
+var _piece_grid: GridContainer
+var _decor_grid: GridContainer
+var _tray_title: Label
+var _tray: PanelContainer
 var _snap_marker: MeshInstance3D
 
 # Pointer
@@ -95,6 +102,7 @@ func _ready() -> void:
 	_room_theme = String(data.get("room", "bedroom"))
 	_by = String(data.get("by", ""))
 	_tiles = _load_layout(data)
+	_decor = _load_decor(data.get("decor", []))
 	_build_scene()
 	_build_ui()
 	_name_edit.text = String(data.get("name", "")) if data.has("name") else NAMES[randi() % NAMES.size()]
@@ -215,6 +223,21 @@ func _load_layout(data: Dictionary) -> Array:
 	return out
 
 
+func _load_decor(list: Variant) -> Array:
+	var out: Array = []
+	if not list is Array:
+		return out
+	for e in list:
+		if e is Dictionary and not Decor.info(String(e.get("id", ""))).is_empty() and out.size() < Decor.MAX:
+			out.append({"id": String(e["id"]), "pos": Vector3(float(e.get("x", 0)), 0.0, float(e.get("z", 0))), "yaw": float(e.get("yaw", 0))})
+	return out
+
+
+func _decor_data() -> Array:
+	return _decor.map(func(d: Dictionary) -> Dictionary:
+		return {"id": d["id"], "x": snappedf((d["pos"] as Vector3).x, 0.01), "z": snappedf((d["pos"] as Vector3).z, 0.01), "yaw": snappedf(float(d["yaw"]), 0.001)})
+
+
 func _layout_data() -> Array:
 	var out: Array = []
 	for t in _tiles:
@@ -227,7 +250,7 @@ func _save() -> bool:
 	if _chain_ids.is_empty():
 		_say("Join some pieces onto the start line first!", Color(1.0, 0.7, 0.3))
 		return false
-	var data := {"name": _clean_name(), "room": _room_theme, "pieces": _chain_ids.duplicate(), "layout": _layout_data()}
+	var data := {"name": _clean_name(), "room": _room_theme, "pieces": _chain_ids.duplicate(), "layout": _layout_data(), "decor": _decor_data()}
 	if _by != "":
 		data["by"] = _by
 	if _slot < 0:
@@ -289,7 +312,7 @@ func _back() -> void:
 # ---------------------------------------------------------------------------
 
 func _remember() -> void:
-	_undo_stack.append(_layout_data())
+	_undo_stack.append({"layout": _layout_data(), "decor": _decor_data()})
 	if _undo_stack.size() > HISTORY:
 		_undo_stack.pop_front()
 
@@ -298,7 +321,9 @@ func _undo() -> void:
 	if _undo_stack.is_empty():
 		_say("Nothing to undo.", Color(1, 1, 1, 0.8))
 		return
-	_tiles = _load_layout({"layout": _undo_stack.pop_back()})
+	var snap: Dictionary = _undo_stack.pop_back()
+	_tiles = _load_layout({"layout": snap["layout"]})
+	_decor = _load_decor(snap["decor"])
 	if _tiles.is_empty():
 		_tiles = []
 	_sel = -1
@@ -319,6 +344,7 @@ func _clear() -> void:
 	_clear_button.text = "Clear"
 	_remember()
 	_tiles.clear()
+	_decor.clear()
 	_sel = -1
 	_rebuild()
 
@@ -407,11 +433,51 @@ func _grab_tile(i: int, hit: Vector3) -> void:
 	Sfx.play("click", 1.3)
 
 
+## Starts carrying a new decoration from the tray.
+func _grab_new_decor(id: String) -> void:
+	if _decor.size() >= Decor.MAX:
+		_say("That's lots of decorations! Throw one in the bin first.", Color(1.0, 0.7, 0.3))
+		return
+	_held = {"id": id, "decor": true, "yaw": 0.0, "offset": Vector3.ZERO, "from": null, "new": true}
+	_press_at = get_viewport().get_mouse_position()
+	_show_held()
+	Sfx.play("click", 1.2)
+
+
+func _grab_decor(i: int, hit: Vector3) -> void:
+	_remember()
+	var d: Dictionary = _decor[i]
+	_held = {"id": d["id"], "decor": true, "yaw": d["yaw"], "offset": (d["pos"] as Vector3) - Vector3(hit.x, 0.0, hit.z), "from": null, "new": false}
+	_decor.remove_at(i)
+	_rebuild()
+	_show_held()
+	Sfx.play("click", 1.3)
+
+
+## The decoration under a screen point (-1 = none).
+func _decor_at(screen: Vector2) -> int:
+	var best := -1
+	var best_d := 34.0
+	for i in _decor.size():
+		var p: Vector3 = _decor[i]["pos"] + Vector3.UP * 2.0
+		if _cam.is_position_behind(p):
+			continue
+		var d := _cam.unproject_position(p).distance_to(screen)
+		if d < best_d:
+			best_d = d
+			best = i
+	return best
+
+
 func _show_held() -> void:
 	if _held_node:
 		_held_node.queue_free()
-	_held_node = MeshInstance3D.new()
-	_held_node.mesh = _ribbon(_held["id"])
+	if _held.get("decor", false):
+		_held_node = Decor.make(_held["id"])
+	else:
+		var mi := MeshInstance3D.new()
+		mi.mesh = _ribbon(_held["id"])
+		_held_node = mi
 	add_child(_held_node)
 	_tools.visible = false
 	_bin.visible = true
@@ -423,6 +489,14 @@ func _move_held(screen: Vector2) -> void:
 	if hit == null:
 		return
 	var id: String = _held["id"]
+	if _held.get("decor", false):
+		var p := (hit as Vector3) + (_held["offset"] as Vector3)
+		_held_pose = Transform3D(Basis(Vector3.UP, _held["yaw"]), Vector3(snappedf(p.x, 1.0), 0.0, snappedf(p.z, 1.0)))
+		_held_node.transform = _held_pose
+		var over := _over_bin(screen)
+		_held_node.scale = Vector3.ONE * (0.7 if over else 1.0)
+		_bin_style.bg_color = Color(0.9, 0.2, 0.15, 0.95) if over else Color(0.55, 0.15, 0.15, 0.8)
+		return
 	var free_pose := _pose((hit as Vector3) + (_held["offset"] as Vector3), _held["yaw"])
 	free_pose.origin = Vector3(snappedf(free_pose.origin.x, GRID), Track.BASE_HEIGHT, snappedf(free_pose.origin.z, GRID))
 	var snapped := _try_snap(id, free_pose)
@@ -464,6 +538,11 @@ func _turn_held() -> void:
 	if _held.is_empty():
 		return
 	var id: String = _held["id"]
+	if _held.get("decor", false):
+		_held["yaw"] = float(_held["yaw"]) - TURN_STEP
+		Sfx.play("click")
+		_move_held(get_viewport().get_mouse_position())
+		return
 	# Keep the piece's middle under your finger while it turns.
 	var old_mid := Basis(Vector3.UP, _held["yaw"]) * _middle(id)
 	_held["yaw"] = float(_held["yaw"]) - TURN_STEP
@@ -479,6 +558,23 @@ func _drop(screen: Vector2) -> void:
 	var id: String = _held["id"]
 	var is_new: bool = _held["new"]
 	var tap := is_new and screen.distance_to(_press_at) < 14.0
+	if _held.get("decor", false):
+		if _over_bin(screen):
+			Sfx.play("pop", 0.8)
+		elif tap:
+			_say("Drag decorations out onto the floor!", Color(0.8, 0.95, 1.0))
+		else:
+			if is_new:
+				_remember()
+			_decor.append({"id": id, "pos": _held_pose.origin, "yaw": _held["yaw"]})
+			Sfx.play("select")
+		_held = {}
+		if _held_node:
+			_held_node.queue_free()
+			_held_node = null
+		_bin_style.bg_color = Color(0.55, 0.15, 0.15, 0.8)
+		_rebuild()
+		return
 	if tap:
 		# A quick tap on a tray piece: put it on the end of the track.
 		var end := _chain_end()
@@ -549,7 +645,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			_press_at = event.position
 			_pressing = true
 			_cam_dragging = false
-			_press_tile = _tile_at(event.position)
+			_press_decor = _decor_at(event.position)
+			_press_tile = _tile_at(event.position) if _press_decor < 0 else -1
 		else:
 			if _pressing and not _cam_dragging:
 				_select(_tile_at(event.position))
@@ -557,6 +654,15 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if event is InputEventMouseMotion and _pressing and (event.button_mask & MOUSE_BUTTON_MASK_LEFT) != 0:
 		if not _cam_dragging and event.position.distance_to(_press_at) > 12.0:
+			if _press_decor >= 0:
+				var dhit = _floor_hit(_press_at)
+				if dhit != null:
+					var di := _press_decor
+					_press_decor = -1
+					_pressing = false
+					_grab_decor(di, dhit)
+					_move_held(event.position)
+					return
 			if _press_tile >= 0:
 				# Pick the piece up and carry it.
 				var hit = _floor_hit(_press_at)
@@ -654,6 +760,15 @@ func _rebuild(fit_view := false) -> void:
 		mi.transform = Transform3D((_tiles[i]["t"] as Transform3D).basis, (_tiles[i]["t"] as Transform3D).origin + Vector3.UP * 0.3)
 		add_child(mi)
 		_loose_nodes.append(mi)
+	for n in _decor_nodes:
+		n.queue_free()
+	_decor_nodes.clear()
+	for d in _decor:
+		var dn := Decor.make(d["id"])
+		dn.position = d["pos"]
+		dn.rotation.y = d["yaw"]
+		add_child(dn)
+		_decor_nodes.append(dn)
 	_show_sockets()
 	if fit_view:
 		_fit_view()
@@ -958,23 +1073,49 @@ func _build_ui() -> void:
 	var tbox := VBoxContainer.new()
 	tbox.add_theme_constant_override("separation", 6)
 	tray.add_child(tbox)
-	var tt := RaceHud.make_label("Drag a piece out:", 21, Color(1.0, 0.95, 0.6), 8)
-	tbox.add_child(tt)
-	var grid := GridContainer.new()
-	grid.columns = 2
-	grid.add_theme_constant_override("h_separation", 6)
-	grid.add_theme_constant_override("v_separation", 6)
-	tbox.add_child(grid)
+	var tabs := HBoxContainer.new()
+	tabs.add_theme_constant_override("separation", 6)
+	tbox.add_child(tabs)
+	var pieces_tab := _button(tabs, "Pieces", func(): _show_tray(false))
+	var decor_tab := _button(tabs, "Decorations", func(): _show_tray(true))
+	for tb: Button in [pieces_tab, decor_tab]:
+		tb.add_theme_font_size_override("font_size", 17)
+		tb.focus_mode = Control.FOCUS_NONE
+		tb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_tray_title = RaceHud.make_label("Drag a piece out:", 19, Color(1.0, 0.95, 0.6), 8)
+	tbox.add_child(_tray_title)
+	_piece_grid = GridContainer.new()
+	_piece_grid.columns = 2
+	_piece_grid.add_theme_constant_override("h_separation", 6)
+	_piece_grid.add_theme_constant_override("v_separation", 5)
+	tbox.add_child(_piece_grid)
 	for p in Track.PIECES:
 		var id: String = p["id"]
 		var b := Button.new()
 		b.text = p["name"]
-		b.custom_minimum_size = Vector2(138, 46)
-		b.add_theme_font_size_override("font_size", 18)
+		b.custom_minimum_size = Vector2(138, 40)
+		b.add_theme_font_size_override("font_size", 17)
 		b.focus_mode = Control.FOCUS_NONE
 		b.button_down.connect(func(): _grab_new(id))
 		_style_piece_button(b, p["color"])
-		grid.add_child(b)
+		_piece_grid.add_child(b)
+	_decor_grid = GridContainer.new()
+	_decor_grid.columns = 2
+	_decor_grid.add_theme_constant_override("h_separation", 6)
+	_decor_grid.add_theme_constant_override("v_separation", 5)
+	_decor_grid.visible = false
+	tbox.add_child(_decor_grid)
+	for it in Decor.ITEMS:
+		var did: String = it["id"]
+		var b := Button.new()
+		b.text = it["name"]
+		b.custom_minimum_size = Vector2(138, 54)
+		b.add_theme_font_size_override("font_size", 18)
+		b.focus_mode = Control.FOCUS_NONE
+		b.button_down.connect(func(): _grab_new_decor(did))
+		_style_piece_button(b, it["color"])
+		_decor_grid.add_child(b)
+	_tray = tray
 	tray.reset_size.call_deferred()
 
 	# --- right: tools for the picked piece ---
@@ -1051,6 +1192,13 @@ func _build_ui() -> void:
 	_button(bottom, "Save", func(): _save())
 	var race := _button(bottom, "Race It!", _race_it)
 	race.add_theme_font_size_override("font_size", 36)
+
+
+func _show_tray(decor: bool) -> void:
+	_piece_grid.visible = not decor
+	_decor_grid.visible = decor
+	_tray_title.text = "Drag a decoration out:" if decor else "Drag a piece out:"
+	_tray.reset_size.call_deferred()
 
 
 func _style_piece_button(b: Button, col: Color) -> void:

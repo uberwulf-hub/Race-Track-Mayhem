@@ -94,6 +94,9 @@ func _ready() -> void:
 	room.name = "Room"
 	add_child(room)
 	room.build(track)
+	# Decorations placed in Build Anywhere.
+	if Game.is_custom_track(Game.selected_track) and not online and Game.selected_track - Track.TRACKS.size() < Game.custom_tracks.size():
+		Decor.spawn_all(self, Game.custom_tracks[Game.selected_track - Track.TRACKS.size()].get("decor", []))
 	Spectators.build(room, track)
 
 	_spawn_racers()

@@ -25,6 +25,7 @@ const FLAG_BOOST := 2             # speed boost pad
 const FLAG_LOOP := 4              # inside the loop-de-loop
 const FLAG_START := 8             # start / finish line
 const FLAG_TWIST := 16            # corkscrew (also flagged as a loop)
+const FLAG_TUNNEL := 32           # under a cardboard-box tunnel
 
 ## The tracks you can race on. `layout` picks the builder function below.
 const TRACKS: Array[Dictionary] = [
@@ -134,6 +135,9 @@ const PIECES: Array[Dictionary] = [
 	{"id": "bumps", "name": "Bumps", "color": Color(0.55, 0.85, 0.3)},
 	{"id": "spiral", "name": "Spiral", "color": Color(0.7, 0.45, 0.95)},
 	{"id": "wiggles", "name": "Wiggles", "color": Color(0.95, 0.5, 0.7)},
+	{"id": "halfpipe_right", "name": "Half-Pipe R", "color": Color(0.25, 0.75, 0.6)},
+	{"id": "halfpipe_left", "name": "Half-Pipe L", "color": Color(0.25, 0.75, 0.6)},
+	{"id": "tunnel", "name": "Tunnel", "color": Color(0.65, 0.5, 0.35)},
 ]
 
 
@@ -158,7 +162,8 @@ static func for_index(index: int) -> Track:
 
 
 ## Left pieces turn into right ones and the other way round.
-const FLIPPED := {"left": "right", "right": "left", "bend_left": "bend_right", "bend_right": "bend_left"}
+const FLIPPED := {"left": "right", "right": "left", "bend_left": "bend_right", "bend_right": "bend_left",
+	"halfpipe_left": "halfpipe_right", "halfpipe_right": "halfpipe_left"}
 
 
 ## The points along one Track Builder piece (for highlighting and clicking it).
@@ -268,6 +273,69 @@ func build() -> void:
 	_build_signs()
 	_build_supports()
 	_build_loop_stand()
+	_build_tunnels()
+
+
+## Cardboard-box tunnels over FLAG_TUNNEL road: two walls and a roof, with
+## a painted arch at each end.
+func _build_tunnels() -> void:
+	var ranges := _ranges_for(FLAG_TUNNEL)
+	if ranges.is_empty():
+		return
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var hw := HALF_WIDTH + 0.6
+	var h := 6.0
+	var card := Color(0.78, 0.6, 0.38)
+	var inside := Color(0.55, 0.4, 0.25)
+	for r: Array in ranges:
+		var s := float(r[0])
+		while s < float(r[1]):
+			var a := sample(s)
+			var b := sample(minf(s + 1.0, float(r[1])))
+			for side: float in [-1.0, 1.0]:
+				var a0 := a.origin + a.basis.x * side * hw
+				var b0 := b.origin + b.basis.x * side * hw
+				var a1 := a0 + a.basis.y * h
+				var b1 := b0 + b.basis.y * h
+				_add_tri(st, a0, b0, b1, a.basis.x * -side, inside)
+				_add_tri(st, a0, b1, a1, a.basis.x * -side, inside)
+				_add_tri(st, a0, b1, b0, a.basis.x * side, card)   # outside face
+				_add_tri(st, a0, a1, b1, a.basis.x * side, card)
+			var la := a.origin - a.basis.x * hw + a.basis.y * h
+			var ra := a.origin + a.basis.x * hw + a.basis.y * h
+			var lb := b.origin - b.basis.x * hw + b.basis.y * h
+			var rb := b.origin + b.basis.x * hw + b.basis.y * h
+			_add_tri(st, la, ra, rb, a.basis.y, card)
+			_add_tri(st, la, rb, lb, a.basis.y, card)
+			_add_tri(st, la, rb, ra, -a.basis.y, inside)
+			_add_tri(st, la, lb, rb, -a.basis.y, inside)
+			s += 1.0
+	var mi := MeshInstance3D.new()
+	mi.name = "Tunnels"
+	mi.mesh = st.commit()
+	mi.material_override = _plastic(Color.WHITE)
+	add_child(mi)
+	# Bright arches at both ends so you can see where it starts.
+	var arch_mat := _plastic(Color(1.0, 0.4, 0.3))
+	for r: Array in ranges:
+		for at: float in [float(r[0]), float(r[1])]:
+			var f := sample(at)
+			for side: float in [-1.0, 1.0]:
+				var post := MeshInstance3D.new()
+				var bm := BoxMesh.new()
+				bm.size = Vector3(0.8, h + 0.6, 0.8)
+				post.mesh = bm
+				post.material_override = arch_mat
+				post.transform = Transform3D(f.basis, f.origin + f.basis.x * side * (hw + 0.2) + f.basis.y * (h * 0.5))
+				add_child(post)
+			var top := MeshInstance3D.new()
+			var tm := BoxMesh.new()
+			tm.size = Vector3(hw * 2.0 + 1.4, 0.8, 0.8)
+			top.mesh = tm
+			top.material_override = arch_mat
+			top.transform = Transform3D(f.basis, f.origin + f.basis.y * (h + 0.3))
+			add_child(top)
 
 
 # ---------------------------------------------------------------------------
@@ -681,6 +749,18 @@ func _piece(id: String) -> void:
 			_ramp_down(7.5)
 		"wiggles":
 			_slalom(4, 32.0, 13.0)
+		"halfpipe_right":
+			_straight(4.0)
+			_turn(180.0, 12.0, 50.0)       # a steep banked U-turn
+			_straight(4.0)
+		"halfpipe_left":
+			_straight(4.0)
+			_turn(-180.0, 12.0, -50.0)
+			_straight(4.0)
+		"tunnel":
+			_straight(3.0)
+			_straight(18.0, FLAG_TUNNEL)
+			_straight(3.0)
 
 
 ## Drives the turtle back to just behind the start line: turn, straight,

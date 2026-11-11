@@ -164,7 +164,8 @@ Click the track (or a chip) where you want to build: new pieces go right after i
   tray onto the floor, and when a piece's end comes close to another end it snaps on with a click. Pick up any
   piece to move it, turn it (R or right-click) or drop it in the bin. Pieces joined up from the start line make
   the race; loose pieces show faded with yellow arrows on their open ends. The road home is still added for you.
-  Switch back any time with Simple Builder.
+  Switch back any time with Simple Builder. The **Decorations** tab has cones, toy blocks, flags, trees, a balloon
+  arch and a teddy to put round your track; they show up when you race it.
 - **Easy:** 8 big, simple pieces.
 - **Advanced:** every piece; drag chips to reorder; Replace,
   Flip (left/right) and Copy; Redo; and shortcuts (`[` `]` pick, Ctrl+Left/Right move, F flip, D copy, Delete, Ctrl+Z/Y).
@@ -181,7 +182,8 @@ racer name (your best). Switch it off in Options > Online times.
 track is added to their own tracks, marked "Built by" whoever made it. Tracks are kept on the same Cloudflare
 server as internet races (`server/relay/tracks.mjs`).
 
-- **Pieces:** Straight, Turn Left/Right, Bend Left/Right, Boost Pad, Loop, Corkscrew, Jump, Big Jump, Hill, Bumps, Spiral and Wiggles.
+- **Pieces:** Straight, Turn Left/Right, Bend Left/Right, Boost Pad, Loop, Corkscrew, Jump, Big Jump, Hill, Bumps, Spiral, Wiggles,
+  Half-Pipe (a steep banked U-turn, left or right) and Tunnel.
 - **Live preview:** a toy car drives your track while you build. A bouncing arrow shows where the next piece goes.
 - **Always a working circuit:** the road back to the start line is drawn for you, so any combination of pieces makes a working track.
   If your pieces already come back around (like four left turns), they're joined up directly.

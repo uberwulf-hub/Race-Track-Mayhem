@@ -7,7 +7,7 @@
 import { newCode } from "./relay-core.mjs";
 
 export const PIECES = ["straight", "left", "right", "bend_left", "bend_right", "boost", "loop", "corkscrew",
-  "jump", "big_jump", "hill", "bumps", "spiral", "wiggles"];
+  "jump", "big_jump", "hill", "bumps", "spiral", "wiggles", "halfpipe_right", "halfpipe_left", "tunnel"];
 export const ROOMS = ["bedroom", "playroom", "kitchen", "bathroom", "living_room", "garden", "garage", "attic", "snowyard", "spooky", "beach"];
 const MAX_PIECES = 40;
 const INDEX_KEY = "_index";   // codes are only letters, so this can't clash

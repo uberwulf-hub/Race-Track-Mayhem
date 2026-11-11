@@ -13,7 +13,7 @@ const MAX_PIECES := 40
 const EASY_PIECES := ["straight", "left", "right", "boost", "loop", "jump", "hill", "bumps"]
 const SHORT := {"straight": "Straight", "left": "Left", "right": "Right", "bend_left": "Bend L",
 	"bend_right": "Bend R", "boost": "Boost", "loop": "Loop", "corkscrew": "Cork-\nscrew",
-	"jump": "Jump", "big_jump": "Big\nJump", "hill": "Hill", "bumps": "Bumps", "spiral": "Spiral", "wiggles": "Wiggles"}
+	"jump": "Jump", "big_jump": "Big\nJump", "hill": "Hill", "bumps": "Bumps", "spiral": "Spiral", "wiggles": "Wiggles", "halfpipe_right": "Half-\nPipe R", "halfpipe_left": "Half-\nPipe L", "tunnel": "Tunnel"}
 const HISTORY := 60
 const NAMES := ["Super Speedway", "Zoom Zone", "Crazy Circuit", "Loop Land", "Turbo Town", "Wiggle Way", "Jump Jungle", "Rocket Run"]
 
