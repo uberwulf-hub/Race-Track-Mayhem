@@ -42,6 +42,11 @@ var sky_top := Color(0.25, 0.5, 0.95)
 var sky_horizon := Color(0.75, 0.88, 1.0)
 var evening := false               # cars switch their headlights on
 var window_sky := Color(0.6, 0.85, 1.0)
+
+# Weather and time of day for this race (set before build()).
+var time_of_day := 0               # 0 day, 1 sunset, 2 night
+var rain := false
+var exposure := 0.9                # overall brightness (night and rain turn it down)
 var saturation := 1.15
 
 
@@ -77,6 +82,7 @@ func build(p_track: Track) -> Room:
 	var r := track.get_aabb_xz()
 	room_rect = Rect2(r.position - Vector2(42.0, 34.0), r.size + Vector2(42.0 + 52.0, 34.0 + 40.0))
 	_configure()
+	_apply_weather()
 	_build_environment()
 	_build_floor()
 	if not outdoor:
@@ -84,7 +90,149 @@ func build(p_track: Track) -> Room:
 		if has_window:
 			_build_window()
 	_build_props()
+	if rain:
+		_build_rain()
 	return self
+
+
+## Sunset, night and rain change the room's light before it's built.
+func _apply_weather() -> void:
+	match time_of_day:
+		1:   # sunset: warm, low, orange light
+			sun_color = Color(1.0, 0.62, 0.38)
+			sun_energy *= 0.8
+			sun_rotation.x = -18.0
+			ambient_color = ambient_color.lerp(Color(1.0, 0.75, 0.6), 0.6)
+			ambient_energy *= 0.85
+			sky_top = Color(0.35, 0.35, 0.7)
+			sky_horizon = Color(1.0, 0.58, 0.38)
+			background_color = background_color.lerp(Color(0.95, 0.6, 0.45), 0.6)
+			window_sky = Color(1.0, 0.6, 0.4)
+			fog_color = Color(1.0, 0.75, 0.6)
+			exposure = 0.8
+			evening = true
+		2:   # night: blue moonlight, lamps on, headlights on
+			sun_color = Color(0.55, 0.65, 1.0)
+			sun_energy = 0.3
+			sun_rotation.x = -50.0
+			ambient_color = Color(0.45, 0.5, 0.85)
+			ambient_energy = maxf(0.22, ambient_energy * 0.6)
+			sky_top = Color(0.02, 0.03, 0.1)
+			sky_horizon = Color(0.1, 0.12, 0.3)
+			sky_ground = sky_ground.darkened(0.7)
+			background_color = Color(0.05, 0.06, 0.15)
+			window_sky = Color(0.08, 0.1, 0.28)
+			fog_color = Color(0.2, 0.22, 0.4)
+			lamp_energy = maxf(lamp_energy, 1.4)
+			lamp_color = Color(1.0, 0.8, 0.5)
+			exposure = 0.5
+			saturation *= 0.85
+			evening = true
+	if rain:
+		sun_energy *= 0.45
+		ambient_color = ambient_color.lerp(Color(0.7, 0.72, 0.78), 0.45)
+		sky_top = sky_top.lerp(Color(0.4, 0.42, 0.48), 0.7)
+		sky_horizon = sky_horizon.lerp(Color(0.6, 0.62, 0.68), 0.7)
+		window_sky = window_sky.lerp(Color(0.5, 0.55, 0.62), 0.6)
+		background_color = background_color.lerp(Color(0.45, 0.48, 0.55), 0.5)
+		saturation *= 0.85
+		exposure *= 0.72
+		evening = evening or time_of_day > 0
+
+
+## Rain: falling outside (or running down the window indoors), a soft
+## patter, and now and then a flash of lightning.
+func _build_rain() -> void:
+	var p := CPUParticles3D.new()
+	var drop := BoxMesh.new()
+	if outdoor:
+		p.amount = 300 if Game.is_mobile() else 900
+		p.lifetime = 1.6
+		p.preprocess = 1.6
+		p.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
+		p.emission_box_extents = Vector3(room_rect.size.x * 0.55, 1.0, room_rect.size.y * 0.55)
+		p.position = center() + Vector3(0, 70.0, 0)
+		p.direction = Vector3(0.1, -1.0, 0.05)
+		p.spread = 3.0
+		p.gravity = Vector3(0, -40.0, 0)
+		p.initial_velocity_min = 45.0
+		p.initial_velocity_max = 55.0
+		drop.size = Vector3(0.3, 3.6, 0.3)
+	elif has_window:
+		# Little drops sliding down the window glass.
+		var r := room_rect
+		p.amount = 70
+		p.lifetime = 4.0
+		p.preprocess = 4.0
+		p.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
+		p.emission_box_extents = Vector3(21.0, 14.0, 0.05)
+		p.position = Vector3(r.position.x + r.size.x * 0.62, 38.0, r.position.y + 0.8)
+		p.direction = Vector3(0, -1, 0)
+		p.spread = 5.0
+		p.gravity = Vector3(0, -2.0, 0)
+		p.initial_velocity_min = 1.0
+		p.initial_velocity_max = 3.0
+		drop.size = Vector3(0.25, 0.6, 0.05)
+	else:
+		p.free()
+		p = null
+	if p:
+		p.mesh = drop
+		var m := StandardMaterial3D.new()
+		m.albedo_color = Color(0.8, 0.88, 1.0, 0.75)
+		m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		p.material_override = m
+		p.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		add_child(p)
+	# The patter of rain: soft looping noise.
+	var player := AudioStreamPlayer.new()
+	player.stream = _rain_sound()
+	player.volume_db = -20.0 if not outdoor else -14.0
+	player.autoplay = true
+	add_child(player)
+	# Lightning: a bright flash now and then.
+	var base := ambient_energy
+	_lightning(base)
+
+
+func _lightning(base: float) -> void:
+	var timer := Timer.new()
+	timer.wait_time = randf_range(8.0, 16.0)
+	timer.autostart = true
+	add_child(timer)
+	timer.timeout.connect(func():
+		timer.wait_time = randf_range(10.0, 22.0)
+		if environment == null:
+			return
+		var tw := create_tween()
+		tw.tween_property(environment, "ambient_light_energy", base + 2.5, 0.05)
+		tw.tween_property(environment, "ambient_light_energy", base, 0.12)
+		tw.tween_property(environment, "ambient_light_energy", base + 1.8, 0.05)
+		tw.tween_property(environment, "ambient_light_energy", base, 0.35)
+		Sfx.play("bump", 0.4, -8.0))   # a distant rumble
+
+
+## One second of soft, smoothed noise that loops: sounds like rain.
+static func _rain_sound() -> AudioStreamWAV:
+	var rate := 22050
+	var data := PackedByteArray()
+	data.resize(rate * 2)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 99
+	var smooth := 0.0
+	for i in rate:
+		smooth = lerpf(smooth, rng.randf_range(-1.0, 1.0), 0.35)
+		var v := int(clampf(smooth * 0.5, -1.0, 1.0) * 32767.0)
+		data.encode_s16(i * 2, v)
+	var w := AudioStreamWAV.new()
+	w.format = AudioStreamWAV.FORMAT_16_BITS
+	w.mix_rate = rate
+	w.stereo = false
+	w.data = data
+	w.loop_mode = AudioStreamWAV.LOOP_FORWARD
+	w.loop_end = rate
+	return w
 
 
 ## Registers something that moves every frame: f(time: float, delta: float).
@@ -152,7 +300,7 @@ func _build_environment() -> void:
 	env.ambient_light_color = ambient_color
 	env.ambient_light_energy = ambient_energy
 	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
-	env.tonemap_exposure = 0.9
+	env.tonemap_exposure = exposure
 	env.glow_enabled = true
 	env.glow_intensity = 0.3
 	env.glow_bloom = 0.05
@@ -270,9 +418,12 @@ func _build_window() -> void:
 	_box(Vector3(2.0, 32.0, 1.2), Vector3(cx + 23.0, 38.0, z + 0.4), frame_mat, false)
 	_box(Vector3(1.0, 32.0, 1.0), Vector3(cx, 38.0, z + 0.4), frame_mat, false)
 	_box(Vector3(46.0, 1.0, 1.0), Vector3(cx, 38.0, z + 0.4), frame_mat, false)
-	var sun := _cylinder(4.0, 0.2, Vector3(cx + 12.0, 47.0, z + 0.45), _glow(Color(1.0, 0.85, 0.2), 2.0))
-	sun.rotation.x = PI * 0.5
-	var cloud := _mat(Color.WHITE, 1.0)
+	# The sun in the window (a moon at night, hidden behind the rain clouds).
+	if not rain:
+		var sun_col := Color(0.92, 0.94, 1.0) if time_of_day == 2 else (Color(1.0, 0.55, 0.25) if time_of_day == 1 else Color(1.0, 0.85, 0.2))
+		var sun := _cylinder(4.0, 0.2, Vector3(cx + 12.0, 47.0 if time_of_day != 1 else 41.0, z + 0.45), _glow(sun_col, 2.0))
+		sun.rotation.x = PI * 0.5
+	var cloud := _mat(Color(0.6, 0.62, 0.68) if rain else (Color(0.4, 0.42, 0.55) if time_of_day == 2 else Color.WHITE), 1.0)
 	for i in 3:
 		var c := _sphere(3.0, Vector3(cx - 12.0 + i * 3.5, 44.0 + (1.0 if i == 1 else 0.0), z + 0.4), cloud, Vector3(1.0, 0.8, 0.1))
 		c.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF

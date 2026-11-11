@@ -167,6 +167,25 @@ func _ready() -> void:
 	ghosts.add_theme_color_override("font_color", Color(1.0, 0.75, 0.95))
 	RaceHud.pin(ghosts, Vector2(0, 0), Vector2(16, 136), Vector2(210, 52))
 	Game.friend_ghost = {}   # picking a track starts fresh
+	# Weather and time of day for the race.
+	var weather := HBoxContainer.new()
+	weather.add_theme_constant_override("separation", 10)
+	RaceHud.pin(weather, Vector2(1, 0), Vector2(-370, 16), Vector2(350, 52))
+	add_child(weather)
+	var sky_btn := _button(weather, "Sky: " + Game.SKY_NAMES[Game.sky_mode], func(): pass)
+	sky_btn.pressed.connect(func():
+		Game.sky_mode = (Game.sky_mode + 1) % 3
+		sky_btn.text = "Sky: " + Game.SKY_NAMES[Game.sky_mode]
+		Game.save_settings())
+	var rain_btn := _button(weather, "Rain: " + ("On" if Game.rain else "Off"), func(): pass)
+	rain_btn.pressed.connect(func():
+		Game.rain = not Game.rain
+		rain_btn.text = "Rain: " + ("On" if Game.rain else "Off")
+		Game.save_settings())
+	for wb: Button in [sky_btn, rain_btn]:
+		wb.add_theme_font_size_override("font_size", 22)
+		wb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		wb.focus_mode = Control.FOCUS_NONE
 	build.add_theme_font_size_override("font_size", 24)
 	bottom.add_child(RaceHud.make_label("   Laps:", 30))
 	var minus := _button(bottom, "-", func(): _change_laps(-1))

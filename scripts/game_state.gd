@@ -109,6 +109,9 @@ var editing_slot := -1           # which custom track the builder is editing (-1
 var skip_track_select := false   # "Race It!" in the builder goes straight to the race
 var builder_advanced := false    # Track Builder in Advanced mode (more pieces and tools)
 var builder_free := false        # Track Builder opens in Build Anywhere (drag pieces anywhere)
+var sky_mode := 0                # races at 0 day, 1 sunset, 2 night
+var rain := false                # races in the rain
+const SKY_NAMES := ["Day", "Sunset", "Night"]
 var builder_handoff := {}        # a track passed between the two builders when switching
 
 var ui_theme: Theme
@@ -353,6 +356,8 @@ func _read_player(cfg: ConfigFile) -> void:
 	powerups_enabled = bool(cfg.get_value("settings", "powerups", true))
 	builder_advanced = bool(cfg.get_value("settings", "builder_advanced", false))
 	builder_free = bool(cfg.get_value("settings", "builder_free", false))
+	sky_mode = clampi(int(cfg.get_value("settings", "sky", 0)), 0, 2)
+	rain = bool(cfg.get_value("settings", "rain", false))
 	auto_go = bool(cfg.get_value("settings", "auto_go", false))
 	best_times = cfg.get_value("records", "best_times", {})
 	best_laps = cfg.get_value("records", "best_laps", {})
@@ -410,6 +415,8 @@ func _write_player() -> void:
 	cfg.set_value("settings", "powerups", _own_prefs.get("powerups", powerups_enabled))
 	cfg.set_value("settings", "builder_advanced", builder_advanced)
 	cfg.set_value("settings", "builder_free", builder_free)
+	cfg.set_value("settings", "sky", sky_mode)
+	cfg.set_value("settings", "rain", rain)
 	cfg.set_value("settings", "auto_go", auto_go)
 	cfg.set_value("records", "best_times", best_times)
 	cfg.set_value("records", "best_laps", best_laps)

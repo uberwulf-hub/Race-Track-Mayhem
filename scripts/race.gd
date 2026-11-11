@@ -93,6 +93,8 @@ func _ready() -> void:
 	room = Room.create(Game.track_info(Game.selected_track)["room"])
 	room.name = "Room"
 	add_child(room)
+	room.time_of_day = Game.sky_mode
+	room.rain = Game.rain
 	room.build(track)
 	# Decorations placed in Build Anywhere.
 	if Game.is_custom_track(Game.selected_track) and not online and Game.selected_track - Track.TRACKS.size() < Game.custom_tracks.size():
