@@ -171,3 +171,11 @@ static func nickname(look: Variant) -> String:
 		return ""
 	var n := String((look as Dictionary).get("nickname", "")).strip_edges().replace("\n", " ")
 	return n.substr(0, NICKNAME_LENGTH)
+
+
+## The number of the car with this id (0 if there's none).
+static func index_of(car_id: String) -> int:
+	for i in CARS.size():
+		if CARS[i]["id"] == car_id:
+			return i
+	return 0

@@ -81,6 +81,7 @@ var friend_id := ""              # this player's friend code, like K7QM2XPA
 var daily := {}                  # daily challenges: {"day", "progress": {id: n}, "done": [ids], "streak", "streak_day"}
 var friends: Array = []          # [{"id": friend code, "name": their name}]
 var pending_join := ""           # a friend's race code to join when the online screen opens
+var friend_ghost := {}           # a friend's ghost lap to race: {"key", "name", "car", "lap", "data"}
 const MAX_FRIENDS := 20
 
 # Story Mode race in progress
@@ -553,6 +554,12 @@ func board_key(index: int, lap_count: int) -> String:
 	elif index - Track.TRACKS.size() < custom_tracks.size():
 		pieces = custom_tracks[index - Track.TRACKS.size()].get("pieces", [])
 	return "c%s_%d" % [JSON.stringify(pieces).md5_text().substr(0, 10), lap_count]
+
+
+## The name a track's ghosts are saved under on the race server (the same
+## for everyone with the same track).
+func ghost_key(index: int) -> String:
+	return board_key(index, 1)
 
 
 func track_id() -> String:

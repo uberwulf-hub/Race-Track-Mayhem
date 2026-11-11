@@ -200,6 +200,9 @@ server as internet races (`server/relay/tracks.mjs`).
 - **Replays and photos:** after a race, press Replay to watch it like TV (chase, trackside and swooping cameras,
   slow motion). Press Photo! to freeze it, drag to turn the camera, and SNAP! to save a picture in
   your Pictures folder under *Race Track Mayhem*.
+- **Friend Ghosts** (track picker): your best lap on each track is shared with your friends (when online best
+  times are on). Pick a friend to race their see-through pink ghost car, with their name above it, even when
+  they're not playing. The results tell you if you beat it.
 - **Track Gallery** (track picker): the most raced and newest tracks everyone has shared. Tap Race! to download one and race it.
 - **Badges:** 25 badges to collect, like Winner!, Big Air, Tourist, Sharing is Caring and Toy Box Hero. See them all
   in the Badges room on the main menu.

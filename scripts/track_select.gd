@@ -161,6 +161,12 @@ func _ready() -> void:
 	gallery.add_theme_font_size_override("font_size", 22)
 	gallery.add_theme_color_override("font_color", Color(0.75, 1.0, 1.0))
 	RaceHud.pin(gallery, Vector2(0, 0), Vector2(16, 76), Vector2(210, 52))
+	var ghosts := _button(self, "Friend Ghosts", _open_ghosts)
+	ghosts.tooltip_text = "Race a friend's best lap on this track"
+	ghosts.add_theme_font_size_override("font_size", 22)
+	ghosts.add_theme_color_override("font_color", Color(1.0, 0.75, 0.95))
+	RaceHud.pin(ghosts, Vector2(0, 0), Vector2(16, 136), Vector2(210, 52))
+	Game.friend_ghost = {}   # picking a track starts fresh
 	build.add_theme_font_size_override("font_size", 24)
 	bottom.add_child(RaceHud.make_label("   Laps:", 30))
 	var minus := _button(bottom, "-", func(): _change_laps(-1))
@@ -389,6 +395,63 @@ func _keep_shared(res: Dictionary) -> int:
 		t["code"] = code
 	Game.custom_tracks.append(t)
 	return Game.track_count() - 1
+
+
+# ---------------------------------------------------------------------------
+# Friend ghosts: race a friend's best lap on the shown track
+# ---------------------------------------------------------------------------
+
+func _open_ghosts() -> void:
+	var index := _index
+	var name: String = Game.track_info(index).get("name", "this track")
+	_show_popup("Friend Ghosts")
+	if Game.friends.is_empty():
+		_popup_text("Add friends first (Race Online > Friends), then you can race their best laps here!", 22, Color(0.85, 0.95, 1.0))
+		_button(_popup_row(), "OK", _close_popup).grab_focus()
+		return
+	var status := _popup_text("Looking for ghosts on %s..." % name, 22, Color.WHITE)
+	var key := Game.ghost_key(index)
+	var found: Dictionary = await Net.list_ghosts(key)
+	if not is_inside_tree() or not _popup.visible or not is_instance_valid(status):
+		return
+	if found.is_empty():
+		status.text = "None of your friends has a ghost on %s yet. Race it and they can race yours!" % name
+	else:
+		status.text = "Race a friend's best lap on %s:" % name
+	var grid := GridContainer.new()
+	grid.columns = 4
+	grid.add_theme_constant_override("h_separation", 18)
+	grid.add_theme_constant_override("v_separation", 6)
+	_popup_box.add_child(grid)
+	var first: Button
+	for fid in found:
+		var g: Dictionary = found[fid]
+		grid.add_child(RaceHud.make_label(String(g.get("name", "?")).substr(0, Game.NAME_LENGTH), 24, Color(1.0, 0.75, 0.95), 6))
+		grid.add_child(RaceHud.make_label(CarData.get_car(CarData.index_of(String(g.get("car", ""))))["name"], 18, Color(0.85, 0.9, 1.0), 5))
+		grid.add_child(RaceHud.make_label("Best lap " + Game.format_time(float(g.get("lap", 0.0))), 20, Color(0.7, 1.0, 0.7), 5))
+		var code := String(fid)
+		var go := _button(grid, "Race!", func(): _race_ghost(index, key, code, status))
+		if first == null:
+			first = go
+	_button(_popup_row(), "Close", _close_popup)
+	if first:
+		first.grab_focus()
+
+
+func _race_ghost(index: int, key: String, code: String, status: Label) -> void:
+	status.text = "Getting the ghost..."
+	var g: Dictionary = await Net.fetch_ghost(key, code)
+	if not is_inside_tree():
+		return
+	if g.has("error"):
+		status.text = String(g["error"])
+		return
+	g["key"] = key
+	Game.friend_ghost = g
+	Game.selected_track = index
+	Game.save_settings()
+	Sfx.play("go")
+	Game.goto_race()
 
 
 # ---------------------------------------------------------------------------

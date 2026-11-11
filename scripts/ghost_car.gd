@@ -19,6 +19,30 @@ var _rec_spoiled := false
 var _rec_lap_start := 0.0
 var _pending: PackedFloat32Array = PackedFloat32Array()
 var _pending_time := -1.0
+var friend_name := ""            # racing a friend's ghost (just plays back; nothing is recorded)
+var ghost_key := ""              # where your best lap goes on the race server
+
+
+## A friend's ghost: their car, see-through pink, with their name above it.
+func setup_friend(p_racer: Racer, ghost: Dictionary) -> void:
+	racer = p_racer
+	friend_name = String(ghost["name"])
+	_best = ghost["data"]
+	_best_time = float(ghost["lap"])
+	var car_def := CarData.get_car(CarData.index_of(String(ghost.get("car", ""))))
+	_model = ToyCarModel.new().setup(car_def, false, {})
+	add_child(_model)
+	_make_see_through(_model, Color(1.0, 0.55, 0.85, 0.38))
+	var tag := Label3D.new()
+	tag.text = friend_name + "'s ghost"
+	tag.font_size = 48
+	tag.outline_size = 12
+	tag.pixel_size = 0.012
+	tag.modulate = Color(1.0, 0.7, 0.95)
+	tag.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	tag.position = Vector3(0, 2.0, 0)
+	_model.add_child(tag)
+	_model.visible = false
 
 
 func setup(p_track: Track, p_track_id: String, p_racer: Racer) -> void:
@@ -31,11 +55,11 @@ func setup(p_track: Track, p_track_id: String, p_racer: Racer) -> void:
 	_model.visible = false
 
 
-func _make_see_through(n: Node) -> void:
+func _make_see_through(n: Node, col := Color(0.6, 0.85, 1.0, 0.32)) -> void:
 	for c in n.get_children():
 		if c is MeshInstance3D:
 			var m := StandardMaterial3D.new()
-			m.albedo_color = Color(0.6, 0.85, 1.0, 0.32)
+			m.albedo_color = col
 			m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 			m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 			m.rim_enabled = true
@@ -43,13 +67,13 @@ func _make_see_through(n: Node) -> void:
 			(c as MeshInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		elif c is Label3D or c is Light3D:
 			c.visible = false
-		_make_see_through(c)
+		_make_see_through(c, col)
 
 
 ## Called every frame with the time since the player's current lap started.
 func follow(lap_t: float, racing: bool) -> void:
 	# --- record ---
-	if racing and racer.lap >= 0:
+	if racing and racer.lap >= 0 and friend_name == "":
 		if lap_t < _rec_clock - 0.5:
 			pass  # a new lap started; lap_finished() resets the buffer
 		if lap_t >= _rec_clock:
@@ -84,6 +108,8 @@ func follow(lap_t: float, racing: bool) -> void:
 
 ## The player crossed the line: keep the lap if it's the best clean one.
 func lap_finished(lap_time: float) -> void:
+	if friend_name != "":
+		return
 	if not _rec_spoiled and _rec.size() > 16 and lap_time > 2.0:
 		var best_so_far := _pending_time if _pending_time > 0.0 else _best_time
 		if best_so_far < 0.0 or lap_time < best_so_far:
@@ -101,15 +127,34 @@ func lap_spoiled() -> void:
 
 ## Saves the best new lap (called when the race ends).
 func save_if_better() -> void:
+	if friend_name != "":
+		return
 	if _pending_time <= 0.0 or (_best_time > 0.0 and _pending_time >= _best_time):
+		_share_old_best()
 		return
 	DirAccess.make_dir_recursive_absolute(_dir())
 	var cfg := ConfigFile.new()
 	cfg.set_value("ghost", "lap_time", _pending_time)
 	cfg.set_value("ghost", "data", _pending)
+	cfg.set_value("ghost", "shared", ghost_key != "" and Game.online_times)
 	cfg.save(_dir() + track_id + ".cfg")
 	_best = _pending
 	_best_time = _pending_time
+	# Share it so friends can race your ghost.
+	if ghost_key != "":
+		Net.upload_ghost(ghost_key, _best_time, _best, String(racer.car.get("id", "")))
+
+
+## A best lap saved before friend ghosts existed: share it once.
+func _share_old_best() -> void:
+	if ghost_key == "" or _best.size() < 16 or not Game.online_times:
+		return
+	var cfg := ConfigFile.new()
+	if cfg.load(_dir() + track_id + ".cfg") != OK or bool(cfg.get_value("ghost", "shared", false)):
+		return
+	Net.upload_ghost(ghost_key, _best_time, _best, String(racer.car.get("id", "")))
+	cfg.set_value("ghost", "shared", true)
+	cfg.save(_dir() + track_id + ".cfg")
 
 
 func _load() -> void:

@@ -25,6 +25,7 @@ const LIST: Array[Dictionary] = [
 	{"id": "sharer", "name": "Sharing is Caring", "desc": "Share a track code", "stat": "shared", "goal": 1, "symbol": "<3", "color": Color(1.0, 0.45, 0.6)},
 	{"id": "online", "name": "Cousin Racer", "desc": "Finish an online race", "stat": "online_races", "goal": 1, "symbol": "NET", "color": Color(0.35, 0.6, 1.0)},
 	{"id": "buddy", "name": "Best Buddies", "desc": "Add a friend", "stat": "friends", "goal": 1, "symbol": "BFF", "color": Color(0.45, 0.85, 0.65)},
+	{"id": "ghost_buster", "name": "Ghost Buster", "desc": "Beat a friend's ghost lap", "stat": "ghost_wins", "goal": 1, "symbol": "GB", "color": Color(1.0, 0.6, 0.9)},
 	{"id": "online_win", "name": "Internet Champ", "desc": "Win an online race", "stat": "online_wins", "goal": 1, "symbol": "#1", "color": Color(0.2, 0.45, 0.95)},
 	{"id": "daily", "name": "Goal Getter", "desc": "Finish 10 daily challenges", "stat": "daily", "goal": 10, "symbol": "D", "color": Color(0.4, 0.8, 0.5)},
 	{"id": "streak", "name": "On a Roll", "desc": "Do daily challenges 5 days in a row", "stat": "streak_best", "goal": 5, "symbol": "x5", "color": Color(1.0, 0.5, 0.2)},

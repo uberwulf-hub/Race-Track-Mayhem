@@ -25,6 +25,7 @@ var hud: RaceHud                # player 1's HUD
 var camera: Camera3D            # player 1's camera
 var skid_marks: SkidMarks
 var ghost: GhostCar
+var friend_ghost: GhostCar        # a friend's best lap to race (from the race server)
 var powerups: PowerUps
 var replay: Replay
 var boss: Racer                   # Story Mode: the boss car to beat
@@ -109,7 +110,12 @@ func _ready() -> void:
 	if humans.size() == 1 and Game.ghost_enabled and not online:
 		ghost = GhostCar.new()
 		add_child(ghost)
+		ghost.ghost_key = Game.ghost_key(Game.selected_track)
 		ghost.setup(track, Game.track_id(), player)
+	if not Game.friend_ghost.is_empty() and Game.friend_ghost.get("key", "") == Game.ghost_key(Game.selected_track) and humans.size() == 1 and not online:
+		friend_ghost = GhostCar.new()
+		add_child(friend_ghost)
+		friend_ghost.setup_friend(player, Game.friend_ghost)
 
 	var super_boss := Game.story_active and Game.story_super and not online
 	if Game.powerups_enabled or super_boss:
@@ -339,6 +345,8 @@ func _set_state(s: State) -> void:
 				v.cam_mode = CamMode.CHASE
 				v.hud.hide_title()
 				v.hud.set_race_ui_visible(true)
+			if friend_ghost:
+				_all_huds(func(h: RaceHud): h.flash_message("Racing %s's ghost!\nBeat %s" % [friend_ghost.friend_name, Game.format_time(friend_ghost._best_time)], Color(1.0, 0.7, 0.95), 2.2))
 			if boss:
 				var ch := Story.chapter(Game.story_chapter)
 				_all_huds(func(h: RaceHud): h.flash_message("%s:\n\"%s\"" % [ch["boss"], ch["hello"]], Color(1.0, 0.6, 0.3), 2.6))
@@ -693,6 +701,8 @@ func _update_view_extras(v: View, delta: float) -> void:
 	v.hud.set_incoming(powerups.incoming_for(r) if powerups and state == State.RACING and not r.has_finished else {})
 	if r == player and ghost:
 		ghost.follow(r.race_time - r.lap_start_time, state == State.RACING and not r.has_finished)
+	if r == player and friend_ghost:
+		friend_ghost.follow(r.race_time - r.lap_start_time, state == State.RACING and not r.has_finished)
 
 
 func _spawn_confetti(r: Racer) -> void:
@@ -1046,6 +1056,15 @@ func _show_results() -> void:
 		sl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		sl.custom_minimum_size = Vector2(680, 0)
 		box.add_child(sl)
+	if friend_ghost and player.best_lap > 0.0:
+		var diff := player.best_lap - friend_ghost._best_time
+		var gl := RaceHud.make_label(("You beat %s's ghost by %.2fs!" % [friend_ghost.friend_name, -diff]) if diff < 0.0 \
+			else ("%s's ghost was %.2fs faster. Try again!" % [friend_ghost.friend_name, diff]), 22,
+			Color(1.0, 0.7, 0.95) if diff < 0.0 else Color(0.85, 0.85, 1.0), 6)
+		gl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		box.add_child(gl)
+		if diff < 0.0:
+			Game.add_stat_now("ghost_wins")
 	for d in daily_done:
 		var dl := RaceHud.make_label("DAILY GOAL!  %s  +%d ★" % [d["text"], d["stars"]], 21, Color(0.55, 1.0, 0.6), 6)
 		dl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -1162,6 +1181,8 @@ func _watch_replay() -> void:
 		v.hud.visible = false
 	if ghost:
 		ghost.visible = false
+	if friend_ghost:
+		friend_ghost.visible = false
 	if touch:
 		touch.visible = false
 	replay.start(views[0], func():

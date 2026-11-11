@@ -259,6 +259,44 @@ func _send_invite() -> void:
 		"to": to, "room": room_code}))
 
 
+# ---------------------------------------------------------------------------
+# Friend ghosts: best laps saved on the race server
+# ---------------------------------------------------------------------------
+
+## Sends your best lap on a track (so friends can race your ghost).
+func upload_ghost(track_key: String, lap: float, data: PackedFloat32Array, car_id: String) -> void:
+	if Game.player_slot < 0 or not Game.online_times or data.is_empty():
+		return
+	var packed := Marshalls.raw_to_base64(data.to_byte_array().compress(FileAccess.COMPRESSION_GZIP))
+	if packed.length() > 150000:
+		return   # an extra long lap: too big to share
+	_web("POST", "/ghosts", JSON.stringify({"id": Game.my_friend_code(), "name": Game.player_name,
+		"car": car_id, "track": track_key, "lap": lap, "data": packed}))
+
+
+## Which friends have a ghost on a track: {friend code: {"name", "car", "lap"}}.
+func list_ghosts(track_key: String) -> Dictionary:
+	var ids: Array = Game.friends.map(func(f: Dictionary) -> String: return f["id"])
+	if ids.is_empty():
+		return {}
+	var res: Dictionary = await _web("GET", "/ghosts/%s?ids=%s" % [track_key.uri_encode(), ",".join(ids)], "")
+	return res.get("ghosts", {}) if res.get("ghosts") is Dictionary else {}
+
+
+## A friend's ghost lap: {"name", "car", "lap", "data": PackedFloat32Array} or {"error"}.
+func fetch_ghost(track_key: String, friend_code: String) -> Dictionary:
+	var res: Dictionary = await _web("GET", "/ghosts/%s/%s" % [track_key.uri_encode(), friend_code.uri_encode()], "")
+	if not res.has("data"):
+		return {"error": String(res.get("error", "Couldn't get that ghost."))}
+	var raw := Marshalls.base64_to_raw(String(res["data"]))
+	var bytes := raw.decompress_dynamic(4 * 1024 * 1024, FileAccess.COMPRESSION_GZIP)
+	var data := bytes.to_float32_array()
+	if data.size() < 16 or data.size() % 8 != 0:
+		return {"error": "That ghost got muddled on the way. Try again!"}
+	return {"name": String(res.get("name", "A friend")).substr(0, Game.NAME_LENGTH), "car": String(res.get("car", "")),
+		"lap": float(res.get("lap", 0.0)), "data": data}
+
+
 ## Sends a finished race time to a track's online top 10.
 ## Returns {"rank": N (0 = not in the top 10), "top": [...]} or {"error": "..."}.
 func submit_time(board: String, racer: String, time: float, car: String) -> Dictionary:
