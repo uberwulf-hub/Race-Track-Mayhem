@@ -8,6 +8,7 @@ export { TrackShelf } from "./tracks.mjs";
 export { TimesBoard } from "./times.mjs";
 export { FriendHub } from "./friends.mjs";
 export { GhostShelf } from "./ghosts.mjs";
+export { HomeBoard } from "./home.mjs";
 import { boardName } from "./times.mjs";
 
 export default {
@@ -21,6 +22,12 @@ export default {
     // Friends online and "Race me!" invites: one hub for everyone.
     if (url.pathname === "/friends/hello" || url.pathname === "/friends/invite") {
       return env.FRIENDS.get(env.FRIENDS.idFromName("hub")).fetch(request);
+    }
+    // Races at home: grouped by the house's internet address.
+    if (url.pathname === "/home") {
+      const fwd = new Request(request);
+      fwd.headers.set("x-house-ip", request.headers.get("cf-connecting-ip") || "");
+      return env.HOMES.get(env.HOMES.idFromName("homes")).fetch(fwd);
     }
     // Friend ghosts: everyone's best laps, on one shelf.
     if (url.pathname === "/ghosts" || url.pathname.startsWith("/ghosts/")) {

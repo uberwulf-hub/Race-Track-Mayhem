@@ -71,6 +71,13 @@ var _friend_timer := 2.0
 var _friend_busy := false
 var _invite_to := ""       # friend to invite once our internet race has its code
 
+# Races at home (through the race server, so no firewall trouble)
+var at_home := false       # this internet race is listed for the other computers in the house
+var home_races: Array = [] # races in this house: [{"room", "name", "players", "open", "v"}]
+var _home_timer := 0.0
+var _home_busy := false
+var _looking := false
+
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -82,6 +89,10 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
+	_home_timer -= delta
+	if _home_timer <= 0.0:
+		_home_timer = 3.0
+		_home_tick()
 	_friend_timer -= delta
 	if _friend_timer <= 0.0:
 		_friend_timer = FRIEND_POLL
@@ -109,6 +120,32 @@ func my_info() -> Dictionary:
 # ---------------------------------------------------------------------------
 # Hosting and joining
 # ---------------------------------------------------------------------------
+
+## "Host at Home": opens a race through the race server and lists it for the
+## other computers on this home internet connection (no firewall trouble).
+## With no internet it falls back to the direct Wi-Fi race (host()).
+func host_home() -> void:
+	host_internet()
+	at_home = true
+
+
+func _home_tick() -> void:
+	if _home_busy:
+		return
+	if active and is_host and internet and at_home and room_code != "":
+		_home_busy = true
+		await _web("POST", "/home", JSON.stringify({"room": room_code, "name": String(players.get(1, {}).get("name", "Someone")),
+			"players": players.size(), "open": not in_race, "v": PROTOCOL}))
+		_home_busy = false
+	elif _looking and not active:
+		_home_busy = true
+		var res: Dictionary = await _web("GET", "/home", "")
+		_home_busy = false
+		var list: Array = res.get("races", []) if res.get("races") is Array else []
+		if list != home_races:
+			home_races = list
+			games_found_changed.emit()
+
 
 func host() -> String:
 	leave("", false)
@@ -380,6 +417,9 @@ func join(address: String) -> void:
 ## Leaves the lobby or race. `reason` is shown on the menu afterwards.
 func leave(reason: String = "", announce: bool = true) -> void:
 	var was_active := active
+	if at_home and is_host and room_code != "":
+		_web("POST", "/home", JSON.stringify({"room": room_code, "closed": true}))   # take it off the list
+	at_home = false
 	if _peer:
 		_peer.close()
 	_peer = null
@@ -417,7 +457,14 @@ func _watch_join(seconds: float) -> void:
 
 
 func _fail(reason: String) -> void:
+	var home_host := at_home and is_host and room_code == ""
 	leave("", false)
+	if home_host:
+		# No race server: host a direct Wi-Fi race instead.
+		var err := host()
+		if err == "":
+			return
+		reason = err
 	join_failed.emit(reason)
 
 
@@ -714,6 +761,8 @@ func player_name_of(peer_id: int) -> String:
 
 func start_looking() -> void:
 	stop_looking()
+	_looking = true
+	_home_timer = 0.0
 	_listen = PacketPeerUDP.new()
 	if _listen.bind(DISCOVERY_PORT) != OK:
 		_listen = null   # another copy of the game on this computer is already listening
@@ -722,6 +771,7 @@ func start_looking() -> void:
 
 
 func stop_looking() -> void:
+	_looking = false
 	if _listen:
 		_listen.close()
 	_listen = null

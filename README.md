@@ -138,7 +138,9 @@ for a **Rematch!**
 - **Friends:** tap Friends on the Race Online screen. Swap friend codes (or tap + Friend next to someone in
   a lobby). You can see when friends are playing, and **Race me!** opens an internet race and sends them an
   invite that pops up in their game with a Join button. Friends' races on your Wi-Fi show first, with a ★.
-- **Fix Firewall** (Windows, on the Race Online screen): if races don't show up or joining fails, tap it on BOTH
+- **Host at Home** now goes through the race server, so other computers in the house (on the same home internet) see your
+  race in their list with no firewall changes. With no internet it falls back to a direct Wi-Fi race.
+- **Fix Firewall** (Windows, on the Race Online screen, for direct Wi-Fi races): if races don't show up or joining fails, tap it on BOTH
   computers and choose Yes on the Windows prompt. It removes any block rule (from clicking "Cancel" on the first
   network prompt) and lets the game through. Or just use Host on the Internet, which needs no firewall changes.
 - If a race shows up but joining never works, the HOST computer's firewall is blocking it (usually because

@@ -102,6 +102,9 @@ func _ready() -> void:
 	Spectators.build(room, track)
 
 	_spawn_racers()
+	for r in racers:
+		if r.player_index == 0:   # not your own car
+			_name_tag(r)
 	replay = Replay.new().setup(self, racers)
 	add_child(replay)
 	_intro_from = room.overview_position()
@@ -1096,9 +1099,16 @@ func _show_results() -> void:
 			Game.goto_menu())
 	elif online:
 		if Net.is_host:
-			first = _add_button(buttons, "Race Again!", func(): Net.start_race())
-			_add_button(buttons, "Back to Lobby", func(): Net.back_to_lobby())
+			# Back to the lobby (everyone comes along) to pick another track.
+			first = _add_button(buttons, "Pick Next Track", func(): Net.back_to_lobby())
+			first.add_theme_color_override("font_color", Color(0.75, 1.0, 1.0))
+			_add_button(buttons, "Race Again!", func(): Net.start_race())
 		else:
+			var host_name := String(Net.players.get(1, {}).get("name", "The host"))
+			var wait := RaceHud.make_label("%s picks the next race." % host_name, 20, Color(0.8, 0.9, 1.0), 6)
+			wait.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			box.add_child(wait)
+			box.move_child(wait, buttons.get_index())
 			var vote := _add_button(buttons, "Rematch!", func(): Net.vote_rematch())
 			vote.pressed.connect(func():
 				vote.text = "Asked for a rematch!"
@@ -1157,6 +1167,24 @@ func _super_boss_tricks(delta: float) -> void:
 	if not _trick_told:
 		_trick_told = true
 		_all_huds(func(h: RaceHud): h.flash_message("%s uses %s!" % [boss.racer_name, trick["name"]], Color(1.0, 0.5, 0.9), 1.6))
+
+
+## The racer's name floating over their car (people in yellow).
+func _name_tag(r: Racer) -> void:
+	if r == boss:
+		return   # the boss has its own sign
+	var l := Label3D.new()
+	l.name = "NameTag"
+	l.text = r.racer_name
+	l.font_size = 40
+	l.outline_size = 10
+	l.fixed_size = true          # the same size on screen near or far
+	l.pixel_size = 0.0022
+	l.modulate = Color(1.0, 0.9, 0.35) if r.human else Color(1, 1, 1, 0.9)
+	l.outline_modulate = Color(0.1, 0.05, 0.2)
+	l.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	l.position = Vector3(0, 2.1, 0)
+	r.add_child(l)
 
 
 ## A gold "BOSS" sign floating over the boss car.

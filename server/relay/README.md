@@ -9,6 +9,7 @@ connects *out* to this relay, which passes the game's messages along inside a
 - `worker.mjs` + `wrangler.toml` - the Cloudflare Workers version (free plan).
 - `tracks.mjs` - shared Track Builder tracks (5-letter codes).
 - `times.mjs` - online best times (a top 10 per track and number of laps).
+- `home.mjs` - races "at home": shows a race to the other computers on the same home internet connection.
 - `ghosts.mjs` - everyone's best lap on each track, for racing friends' ghosts.
 - `friends.mjs` - friends who are playing right now, and "Race me!" invites (handed over on the next check-in).
 - `local.mjs` - the same relay for testing on one computer: `npm install && node local.mjs`.

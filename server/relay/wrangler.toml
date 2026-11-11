@@ -23,6 +23,10 @@ class_name = "FriendHub"
 name = "GHOSTS"
 class_name = "GhostShelf"
 
+[[durable_objects.bindings]]
+name = "HOMES"
+class_name = "HomeBoard"
+
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["RaceRoom"]
@@ -46,3 +50,7 @@ new_sqlite_classes = ["FriendHub"]
 [[migrations]]
 tag = "v6"
 new_sqlite_classes = ["GhostShelf"]
+
+[[migrations]]
+tag = "v7"
+new_sqlite_classes = ["HomeBoard"]

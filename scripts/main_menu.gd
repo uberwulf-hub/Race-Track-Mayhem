@@ -17,6 +17,7 @@ var _credits_panel: Control
 var _badges_panel: Control
 var _story_panel: Control
 var _daily_panel: Control
+var _play_panel: Control
 var _album_panel: Control
 var _album_photos: Array[String] = []
 var _album_view: TextureRect
@@ -131,68 +132,44 @@ func _build_ui() -> void:
 	title.add_child(_title_row("RACE TRACK", 92, [Color(1.0, 0.35, 0.3), Color(1.0, 0.65, 0.15), Color(1.0, 0.9, 0.2), Color(0.4, 0.9, 0.35), Color(0.35, 0.7, 1.0), Color(0.75, 0.45, 1.0)]))
 	title.add_child(_title_row("MAYHEM!", 132, [Color(1.0, 0.55, 0.1)]))
 
-	# Main buttons
+	# Main buttons: one big PLAY! (all the ways to race on your own are in
+	# there), Race Online and the Track Builder, then a row of small extras.
 	_main_box = VBoxContainer.new()
 	RaceHud.pin(_main_box, Vector2(0.5, 0.5), Vector2(-280, -62), Vector2(560, 380))
-	_main_box.add_theme_constant_override("separation", 12)
+	_main_box.add_theme_constant_override("separation", 14)
 	root.add_child(_main_box)
-	var modes := _row(_main_box)
-	var play := _button(modes, "Quick Race", func():
-		Game.end_grand_prix()
-		Game.goto_garage())
-	var cup := _button(modes, "Grand Prix", func():
-		Game.start_grand_prix()
-		Game.goto_garage())
-	var story := _button(modes, "Story", _open_story)
-	story.tooltip_text = "Beat the boss car in every room of the house!"
-	for b: Button in [play, cup, story]:
-		b.add_theme_font_size_override("font_size", 34)
-		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var top_row := _row(_main_box)
+	var goals := Game.daily_goals()
+	var left := goals.filter(func(g): return not (Game.daily.get("done", []) as Array).has(g["id"])).size()
+	var play := _button(top_row, "PLAY!", _open_play)
+	play.add_theme_font_size_override("font_size", 52)
+	play.custom_minimum_size = Vector2(0, 96)
+	play.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	play.tooltip_text = "Quick Race, Grand Prix, Story, Weekly and Daily Goals"
 	var mid := _row(_main_box)
-	var builder := _button(mid, "Track Builder", func():
-		Game.end_grand_prix()
-		Game.goto_editor(-1))
-	# This week's challenge track: new every Monday, with its own online top 10.
-	var weekly := _button(mid, "Weekly: " + String(Game.weekly_track()["name"]), func():
-		Game.end_grand_prix()
-		Game.selected_track = Game.WEEKLY_TRACK
-		Game.skip_track_select = true
-		Game.goto_garage())
-	weekly.tooltip_text = "This week's challenge track. A new one every Monday!"
-	weekly.add_theme_color_override("font_color", Color(1.0, 0.92, 0.45))
-	for b: Button in [builder, weekly]:
-		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var online_row := _row(_main_box)
-	var online := _button(online_row, "Race Online!", func():
+	var online := _button(mid, "Race Online!", func():
 		Game.end_grand_prix()
 		Game.goto("res://scenes/online.tscn"))
 	online.add_theme_color_override("font_color", Color(0.75, 1.0, 1.0))
-	online.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	# Today's three goals (a ★ when there's something left to do).
-	var goals := Game.daily_goals()
-	var left := goals.filter(func(g): return not (Game.daily.get("done", []) as Array).has(g["id"])).size()
-	var daily_btn := _button(online_row, ("Daily Goals (%d)" % left) if left > 0 else "Daily Goals ✓", _open_daily)
-	daily_btn.add_theme_color_override("font_color", Color(0.7, 1.0, 0.7))
-	daily_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	# Seasonal event tracks (holidays, Halloween, summer) at their time of year.
-	for ev: int in Game.events_on():
-		var info: Dictionary = Game.EVENTS[ev]
-		var ev_button := _button(online_row, String(info["button"]), func():
-			Game.end_grand_prix()
-			Game.selected_track = ev
-			Game.skip_track_select = true
-			Game.goto_garage())
-		ev_button.tooltip_text = info["tip"]
-		ev_button.add_theme_color_override("font_color", info["button_color"])
-		ev_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var builder := _button(mid, "Track Builder", func():
+		Game.end_grand_prix()
+		Game.goto_editor(-1))
+	for b: Button in [online, builder]:
+		b.add_theme_font_size_override("font_size", 32)
+		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var more := _row(_main_box)
-	var badges_btn := _button(more, "Badges", _open_badges)
-	var photos_btn := _button(more, "Photos", _open_album)
-	var extras: Array = [badges_btn, photos_btn, _button(more, "Options", func(): _show_panel(_options_panel)), _button(more, "Help", func(): _show_panel(_help_panel))]
+	var extras: Array = [_button(more, "Badges", _open_badges), _button(more, "Photos", _open_album),
+		_button(more, "Options", func(): _show_panel(_options_panel)), _button(more, "Help", func(): _show_panel(_help_panel))]
 	if OS.get_name() != "Web" and not Game.is_mobile():
 		extras.append(_button(more, "Quit", func(): get_tree().quit()))
 	for b: Button in extras:
+		b.add_theme_font_size_override("font_size", 22)
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	# A little reminder when today's goals aren't done yet.
+	if left > 0:
+		var nudge := RaceHud.make_label("%d daily goal%s left today!" % [left, "" if left == 1 else "s"], 20, Color(0.7, 1.0, 0.7), 6)
+		nudge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_main_box.add_child(nudge)
 	play.grab_focus.call_deferred()
 
 	# Who's playing (their own save slot); press to switch.
@@ -229,6 +206,7 @@ func _build_ui() -> void:
 	_story_panel = _build_story(root)
 	_daily_panel = _build_daily(root)
 	_album_panel = _build_album(root)
+	_play_panel = _build_play(root)
 	_who_panel = _build_who(root)
 	_new_panel = _build_new_player(root)
 	var credits_btn := _button(root, "Credits", func(): _show_panel(_credits_panel))
@@ -326,6 +304,7 @@ func _show_panel(panel: Control) -> void:
 	_story_panel.visible = panel == _story_panel
 	_daily_panel.visible = panel == _daily_panel
 	_album_panel.visible = panel == _album_panel
+	_play_panel.visible = panel == _play_panel
 	_who_panel.visible = panel == _who_panel
 	_new_panel.visible = panel == _new_panel
 	if panel == null:
@@ -582,6 +561,57 @@ func _album_delete() -> void:
 	var keep := _album_index
 	_open_album()
 	_album_show(keep)
+
+
+func _open_play() -> void:
+	var root := _play_panel.get_parent() as Control
+	_play_panel.queue_free()
+	_play_panel = _build_play(root)
+	_show_panel(_play_panel)
+
+
+## PLAY!: every way to race on your own, as big buttons.
+func _build_play(root: Control) -> Control:
+	var parts := _panel(root, "Let's Race!")
+	var box: VBoxContainer = parts[1]
+	box.custom_minimum_size = Vector2(720, 0)
+	var grid := GridContainer.new()
+	grid.columns = 2
+	grid.add_theme_constant_override("h_separation", 14)
+	grid.add_theme_constant_override("v_separation", 12)
+	box.add_child(grid)
+	var tiles: Array = [
+		["Quick Race", "Pick a car and any track", Color.WHITE, func():
+			Game.end_grand_prix()
+			Game.goto_garage()],
+		["Grand Prix", "Race every track for a trophy", Color.WHITE, func():
+			Game.start_grand_prix()
+			Game.goto_garage()],
+		["Story", "Beat the boss in every room", Color(1.0, 0.85, 0.6), _open_story],
+		["Weekly: " + String(Game.weekly_track()["name"]), "A new challenge track every Monday", Color(1.0, 0.92, 0.45), func():
+			Game.end_grand_prix()
+			Game.selected_track = Game.WEEKLY_TRACK
+			Game.skip_track_select = true
+			Game.goto_garage()],
+	]
+	var goals := Game.daily_goals()
+	var left := goals.filter(func(g): return not (Game.daily.get("done", []) as Array).has(g["id"])).size()
+	tiles.append([("Daily Goals (%d)" % left) if left > 0 else "Daily Goals ✓", "Three new goals every day", Color(0.7, 1.0, 0.7), _open_daily])
+	# Seasonal event tracks (holidays, Halloween, summer) at their time of year.
+	for ev: int in Game.events_on():
+		var info: Dictionary = Game.EVENTS[ev]
+		tiles.append([String(info["button"]), String(info["tip"]).get_slice(":", 0), info["button_color"], func():
+			Game.end_grand_prix()
+			Game.selected_track = ev
+			Game.skip_track_select = true
+			Game.goto_garage()])
+	for t in tiles:
+		var b := _button(grid, String(t[0]), t[3])
+		b.add_theme_font_size_override("font_size", 30)
+		b.add_theme_color_override("font_color", t[2])
+		b.custom_minimum_size = Vector2(350, 80)
+		b.tooltip_text = String(t[1])
+	return parts[0]
 
 
 func _open_daily() -> void:

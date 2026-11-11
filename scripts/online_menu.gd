@@ -24,6 +24,8 @@ var _friends_list: VBoxContainer
 var _friend_code_edit: LineEdit
 var _friend_msg: Label
 var _invite_note := ""   # "Invited Noah..." while waiting for a friend to join
+var _preview_spin: Node3D    # turntable for the 3D preview of your car
+var _preview_car := -1
 
 
 func _ready() -> void:
@@ -52,6 +54,9 @@ func _ready() -> void:
 	_build_browse()
 	_build_lobby()
 	_build_friends()
+	var back := _button(self, "< Back", _go_back)
+	back.add_theme_font_size_override("font_size", 24)
+	RaceHud.pin(back, Vector2(0, 0), Vector2(16, 16), Vector2(140, 56))
 	Net.friends_changed.connect(_refresh_friends)
 	Net.check_friends_soon()
 	Net.lobby_changed.connect(_refresh_lobby)
@@ -89,6 +94,34 @@ func _unhandled_input(event: InputEvent) -> void:
 			_show_browse()
 		else:
 			Game.goto_menu()
+
+
+## Back: out of the lobby to the race list, or from the list to the menu.
+func _go_back() -> void:
+	if _friends_panel.visible:
+		_friends_panel.visible = false
+	elif _lobby.visible:
+		Net.leave("")
+		_show_browse()
+	else:
+		Game.goto_menu()
+
+
+## Shrinks the race list or lobby when the window is too short for it, so
+## nothing (like START RACE!) ends up off the bottom.
+func _process(delta: float) -> void:
+	if _preview_spin:
+		_preview_spin.rotation.y += delta * 0.8
+	var screen := get_viewport().get_visible_rect().size
+	for c: Control in [_browse, _lobby]:
+		if c == null or not c.visible:
+			continue
+		var top := c.position.y
+		var need := maxf(c.size.y, c.get_combined_minimum_size().y)
+		var room := screen.y - top - 100.0   # leave room for the message line
+		var k := clampf(room / maxf(1.0, need), 0.55, 1.0)
+		c.pivot_offset = Vector2(c.size.x * 0.5, 0.0)
+		c.scale = Vector2(k, k)
 
 
 func _say(text: String) -> void:
@@ -180,15 +213,36 @@ func _refresh_games() -> void:
 	for c in _games_box.get_children():
 		_games_box.remove_child(c)
 		c.queue_free()
-	if Net.found.is_empty():
+	# Races in this house, through the race server (these always work).
+	for r in Net.home_races:
+		if not r is Dictionary:
+			continue
+		var room := String(r.get("room", ""))
+		var hname := String(r.get("name", "?")).substr(0, Game.NAME_LENGTH)
+		var same := int(r.get("v", 0)) == Net.PROTOCOL
+		var text := "%s%s's race   (%d racing)" % ["★ " if _is_friend_name(hname) else "", hname, int(r.get("players", 1))]
+		if not same:
+			text += "  - different version"
+		elif not r.get("open", true):
+			text += "  - racing now"
+		var hb := _button(_games_box, text, func():
+			_say("Joining...")
+			Net.join_internet(room)
+			_show_lobby())
+		hb.disabled = not same or not r.get("open", true)
+		hb.add_theme_font_size_override("font_size", 26)
+	if Net.found.is_empty() and Net.home_races.is_empty():
 		var hint := "Looking for races...  (the other computer taps \"Host at Home\")"
 		if OS.get_name() == "Windows":
-			hint += "\nNot showing up? Tap Fix Firewall on both computers, or use Host on the Internet."
+			hint += "\nNot showing up? Make sure both computers have the newest version, or use Host on the Internet."
 		var l := RaceHud.make_label(hint, 20, Color(1, 1, 1, 0.7), 4)
 		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		_games_box.add_child(l)
 		return
 	var ips := Net.found.keys()
+	# The same race can show up both ways; the race-server one is listed already.
+	var listed: Array = Net.home_races.map(func(r): return String(r.get("name", "")) if r is Dictionary else "")
+	ips = ips.filter(func(ip) -> bool: return not listed.has(String(Net.found[ip]["name"])))
 	ips.sort_custom(func(a, b) -> bool: return _is_friend_name(Net.found[a]["name"]) and not _is_friend_name(Net.found[b]["name"]))
 	for ip in ips:
 		var g: Dictionary = Net.found[ip]
@@ -207,11 +261,8 @@ func _is_friend_name(n: String) -> bool:
 
 
 func _host() -> void:
-	var err := Net.host()
-	if err != "":
-		_say(err)
-		return
 	_say("")
+	Net.host_home()
 	_show_lobby()
 
 
@@ -280,6 +331,35 @@ func _build_lobby() -> void:
 	_car_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	car_row.add_child(_car_label)
 	_button(car_row, ">", func(): _change_car(1))
+	# A little spinning 3D picture of the car you've picked.
+	var view_box := SubViewportContainer.new()
+	view_box.stretch = true
+	view_box.custom_minimum_size = Vector2(460, 150)
+	view_box.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	lbox.add_child(view_box)
+	var vp := SubViewport.new()
+	vp.own_world_3d = true
+	vp.transparent_bg = true
+	vp.msaa_3d = Viewport.MSAA_2X
+	view_box.add_child(vp)
+	var light := DirectionalLight3D.new()
+	light.rotation_degrees = Vector3(-45, 30, 0)
+	light.light_energy = 1.2
+	vp.add_child(light)
+	var env := WorldEnvironment.new()
+	env.environment = Environment.new()
+	env.environment.background_mode = Environment.BG_CLEAR_COLOR
+	env.environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+	env.environment.ambient_light_color = Color(0.85, 0.85, 1.0)
+	env.environment.ambient_light_energy = 0.6
+	vp.add_child(env)
+	var cam := Camera3D.new()
+	cam.fov = 26.0
+	cam.position = Vector3(0, 1.9, 5.2)
+	vp.add_child(cam)
+	cam.look_at(Vector3(0, 0.5, 0), Vector3.UP)
+	_preview_spin = Node3D.new()
+	vp.add_child(_preview_spin)
 	# Right: race settings (the host can change them)
 	var right := PanelContainer.new()
 	right.custom_minimum_size = Vector2(580, 330)
@@ -352,7 +432,12 @@ func _refresh_lobby() -> void:
 	else:
 		_lobby_title.text = "%s's race" % String(Net.players.get(1, {}).get("name", "?"))
 		_say("")
-	if Net.internet and Net.is_host:
+	if Net.internet and Net.is_host and Net.at_home:
+		_address_label.text = ("Others in your house will see your race in their list.   (Or type the code:  %s)" % Net.room_code) if Net.room_code != "" \
+			else "Opening your race..."
+		_address_label.add_theme_font_size_override("font_size", 24)
+		_address_label.add_theme_color_override("font_color", Color(0.6, 1.0, 1.0))
+	elif Net.internet and Net.is_host:
 		_address_label.text = ("Race code:  %s     Tell your cousins to type it in Race Online!" % Net.room_code) if Net.room_code != "" \
 			else "Getting a race code..."
 		if Net.players.size() > 1:
@@ -392,7 +477,10 @@ func _refresh_lobby() -> void:
 				Net.check_friends_soon()
 				_refresh_lobby())
 			add.add_theme_font_size_override("font_size", 18)
-	_car_label.text = CarData.get_car(_my_car())["name"]
+	var my_car := CarData.get_car(_my_car())
+	var my_nick := CarData.nickname(Game.custom_for(my_car["id"]))
+	_car_label.text = my_nick if my_nick != "" else String(my_car["name"])
+	_show_preview(_my_car())
 	_fill_settings()
 	_start_button.visible = Net.is_host
 	_wait_label.visible = not Net.is_host
@@ -602,3 +690,15 @@ func _refresh_friends() -> void:
 			_refresh_friends())
 		remove.tooltip_text = "Remove this friend"
 		remove.add_theme_font_size_override("font_size", 18)
+
+
+## Puts the chosen car on the little spinning turntable.
+func _show_preview(index: int) -> void:
+	if _preview_spin == null or index == _preview_car:
+		return
+	_preview_car = index
+	for c in _preview_spin.get_children():
+		c.queue_free()
+	var car := CarData.get_car(index)
+	var model := ToyCarModel.new().setup(car, false, Game.custom_for(car["id"]))
+	_preview_spin.add_child(model)
