@@ -28,6 +28,8 @@ var ghost: GhostCar
 var powerups: PowerUps
 var replay: Replay
 var boss: Racer                   # Story Mode: the boss car to beat
+var _trick_timer := 4.0           # Super boss: seconds until its next trick
+var _trick_told := false
 
 var state := State.INTRO
 var _state_time := 0.0
@@ -109,10 +111,11 @@ func _ready() -> void:
 		add_child(ghost)
 		ghost.setup(track, Game.track_id(), player)
 
-	if Game.powerups_enabled:
+	var super_boss := Game.story_active and Game.story_super and not online
+	if Game.powerups_enabled or super_boss:
 		powerups = PowerUps.new()
 		add_child(powerups)
-		powerups.setup(track, racers)
+		powerups.setup(track, racers, Game.powerups_enabled)
 		powerups.item_got.connect(_on_item_got)
 		powerups.item_hit.connect(_on_item_hit)
 		if online:
@@ -185,7 +188,8 @@ func _make_roster() -> Array:
 	var k := 0
 	if Game.story_active:
 		var ch := Story.chapter(Game.story_chapter)
-		roster.append({"name": ch["boss"], "car": int(ch["car"]), "player": 0, "look": ch["look"], "boss": true})
+		var boss_name: String = ("Super " + String(ch["boss"])) if Game.story_super else String(ch["boss"])
+		roster.append({"name": boss_name, "car": int(ch["car"]), "player": 0, "look": ch["look"], "boss": true})
 	while roster.size() < 5:
 		roster.append({"name": names[k % names.size()], "car": pool[k % pool.size()], "player": 0})
 		k += 1
@@ -421,6 +425,7 @@ func _physics_process(delta: float) -> void:
 	_update_rubber_band(delta)
 	if powerups and (state == State.RACING or state == State.FINISHED):
 		powerups.update(delta)
+		_super_boss_tricks(delta)
 	for i in racers.size():
 		for j in range(i + 1, racers.size()):
 			if racers[i].remote and racers[j].remote:
@@ -460,7 +465,7 @@ func _update_rubber_band(delta: float) -> void:
 		var gap := r.total - lead.total
 		var target := base
 		if r == boss:
-			target = base + 0.04 + 0.01 * Game.story_chapter
+			target = base + 0.04 + 0.01 * Game.story_chapter + (0.05 if Game.story_super else 0.0)
 		if all_done:
 			target = 1.0
 		elif gap > 30.0:
@@ -1013,9 +1018,10 @@ func _show_results() -> void:
 		beat_boss = player.has_finished and order.find(player) < order.find(boss)
 		if beat_boss:
 			var first_time := Game.beat_boss(Game.story_chapter)
+			var bonus := Story.SUPER_STARS if Game.story_super else Story.BONUS_STARS
 			if first_time:
-				fresh.append_array(Game.award_stars(Story.BONUS_STARS))
-			story_line = "You beat %s!%s\n%s: \"%s\"" % [ch["boss"], ("  +%d ★ bonus!" % Story.BONUS_STARS) if first_time else "", ch["boss"], ch["won"]]
+				fresh.append_array(Game.award_stars(bonus))
+			story_line = "You beat %s!%s\n%s: \"%s\"" % [boss.racer_name, ("  +%d ★ bonus!" % bonus) if first_time else "", ch["boss"], ch["won"]]
 		else:
 			story_line = "%s: \"%s\"" % [ch["boss"], ch["lost"]]
 	# Daily challenges.
@@ -1090,7 +1096,7 @@ func _show_results() -> void:
 			e.add_theme_font_size_override("font_size", 18)
 			e.add_theme_color_override("font_color", Net.EMOTE_COLORS[i])
 	elif Game.story_active:
-		if beat_boss and Game.story_chapter + 1 < Story.count():
+		if beat_boss and Game.story_chapter + 1 < Story.count() and not Game.story_super:
 			var next := Game.story_chapter + 1
 			first = _add_button(buttons, "Next Boss  >", func(): Game.start_story(next))
 		else:
@@ -1112,13 +1118,30 @@ func _show_results() -> void:
 	_refresh_results()
 
 
+## Super bosses use their special trick every few seconds.
+func _super_boss_tricks(delta: float) -> void:
+	if boss == null or not Game.story_super or state != State.RACING or boss.has_finished:
+		return
+	_trick_timer -= delta
+	if _trick_timer > 0.0:
+		return
+	var trick: Dictionary = Story.chapter(Game.story_chapter).get("trick", {})
+	if trick.is_empty():
+		return
+	_trick_timer = float(trick["every"]) * randf_range(0.8, 1.2)
+	powerups.boss_trick(boss, String(trick["kind"]))
+	if not _trick_told:
+		_trick_told = true
+		_all_huds(func(h: RaceHud): h.flash_message("%s uses %s!" % [boss.racer_name, trick["name"]], Color(1.0, 0.5, 0.9), 1.6))
+
+
 ## A gold "BOSS" sign floating over the boss car.
 func _crown(r: Racer) -> void:
 	var l := Label3D.new()
-	l.text = "BOSS"
+	l.text = "SUPER BOSS" if Game.story_super else "BOSS"
 	l.font_size = 64
 	l.outline_size = 16
-	l.modulate = Color(1.0, 0.82, 0.2)
+	l.modulate = Color(1.0, 0.45, 0.95) if Game.story_super else Color(1.0, 0.82, 0.2)
 	l.outline_modulate = Color(0.35, 0.1, 0.0)
 	l.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	l.pixel_size = 0.012

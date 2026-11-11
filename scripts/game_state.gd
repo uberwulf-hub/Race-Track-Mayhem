@@ -86,6 +86,8 @@ const MAX_FRIENDS := 20
 # Story Mode race in progress
 var story_active := false
 var story_chapter := 0
+var story_super := false         # racing the Super version of the boss
+var super_beaten: Array = []     # chapters whose Super boss you've beaten
 var open_story := false          # the main menu opens the story map when it loads
 
 ## A new badge was just earned (the Toast layer shows a pop-up).
@@ -360,6 +362,7 @@ func _read_player(cfg: ConfigFile) -> void:
 	stats = cfg.get_value("progress", "stats", {})
 	badges = cfg.get_value("progress", "badges", [])
 	story_beaten = int(cfg.get_value("progress", "story", 0))
+	super_beaten = cfg.get_value("progress", "super", [])
 	friend_id = String(cfg.get_value("friends", "id", ""))
 	daily = cfg.get_value("progress", "daily", {})
 	friends = cfg.get_value("friends", "list", [])
@@ -416,6 +419,7 @@ func _write_player() -> void:
 	cfg.set_value("progress", "stats", stats)
 	cfg.set_value("progress", "badges", badges)
 	cfg.set_value("progress", "story", story_beaten)
+	cfg.set_value("progress", "super", super_beaten)
 	cfg.set_value("friends", "id", friend_id)
 	cfg.set_value("progress", "daily", daily)
 	cfg.set_value("friends", "list", friends)
@@ -939,9 +943,10 @@ func remove_friend(code: String) -> void:
 
 
 ## Story Mode: race the boss of chapter i (pick your car first).
-func start_story(i: int) -> void:
+func start_story(i: int, super_boss := false) -> void:
 	end_grand_prix()
 	story_active = true
+	story_super = super_boss
 	story_chapter = clampi(i, 0, Story.count() - 1)
 	selected_track = story_chapter
 	skip_track_select = true
@@ -950,6 +955,12 @@ func start_story(i: int) -> void:
 
 ## You finished ahead of the boss. Returns true the first time.
 func beat_boss(i: int) -> bool:
+	if story_super:
+		if super_beaten.has(i):
+			return false
+		super_beaten.append(i)
+		add_stat("super_bosses")
+		return true
 	if i < story_beaten:
 		return false
 	story_beaten = i + 1

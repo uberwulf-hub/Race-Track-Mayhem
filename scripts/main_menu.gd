@@ -550,13 +550,13 @@ func _build_story(root: Control) -> Control:
 	var parts := _panel(root, "Story Mode")
 	var box: VBoxContainer = parts[1]
 	box.custom_minimum_size = Vector2(900, 0)
-	var intro := RaceHud.make_label("Each room has a boss car. Finish ahead of the boss to open the next room!", 20, Color(0.85, 0.95, 1.0), 6)
+	var intro := RaceHud.make_label("Each room has a boss car. Finish ahead of the boss to open the next room! Beaten bosses can be raced again as Super bosses.", 20, Color(0.85, 0.95, 1.0), 6)
 	intro.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(intro)
 	var grid := GridContainer.new()
-	grid.columns = 4
-	grid.add_theme_constant_override("h_separation", 22)
+	grid.columns = 5
+	grid.add_theme_constant_override("h_separation", 18)
 	grid.add_theme_constant_override("v_separation", 6)
 	box.add_child(grid)
 	var focus: Button
@@ -577,6 +577,14 @@ func _build_story(root: Control) -> Control:
 		var b := _button(grid, "Race!" if open else "  ?  ", func(): Game.start_story(idx))
 		b.add_theme_font_size_override("font_size", 22)
 		b.disabled = not open
+		# Beat a boss and its Super version opens: faster, with a special trick.
+		if beaten:
+			var sup := _button(grid, "Super ★" if Game.super_beaten.has(i) else "Super!", func(): Game.start_story(idx, true))
+			sup.add_theme_font_size_override("font_size", 20)
+			sup.add_theme_color_override("font_color", Color(1.0, 0.6, 0.95))
+			sup.tooltip_text = "A Super rematch: %s is faster and uses %s!" % [ch["boss"], ch.get("trick", {}).get("name", "tricks")]
+		else:
+			grid.add_child(Control.new())   # keeps the rows lined up
 		if open and not beaten:
 			focus = b
 	if Game.story_beaten >= Story.count():

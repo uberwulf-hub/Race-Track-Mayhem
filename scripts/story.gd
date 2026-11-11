@@ -6,37 +6,37 @@ extends RefCounted
 
 ## car: index into CarData.CARS. look: Car Designer look for the boss's car.
 const CHAPTERS: Array[Dictionary] = [
-	{"boss": "Teddy Thunder", "car": 2, "title": "Bedtime Showdown",
+	{"boss": "Teddy Thunder", "trick": {"kind": "balloon", "every": 7.0, "name": "honey puddles"}, "car": 2, "title": "Bedtime Showdown",
 		"look": {"color": "8b5a2b", "accent": "ffd21f", "sticker": "sticker_stars", "nickname": "Teddy Truck"},
 		"hello": "Nobody races in MY bedroom without beating me first!",
 		"won": "Grrr... fine! You're faster than a sleepy bear.",
 		"lost": "Ha! Back to bed with you!"},
-	{"boss": "Block Boss Bella", "car": 4, "title": "Toy Box Trouble",
+	{"boss": "Block Boss Bella", "trick": {"kind": "ball", "every": 6.0, "name": "bouncy blocks"}, "car": 4, "title": "Toy Box Trouble",
 		"look": {"color": "2f6fe8", "accent": "ffd21f", "sticker": "sticker_checkers", "nickname": "Block Bus"},
 		"hello": "I built this whole playroom. Block by block!",
 		"won": "You knocked my tower down! Well raced!",
 		"lost": "Stack 'em up and knock 'em down!"},
-	{"boss": "Captain Crumbs", "car": 3, "title": "Kitchen Chaos",
+	{"boss": "Captain Crumbs", "trick": {"kind": "banana", "every": 6.5, "name": "cookie crumbs"}, "car": 3, "title": "Kitchen Chaos",
 		"look": {"color": "ff7a1a", "accent": "8b5a2b", "sticker": "sticker_flames", "nickname": "Cookie Cruiser"},
 		"hello": "This kitchen is MY cookie jar. Try and catch me!",
 		"won": "You ate my crumbs! I mean... you beat me.",
 		"lost": "Too slow! More cookies for me!"},
-	{"boss": "Bubbles McSplash", "car": 7, "title": "Bath Time Blast",
+	{"boss": "Bubbles McSplash", "trick": {"kind": "bubble", "every": 6.0, "name": "bubble blasts"}, "car": 7, "title": "Bath Time Blast",
 		"look": {"color": "1fc8d8", "accent": "ffffff", "sticker": "sticker_stars", "nickname": "Soap Speeder"},
 		"hello": "Splish splash, I'm going to make you crash!",
 		"won": "Blub blub... you washed me right out!",
 		"lost": "Splashed ya! Better dry off and try again."},
-	{"boss": "Couch King Carl", "car": 1, "title": "Sofa Kingdom",
+	{"boss": "Couch King Carl", "trick": {"kind": "rocket", "every": 9.0, "name": "rocket cushions"}, "car": 1, "title": "Sofa Kingdom",
 		"look": {"color": "7a3fe0", "accent": "ffd21f", "sticker": "sticker_lightning", "nickname": "Royal Remote"},
 		"hello": "Bow down! I am the king of the comfy cushions!",
 		"won": "My crown! You've taken the couch throne!",
 		"lost": "The king stays on the couch! Ha ha!"},
-	{"boss": "Gnome Gus", "car": 3, "title": "Garden Getaway",
+	{"boss": "Gnome Gus", "trick": {"kind": "balloon", "every": 5.5, "name": "watering-can splashes"}, "car": 3, "title": "Garden Getaway",
 		"look": {"color": "1fae4b", "accent": "e8241c", "sticker": "sticker_stripes", "nickname": "Mushroom Zoomer"},
 		"hello": "Hmph. Nobody gets past the garden gnome.",
 		"won": "Well I never! You zoomed right past me.",
 		"lost": "Back to the flower beds, little racer!"},
-	{"boss": "Big Wrench Wendy", "car": 6, "title": "The Final Workshop",
+	{"boss": "Big Wrench Wendy", "trick": {"kind": "magnet", "every": 8.0, "name": "magnet pulls"}, "car": 6, "title": "The Final Workshop",
 		"look": {"color": "1e1e26", "accent": "ff7a1a", "sticker": "sticker_flames", "nickname": "Wrench Wagon"},
 		"hello": "I fixed up every car in this house. I'm the fastest of all!",
 		"won": "Whoa! You're the champion of the WHOLE house!",
@@ -44,6 +44,7 @@ const CHAPTERS: Array[Dictionary] = [
 ]
 
 const BONUS_STARS := 5
+const SUPER_STARS := 8   # first win against a Super boss
 
 
 static func count() -> int:

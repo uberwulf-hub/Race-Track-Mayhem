@@ -39,12 +39,21 @@ var _ai_wait: Dictionary = {} # racer -> seconds before it uses its item
 var _time := 0.0
 
 
-func setup(p_track: Track, p_racers: Array[Racer]) -> void:
+func setup(p_track: Track, p_racers: Array[Racer], with_boxes := true) -> void:
 	track = p_track
 	racers = p_racers
 	for r in racers:
 		_ai_wait[r] = 0.0
-	_place_boxes()
+	if with_boxes:
+		_place_boxes()
+
+
+## A boss's special trick (Story Mode Super bosses): uses a power-up without
+## needing to pick one up.
+func boss_trick(r: Racer, kind: String) -> void:
+	if r.mode != Racer.Mode.DRIVING:
+		return
+	_use(r, kind, 1.0 if randf() < 0.5 else -1.0)
 
 
 # ---------------------------------------------------------------------------

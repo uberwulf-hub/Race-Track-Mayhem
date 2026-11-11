@@ -281,7 +281,7 @@ func _build_ui() -> void:
 	if Game.gp_active:
 		header_text = "GRAND PRIX: PICK YOUR CAR!"
 	elif Game.story_active:
-		header_text = "BOSS RACE vs %s!" % String(Story.chapter(Game.story_chapter)["boss"]).to_upper()
+		header_text = "%s vs %s!" % ["SUPER BOSS" if Game.story_super else "BOSS RACE", String(Story.chapter(Game.story_chapter)["boss"]).to_upper()]
 	elif Game.skip_track_select and Game.selected_track == Game.WEEKLY_TRACK:
 		header_text = "WEEKLY CHALLENGE: PICK YOUR CAR!"
 	var header := RaceHud.make_label(header_text, 56, Color(1.0, 0.85, 0.2), 16)
