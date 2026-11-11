@@ -39,8 +39,13 @@ const CHAPTERS: Array[Dictionary] = [
 	{"boss": "Big Wrench Wendy", "trick": {"kind": "magnet", "every": 8.0, "name": "magnet pulls"}, "car": 6, "title": "The Final Workshop",
 		"look": {"color": "1e1e26", "accent": "ff7a1a", "sticker": "sticker_flames", "nickname": "Wrench Wagon"},
 		"hello": "I fixed up every car in this house. I'm the fastest of all!",
-		"won": "Whoa! You're the champion of the WHOLE house!",
+		"won": "Whoa! You're the champion of the whole downstairs!",
 		"lost": "Need a tune-up? Come back and try again!"},
+	{"boss": "Professor Cobweb", "trick": {"kind": "banana", "every": 6.0, "name": "sticky webs"}, "car": 5, "title": "The Secret Attic",
+		"look": {"color": "8a8f99", "accent": "7a3fe0", "sticker": "sticker_stars", "nickname": "Dust Rocket"},
+		"hello": "Nobody has raced up here for a hundred years. Let's see if you're the real champion!",
+		"won": "Splendid! You truly are the champion of the WHOLE house!",
+		"lost": "Ha! The attic is mine. Dust yourself off and try again!"},
 ]
 
 const BONUS_STARS := 5

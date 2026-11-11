@@ -20,7 +20,7 @@ const PORT := 24680
 const DISCOVERY_PORT := 24681
 const MAX_CLIENTS := 5          # plus the host = 6 racers
 const MAX_RACERS := 6
-const PROTOCOL := 4             # the game's version for racing together: bump when tracks,
+const PROTOCOL := 5             # the game's version for racing together: bump when tracks,
                                 # cars or messages change, so mismatched copies can't join
 const RELAY_PROTOCOL := 1       # the race server's message format (server/relay)
 const SEND_RATE := 1.0 / 20.0

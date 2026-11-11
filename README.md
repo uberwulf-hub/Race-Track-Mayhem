@@ -8,7 +8,7 @@ Pick a toy car and a track, then race four computer cars around an orange plasti
 kid's bedroom floor. Each race starts with the camera looking at the whole bedroom, then it swoops
 down to your car for **3… 2… 1… GO!**
 
-**7 tracks, each in its own room (and one outside!), plus a new Weekly Challenge track every Monday**
+**8 tracks, each in its own room (and one outside!), plus a new Weekly Challenge track every Monday**
 
 | Track | Room | Trickiness | Highlights |
 |---|---|---|---|
@@ -19,6 +19,7 @@ down to your car for **3… 2… 1… GO!**
 | Sofa Slalom | Living room at sunset: sofa, TV, sleeping cat | ★★★ | slalom, spiral, corkscrew, loop, jump |
 | Backyard Blast | **Outdoors in the garden:** blue sky, picket fence, big tree with a swing, flowers, gnome, pond with a frog, butterflies | ★★☆ | giant jump over the pond, bumpy lawn, loop, spiral, slalom |
 | Workshop Wheelie | Garage: pegboard of tools, workbench, red tool chest, tyre stacks, cones, a bike | ★★☆ | jump, hill, bumps, big jump over the toolbox, loop, slalom |
+| Attic Antics | The attic: floorboards, rafters, a round window with a sunbeam, a rocking horse, old trunks, boxes and cobwebs | ★★★ | corkscrew, spiral climb, double jump, loop, slalom |
 
 **Weekly Challenge** (main menu): a brand-new track every Monday, the same for everyone, with its own
 online top 10 for the week.
@@ -190,8 +191,8 @@ server as internet races (`server/relay/tracks.mjs`).
   where you can also edit or delete them. Your best times and ghost car are kept for each one.
 
 **Ways to play**
-- **Quick Race:** pick a car and any of the 7 tracks.
-- **Grand Prix:** race all 7 tracks in a row for points (10, 8, 6, 5, 4), then a trophy ceremony on the podium.
+- **Quick Race:** pick a car and any of the 8 tracks.
+- **Grand Prix:** race all 8 tracks in a row for points (10, 8, 6, 5, 4), then a trophy ceremony on the podium.
   Gold, silver and bronze trophies are kept on the shelf in the bedroom (one per difficulty).
 - **Story Mode:** each room has a boss car (Teddy Thunder, Block Boss Bella, Captain Crumbs, Bubbles McSplash,
   Couch King Carl, Gnome Gus and Big Wrench Wendy). Finish ahead of the boss to open the next room and get 5 bonus stars.

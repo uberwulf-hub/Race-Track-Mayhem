@@ -102,7 +102,7 @@ var last_unlocks: Array = []     # unlocks earned by the last race, shown on the
 
 # Track Builder
 const MAX_CUSTOM_TRACKS := 12
-const ROOM_THEMES := [["bedroom", "The Bedroom"], ["playroom", "The Playroom"], ["kitchen", "The Kitchen"], ["bathroom", "The Bathroom"], ["living_room", "The Living Room"], ["garden", "The Garden"], ["garage", "The Garage"], ["snowyard", "The Snowy Yard"], ["spooky", "The Spooky Garden"], ["beach", "The Beach"]]
+const ROOM_THEMES := [["bedroom", "The Bedroom"], ["playroom", "The Playroom"], ["kitchen", "The Kitchen"], ["bathroom", "The Bathroom"], ["living_room", "The Living Room"], ["garden", "The Garden"], ["garage", "The Garage"], ["attic", "The Attic"], ["snowyard", "The Snowy Yard"], ["spooky", "The Spooky Garden"], ["beach", "The Beach"]]
 var custom_tracks: Array = []    # [{"name": String, "room": String, "pieces": Array[String]}]
 var editing_slot := -1           # which custom track the builder is editing (-1 = a new one)
 var skip_track_select := false   # "Race It!" in the builder goes straight to the race

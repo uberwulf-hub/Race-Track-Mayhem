@@ -34,6 +34,7 @@ Made by Andrew Saulls with Suno. All rights reserved; included here for Race Tra
 | `music/race_snowyard.ogg` | Sonoran Mesa (second take) | Frosty Backyard, the holiday track |
 | `music/race_spooky.ogg` | Copper Pit (second take) | Pumpkin Patch Panic, the Halloween track |
 | `music/race_beach.ogg` | The Lab (second take) | Sandy Shores Splash, the summer beach track |
+| `music/race_attic.ogg` | Game Menu (first take) | Attic Antics (and builder tracks in the attic) |
 | `music/results.ogg` | Triumphant Fanfare | Results and podium (plays once, then the menu song returns) |
 
 The songs were converted from MP3 to Ogg Vorbis and their loudness was evened out (-16 LUFS).

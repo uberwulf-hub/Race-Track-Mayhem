@@ -64,6 +64,8 @@ static func create(theme: String) -> Room:
 			return SnowRoom.new()
 		"spooky":
 			return SpookyRoom.new()
+		"attic":
+			return AtticRoom.new()
 		"beach":
 			return BeachRoom.new()
 	return BedroomRoom.new()

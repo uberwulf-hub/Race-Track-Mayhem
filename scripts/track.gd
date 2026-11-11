@@ -98,6 +98,16 @@ const TRACKS: Array[Dictionary] = [
 		"stars": 2,
 		"color": Color(0.85, 0.2, 0.15),
 	},
+	{
+		"id": "attic_antics",
+		"name": "Attic Antics",
+		"room": "attic",
+		"room_name": "The Attic",
+		"blurb": "Up in the dusty attic: corkscrew past the rocking horse, spiral round the old trunks and double-jump the boxes!",
+		"features": ["Corkscrew", "Spiral climb", "Double jump", "Loop-de-loop", "Slalom"],
+		"stars": 3,
+		"color": Color(0.6, 0.42, 0.25),
+	},
 ]
 
 var layout_id := 0
@@ -279,6 +289,8 @@ func _layout(stretch_a: float, stretch_b: float) -> void:
 			_layout_garden(stretch_a, stretch_b)
 		6:
 			_layout_garage(stretch_a, stretch_b)
+		7:
+			_layout_attic(stretch_a, stretch_b)
 		_:
 			_layout_speedway(stretch_a, stretch_b)
 
@@ -473,6 +485,41 @@ func _layout_garage(stretch_a: float, stretch_b: float) -> void:
 	_straight(6.0)
 	_turn(90.0, 16.0, 22.0)             # -> north
 	_straight(22.0)
+
+
+## Track 8: Attic Antics. A corkscrew, a spiral climb round the trunks, a
+## double jump over the boxes, then a loop and a slalom home.
+func _layout_attic(stretch_a: float, stretch_b: float) -> void:
+	_mark("A")
+	_straight(stretch_a)                # north
+	_straight(8.0, FLAG_BOOST)
+	_corkscrew(60.0, 5.5)
+	_straight(8.0)
+	_turn(90.0, 16.0, 22.0)             # -> east
+	_straight(6.0)
+	_helix(360.0, 13.0, 7.5, 12.0)      # spiral up round the trunks
+	_straight(4.0)
+	_ramp_down(7.5)
+	_straight(8.0)
+	_turn(90.0, 16.0, 22.0)             # -> south
+	_straight(8.0, FLAG_BOOST)
+	_straight(4.0)
+	_jump()                             # double jump over the boxes
+	_straight(12.0)
+	_straight(8.0, FLAG_BOOST)
+	_jump()
+	_straight(16.0)
+	_turn(90.0, 16.0, 22.0)             # -> west
+	_mark("B")
+	_straight(stretch_b)
+	_straight(8.0, FLAG_BOOST)
+	_straight(4.0)
+	_loop(8.5, 10.0)
+	_straight(8.0)
+	_slalom(3, 28.0, 13.0)
+	_straight(6.0)
+	_turn(90.0, 16.0, 22.0)             # -> north
+	_straight(20.0)
 
 
 ## Track 6: Backyard Blast, out in the garden. A giant jump over the pond,
