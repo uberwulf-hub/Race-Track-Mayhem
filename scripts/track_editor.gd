@@ -65,7 +65,13 @@ var _dragging := false          # dragging turns the view instead of picking a p
 func _ready() -> void:
 	Sfx.play_music("garage")
 	_slot = Game.editing_slot
-	if _slot >= 0 and _slot < Game.custom_tracks.size():
+	var handoff: Dictionary = Game.builder_handoff
+	Game.builder_handoff = {}
+	if not handoff.is_empty():
+		# Coming from Build Anywhere with this track.
+		_pieces = (handoff.get("pieces", []) as Array).duplicate()
+		_room_theme = String(handoff.get("room", "bedroom"))
+	elif _slot >= 0 and _slot < Game.custom_tracks.size():
 		var t: Dictionary = Game.custom_tracks[_slot]
 		_pieces = (t.get("pieces", []) as Array).duplicate()
 		_room_theme = t.get("room", "bedroom")
@@ -74,7 +80,9 @@ func _ready() -> void:
 		_pieces = ["straight", "right", "loop", "right"]   # a little starter track
 	_build_scene()
 	_build_ui()
-	if _slot >= 0:
+	if not handoff.is_empty():
+		_name_edit.text = String(handoff.get("name", "My Track"))
+	elif _slot >= 0:
 		_name_edit.text = Game.custom_tracks[_slot].get("name", "My Track")
 	else:
 		_name_edit.text = NAMES[randi() % NAMES.size()]
@@ -543,6 +551,17 @@ func _race_it() -> void:
 	Game.goto_garage()
 
 
+func _to_build_anywhere() -> void:
+	Game.builder_free = true
+	Game.save_settings()
+	var by := ""
+	if _slot >= 0 and _slot < Game.custom_tracks.size():
+		by = String(Game.custom_tracks[_slot].get("by", ""))
+	Game.builder_handoff = {"name": _clean_name(), "room": _room_theme, "pieces": _pieces.duplicate(), "by": by}
+	Game.editing_slot = _slot
+	Game.goto("res://scenes/free_builder.tscn")
+
+
 func _back() -> void:
 	Sfx.play("back")
 	Game.goto_track_select()
@@ -612,14 +631,14 @@ func _build_ui() -> void:
 	root.add_child(top)
 	top.add_child(RaceHud.make_label("TRACK BUILDER", 34, Color(1.0, 0.85, 0.2), 12))
 	_name_edit = LineEdit.new()
-	_name_edit.custom_minimum_size = Vector2(280, 52)
+	_name_edit.custom_minimum_size = Vector2(220, 52)
 	_name_edit.max_length = 24
 	_name_edit.placeholder_text = "Name your track"
 	_name_edit.add_theme_font_size_override("font_size", 26)
 	top.add_child(_name_edit)
 	_room_button = _button(top, "Room: " + Game.room_name(_room_theme).trim_prefix("The "), _cycle_room)
 	_room_button.add_theme_font_size_override("font_size", 20)
-	_room_button.custom_minimum_size = Vector2(260, 52)
+	_room_button.custom_minimum_size = Vector2(220, 52)
 	_count_label = RaceHud.make_label("", 20, Color.WHITE, 8)
 	_count_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	RaceHud.pin(_count_label, Vector2(1, 1), Vector2(-212, -218), Vector2(200, 32))
@@ -629,6 +648,12 @@ func _build_ui() -> void:
 	_mode_button.add_theme_font_size_override("font_size", 20)
 	_mode_button.tooltip_text = "Easy: big simple pieces.  Advanced: every piece and more tools."
 	RaceHud.pin(_mode_button, Vector2(1, 0), Vector2(-232, 14), Vector2(218, 52))
+	# Build Anywhere: drag pieces around the floor like a real toy track set.
+	var anywhere := _button(top, "Build Anywhere!", _to_build_anywhere)
+	anywhere.add_theme_font_size_override("font_size", 20)
+	anywhere.add_theme_color_override("font_color", Color(0.6, 1.0, 1.0))
+	anywhere.tooltip_text = "Drag pieces anywhere on the floor and snap them together"
+	anywhere.custom_minimum_size = Vector2(0, 52)
 	_ui_root = root
 
 	# --- left: piece palette ---

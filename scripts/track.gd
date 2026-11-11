@@ -180,6 +180,37 @@ func piece_end(i: int) -> Transform3D:
 	return Transform3D(Basis(fwd.cross(up).normalized(), up, -fwd), _raw_pos[k])
 
 
+## A Track Builder piece on its own, starting at the origin facing -Z on the
+## floor: {"end": Transform3D where it finishes (relative to its start),
+## "points"/"ups": its centre line, "gaps": [first, last] point index ranges
+## that are in the air}. Pieces only depend on where they start, so placing
+## one is just start_transform * these.
+static var _shape_cache := {}
+
+static func piece_shape(id: String) -> Dictionary:
+	if _shape_cache.has(id):
+		return _shape_cache[id]
+	var t := Track.new()
+	t._reset_turtle()
+	var first := t._raw_pos.size()
+	t._piece(id)
+	var origin := Vector3(0.0, BASE_HEIGHT, 0.0)
+	var pts := PackedVector3Array()
+	var ups := PackedVector3Array()
+	var air := PackedByteArray()
+	for k in range(first, t._raw_pos.size()):
+		pts.append(t._raw_pos[k] - origin)
+		ups.append(t._raw_up[k])
+		air.append(1 if (t._raw_flags[k] & FLAG_GAP) != 0 else 0)
+	var fwd := t._fwd.normalized()
+	var up := t._up.normalized()
+	var end := Transform3D(Basis(fwd.cross(up).normalized(), up, -fwd), t._pos - origin)
+	t.free()
+	var shape := {"end": end, "points": pts, "ups": ups, "air": air}
+	_shape_cache[id] = shape
+	return shape
+
+
 static func piece_info(id: String) -> Dictionary:
 	for p in PIECES:
 		if p["id"] == id:

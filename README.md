@@ -159,6 +159,11 @@ numbered chips: tap a chip (or tap the piece on the track) to pick it, and it gl
 left or right, or delete it. Undo brings back anything. There are two modes (switch with the Mode button):
 Click the track (or a chip) where you want to build: new pieces go right after it, shown by the yellow
 "NEW PIECES GO HERE" arrow and a "+" in the chip row. Tap Done to build on the end again.
+- **Build Anywhere!** (button at the top of the builder): like a real toy track set. Drag pieces out of the
+  tray onto the floor, and when a piece's end comes close to another end it snaps on with a click. Pick up any
+  piece to move it, turn it (R or right-click) or drop it in the bin. Pieces joined up from the start line make
+  the race; loose pieces show faded with yellow arrows on their open ends. The road home is still added for you.
+  Switch back any time with Simple Builder.
 - **Easy:** 8 big, simple pieces.
 - **Advanced:** every piece; drag chips to reorder; Replace,
   Flip (left/right) and Copy; Redo; and shortcuts (`[` `]` pick, Ctrl+Left/Right move, F flip, D copy, Delete, Ctrl+Z/Y).

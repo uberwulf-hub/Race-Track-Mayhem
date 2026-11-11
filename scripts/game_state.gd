@@ -104,6 +104,8 @@ var custom_tracks: Array = []    # [{"name": String, "room": String, "pieces": A
 var editing_slot := -1           # which custom track the builder is editing (-1 = a new one)
 var skip_track_select := false   # "Race It!" in the builder goes straight to the race
 var builder_advanced := false    # Track Builder in Advanced mode (more pieces and tools)
+var builder_free := false        # Track Builder opens in Build Anywhere (drag pieces anywhere)
+var builder_handoff := {}        # a track passed between the two builders when switching
 
 var ui_theme: Theme
 
@@ -188,7 +190,8 @@ func goto_track_select() -> void:
 
 func goto_editor(slot: int = -1) -> void:
 	editing_slot = slot
-	goto("res://scenes/track_editor.tscn")
+	builder_handoff = {}
+	goto("res://scenes/free_builder.tscn" if builder_free else "res://scenes/track_editor.tscn")
 
 
 func goto_race() -> void:
@@ -345,6 +348,7 @@ func _read_player(cfg: ConfigFile) -> void:
 	ghost_enabled = bool(cfg.get_value("settings", "ghost", true))
 	powerups_enabled = bool(cfg.get_value("settings", "powerups", true))
 	builder_advanced = bool(cfg.get_value("settings", "builder_advanced", false))
+	builder_free = bool(cfg.get_value("settings", "builder_free", false))
 	auto_go = bool(cfg.get_value("settings", "auto_go", false))
 	best_times = cfg.get_value("records", "best_times", {})
 	best_laps = cfg.get_value("records", "best_laps", {})
@@ -399,6 +403,7 @@ func _write_player() -> void:
 	cfg.set_value("settings", "ghost", ghost_enabled)
 	cfg.set_value("settings", "powerups", _own_prefs.get("powerups", powerups_enabled))
 	cfg.set_value("settings", "builder_advanced", builder_advanced)
+	cfg.set_value("settings", "builder_free", builder_free)
 	cfg.set_value("settings", "auto_go", auto_go)
 	cfg.set_value("records", "best_times", best_times)
 	cfg.set_value("records", "best_laps", best_laps)
