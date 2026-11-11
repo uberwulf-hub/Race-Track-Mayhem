@@ -206,6 +206,8 @@ server as internet races (`server/relay/tracks.mjs`).
 - **Track Gallery** (track picker): the most raced and newest tracks everyone has shared. Tap Race! to download one and race it.
 - **Badges:** 25 badges to collect, like Winner!, Big Air, Tourist, Sharing is Caring and Toy Box Hero. See them all
   in the Badges room on the main menu.
+- **Showroom** (Badges, then Visit the Showroom): every car on its own spinning pedestal, with your Grand Prix
+  cups and badge medals on the shelves. Locked cars show as mystery shapes with how to get them.
 
 **Unlockables.** Finish races to earn stars (3 for 1st place, 2 for 2nd, 1 for finishing), plus bonus stars for Grand Prix trophies:
 - **Paint:** Sky Blue, Lime Zest, Midnight, Shiny Gold, Chrome, Galaxy.

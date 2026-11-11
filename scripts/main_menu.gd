@@ -717,6 +717,9 @@ func _build_badges(root: Control) -> Control:
 		int(st.get("races", 0)), int(st.get("wins", 0)), int(st.get("jumps", 0))], 22, Color(0.85, 0.95, 1.0), 6)
 	summary.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(summary)
+	var visit := _button(box, "Visit the Showroom: all your cars, cups and badges", func(): Game.goto("res://scenes/showroom.tscn"))
+	visit.add_theme_font_size_override("font_size", 22)
+	visit.add_theme_color_override("font_color", Color(1.0, 0.9, 0.5))
 	var grid := GridContainer.new()
 	grid.columns = 5
 	grid.add_theme_constant_override("h_separation", 10)
