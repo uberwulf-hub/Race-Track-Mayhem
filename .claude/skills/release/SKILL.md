@@ -18,6 +18,10 @@ changes, tiny tweaks, or work in progress. When unsure, ask the user ("worth a r
 with the next batch?"). When you hold a release back, say so, and keep a running list of the unreleased
 changes so the next release notes cover them.
 
+The Release workflow also enforces **one release a day** (UTC): a second run that day fails at the
+`once-a-day` job unless started by hand with "Release even if one already ran today" (`force: true`).
+Only use `force` when the user asks for it. The free minutes ran out on 2026-11-14.
+
 ## Steps
 
 1. **Test first.** Run the changed screens headless under xvfb at the user's window size (1510x930) and
