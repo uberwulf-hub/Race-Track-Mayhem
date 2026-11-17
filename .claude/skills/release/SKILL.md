@@ -9,6 +9,15 @@ Players get updates from **SauceStore**, which reads the repo's latest public Gi
 (uberwulf-hub/Race-Track-Mayhem) about every 10 minutes. A release must carry **both**
 `RaceTrackMayhem-windows.zip` and `RaceTrackMayhem-android.apk` (names come from `saucestore.json` > `assets`).
 
+## Only release when it's worth it
+
+Build minutes are limited and the owner won't pay for more, so **don't release after every change**.
+Commit and push small things as usual, then release when there's something players will notice: a new
+feature, a fix for a bug players actually hit, or a batch of smaller changes. Not for README/skill/CI-only
+changes, tiny tweaks, or work in progress. When unsure, ask the user ("worth a release now, or bundle it
+with the next batch?"). When you hold a release back, say so, and keep a running list of the unreleased
+changes so the next release notes cover them.
+
 ## Steps
 
 1. **Test first.** Run the changed screens headless under xvfb at the user's window size (1510x930) and
