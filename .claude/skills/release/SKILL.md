@@ -54,15 +54,11 @@ Players get updates from **SauceStore**, which reads the repo's latest public Gi
   `go-public-bandaid` skill. It's a TEMPORARY bandaid: always give the user its full warning first and
   suggest the real fixes.
 
-- **Stuck on "Set up rcedit"**: that step installs wine from Ubuntu's apt mirrors so rcedit can put the icon
-  into the .exe. When the mirrors are unreachable it hangs. The step now has `timeout-minutes: 6` and
-  `continue-on-error: true`, so the release still ships, just with Godot's default .exe icon.
-  If a run sits on any step far longer than usual, cancel it (`cancel_workflow_run`), read the logs
-  (`get_job_logs`), fix, and re-run with the same version (the release isn't created until the last step,
-  so re-running is safe).
-- **The icon check is a false positive**: "Check the game's icon is in the .exe" searches the whole .exe,
-  which includes the embedded game pack that contains `icon.ico`, so it reports "7 of 7 found" even when
-  rcedit didn't run. Trust the export log line "Could not start rcedit executable" instead.
+- **No icon tool in the build (on purpose):** to save build minutes, the Windows build no longer installs
+  wine/rcedit, and `application/modify_resources=false` in `export_presets.cfg`. The .exe file shows Godot's
+  default icon in File Explorer; the game window still uses the game's icon. Don't add it back without asking.
+- **A run stuck far longer than usual:** cancel it (`cancel_workflow_run`), read the logs (`get_job_logs`),
+  fix, and re-run with the same version (the release isn't created until the last step, so re-running is safe).
 - **Release already exists for that tag**: `gh release create` fails. Use the next patch version rather
   than deleting a public release.
 - **Android signing key**: kept in the Actions cache and refreshed by `keep-android-key.yml` every 3 days.

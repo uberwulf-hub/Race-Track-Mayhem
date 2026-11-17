@@ -56,5 +56,5 @@ the Actions budget/spending limit above $0. Keep it at $0 (no charges; builds ju
 Only suggest free options:
 
 - Wait for the monthly free minutes to reset (GitHub Settings > Billing shows usage and the reset date).
-- Cut minutes per release: cache more of the build, skip the wine/rcedit install when the icon isn't needed.
+- Cut minutes per release: cache more of the build (the wine/rcedit icon install was already dropped).
 - Move the Suno music out of the repo so going public later wouldn't expose it.

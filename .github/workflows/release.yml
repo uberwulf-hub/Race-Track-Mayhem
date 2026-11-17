@@ -51,30 +51,6 @@ jobs:
             rm /tmp/templates.tpz
           fi
 
-      # Optional: if Ubuntu's package servers are down the release still ships, just with Godot's
-      # default icon on the .exe (the check step below warns about it).
-      - name: Set up rcedit (puts the game's icon into the .exe)
-        timeout-minutes: 6
-        continue-on-error: true
-        run: |
-          set -e
-          sudo dpkg --add-architecture i386 >/dev/null 2>&1 || true
-          export DEBIAN_FRONTEND=noninteractive
-          sudo timeout 90 apt-get update -qq || true
-          sudo DEBIAN_FRONTEND=noninteractive timeout 150 apt-get install -y -qq wine64 >/dev/null || sudo DEBIAN_FRONTEND=noninteractive timeout 150 apt-get install -y -qq wine >/dev/null
-          WINE=$(command -v wine64 || command -v wine)
-          mkdir -p ~/tools
-          curl -sSL --retry 3 --max-time 120 -o ~/tools/rcedit.exe https://github.com/electron/rcedit/releases/download/v2.0.0/rcedit-x64.exe
-          export WINEDEBUG=-all
-          timeout 120 "$WINE" wineboot -i >/dev/null 2>&1 < /dev/null || true
-          mkdir -p ~/.config/godot
-          for f in editor_settings-4.tres editor_settings-4.3.tres; do
-            printf '%s\n' '[gd_resource type="EditorSettings" format=3]' '' '[resource]' \
-              "export/windows/rcedit = \"$HOME/tools/rcedit.exe\"" \
-              "export/windows/wine = \"$WINE\"" > ~/.config/godot/$f
-          done
-          echo "WINEDEBUG=-all" >> "$GITHUB_ENV"
-
       - name: Stamp the version number
         env:
           VERSION: ${{ inputs.version || github.ref_name }}
@@ -90,24 +66,6 @@ jobs:
           mkdir -p build/windows
           ~/godot/godot --headless --path . --export-release "Windows Desktop" build/windows/RaceTrackMayhem.exe
           test -s build/windows/RaceTrackMayhem.exe
-
-      - name: Check the game's icon is in the .exe
-        run: |
-          pip install -q pefile
-          python3 - <<'PY'
-          import pefile, struct
-          ico = open("icon.ico", "rb").read()
-          count = struct.unpack_from("<H", ico, 4)[0]
-          images = []
-          for i in range(count):
-              size, offset = struct.unpack_from("<II", ico, 6 + i * 16 + 8)
-              images.append(ico[offset:offset + size])
-          exe = open("build/windows/RaceTrackMayhem.exe", "rb").read()
-          found = sum(1 for img in images if img in exe)
-          print(f"{found} of {len(images)} icon images found in the exe")
-          if found == 0:
-              print("::warning::The game's icon did not get into the .exe (rcedit didn't run?)")
-          PY
 
       - name: Zip it up
         run: |
