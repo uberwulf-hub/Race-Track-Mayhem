@@ -30,6 +30,10 @@ visibility for them, never present it as the normal way to release, and never sk
    ```
    If anything turns up, **stop**: don't go public until it's removed and the secret is rotated.
    (Last scan, 2026-11-17: nothing found.)
+3b. **Your email address is in the commit history.** Every commit records its author's email, and GitHub
+   shows it to anyone once the repo is public. Check with `git log --format='%ae' | sort | uniq -c`.
+   (Repos already public may expose it already. To stop it on future commits: GitHub Settings > Emails >
+   "Keep my email addresses private", and commit with the noreply address. Old commits keep the old address.)
 4. **What stays private anyway:** repository/Actions secrets (Cloudflare token), the Android signing key in
    the Actions cache, the SauceStore listing.
 5. **It's reversible but not undoable.** Switching back to private hides the repo again, but anything that was
