@@ -9,18 +9,42 @@ on:
     tags: ["v*"]
   workflow_dispatch:
     inputs:
+      force:
+        description: "Release even if one already ran today"
+        type: boolean
+        default: false
       version:
         description: "Version to publish, like v1.0.1"
         required: true
 
 permissions:
+  actions: read
   contents: write
 
 env:
   GODOT_VERSION: "4.3"
 
 jobs:
+  once-a-day:
+    # Keeps GitHub's free 2,000 build minutes a month in budget: one release a day (days in UTC). To release again
+    # today anyway, run this workflow by hand with "Release even if one already ran today" ticked.
+    runs-on: ubuntu-latest
+    steps:
+      - name: Only one release a day
+        if: ${{ !inputs.force }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          wf=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" --jq .workflow_id)
+          n=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/$wf/runs?created=$(date -u +%Y-%m-%d)&status=success" --jq .total_count)
+          if [ "$n" -gt 0 ]; then
+            echo "::error::A release already ran today. To release again anyway, run it by hand with 'Release even if one already ran today' ticked."
+            exit 1
+          fi
+
   windows:
+    needs: once-a-day
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
