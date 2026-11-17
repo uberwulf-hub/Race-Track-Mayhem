@@ -49,6 +49,11 @@ Players get updates from **SauceStore**, which reads the repo's latest public Gi
 
 ## Known problems
 
+- **Out of GitHub Actions minutes** (workflow won't start, or fails mentioning minutes/spending limit/billing):
+  the repo is private, and private repos get a limited number of free build minutes a month. Use the
+  `go-public-bandaid` skill. It's a TEMPORARY bandaid: always give the user its full warning first and
+  suggest the real fixes.
+
 - **Stuck on "Set up rcedit"**: that step installs wine from Ubuntu's apt mirrors so rcedit can put the icon
   into the .exe. When the mirrors are unreachable it hangs. The step now has `timeout-minutes: 6` and
   `continue-on-error: true`, so the release still ships, just with Godot's default .exe icon.
