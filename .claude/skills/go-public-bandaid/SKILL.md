@@ -51,11 +51,10 @@ Then ask whether they still want to go ahead. Only continue on a clear yes.
 
 ## Real fixes to suggest instead (every time)
 
+**The owner does not want to spend any money on GitHub.** Never suggest a paid plan, extra minutes, or raising
+the Actions budget/spending limit above $0. Keep it at $0 (no charges; builds just stop when free minutes run out).
+Only suggest free options:
+
 - Wait for the monthly free minutes to reset (GitHub Settings > Billing shows usage and the reset date).
-- Set a small Actions budget/spending limit in GitHub billing so private builds keep running. **This costs real
-  money**: past the free minutes, usage is charged to the user's card up to the limit (Linux runners are under a
-  cent a minute, so a ~8-minute release is roughly 5-10 cents). The limit is a cap, not a free allowance. A limit
-  of $0 (the default with no payment method) means no charges, and builds simply stop at the free minutes.
-  Make sure "stop usage when the budget is reached" is on, so it can never go past the cap.
 - Cut minutes per release: cache more of the build, skip the wine/rcedit install when the icon isn't needed.
 - Move the Suno music out of the repo so going public later wouldn't expose it.
