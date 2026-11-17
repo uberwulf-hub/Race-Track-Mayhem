@@ -28,6 +28,7 @@ jobs:
   once-a-day:
     # Keeps GitHub's free 2,000 build minutes a month in budget: one release a day (days in UTC). To release again
     # today anyway, run this workflow by hand with "Release even if one already ran today" ticked.
+    # While the repo is public (the go-public bandaid), builds don't use minutes, so there's no daily limit.
     runs-on: ubuntu-latest
     steps:
       - name: Only one release a day
@@ -36,6 +37,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -e
+          if [ "$(gh api "repos/$GITHUB_REPOSITORY" --jq .private)" = "false" ]; then
+            echo "The repo is public, so builds don't use minutes: no daily limit."
+            exit 0
+          fi
           wf=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" --jq .workflow_id)
           n=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/$wf/runs?created=$(date -u +%Y-%m-%d)&status=success" --jq .total_count)
           if [ "$n" -gt 0 ]; then

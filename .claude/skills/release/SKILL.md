@@ -9,7 +9,16 @@ Players get updates from **SauceStore**, which reads the repo's latest public Gi
 (uberwulf-hub/Race-Track-Mayhem) about every 10 minutes. A release must carry **both**
 `RaceTrackMayhem-windows.zip` and `RaceTrackMayhem-android.apk` (names come from `saucestore.json` > `assets`).
 
-## Only release when it's worth it
+## How often to release depends on whether the repo is public
+
+Check first with `list_repos` (query `race-track`) and look at `visibility`.
+
+- **Public** (usually because of the `go-public-bandaid` skill): builds don't use minutes, so release as
+  often as the work deserves. The workflow's daily limit switches itself off. Still remind the user that
+  public is a temporary bandaid and when it's due to go back to private.
+- **Private**: follow the rules below.
+
+## Only release when it's worth it (private repo)
 
 Build minutes are limited and the owner won't pay for more, so **don't release after every change**.
 Commit and push small things as usual, then release when there's something players will notice: a new

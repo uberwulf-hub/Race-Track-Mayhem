@@ -45,9 +45,14 @@ Then ask whether they still want to go ahead. Only continue on a clear yes.
    **Danger Zone** > **Change visibility** > **Make public** > confirm.
 3. Confirm it took effect with `list_repos` (query `race-track`): `visibility` should be `public`.
 4. Re-run the release (see the `release` skill).
-5. **Remind the user to switch back** once the release is out (same place, **Make private**), unless they
-   choose to stay public. Offer to schedule a reminder (`send_later`) for when the monthly minutes reset
-   (start of the next billing month).
+5. **Schedule the switch-back reminder.** Claude can't change visibility, so this is a reminder for the user.
+   - Ask the user for the reset date: github.com > Settings > Billing and plans > Usage shows when included
+     minutes reset (Claude can't read billing).
+   - Create one scheduled task (`create_trigger` with `run_once_at` on the reset date, morning in the
+     user's time zone) that lists **every** repo switched public under this bandaid, with the steps to make
+     each private again and to confirm with `list_repos`. If another repo goes public later in the same cycle,
+     update that task's prompt (`update_trigger`) to add it rather than making a second one.
+   - While public, releases aren't limited (see the `release` skill); back on private, the private rules apply.
 
 ## Real fixes to suggest instead (every time)
 
