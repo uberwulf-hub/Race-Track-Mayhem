@@ -67,3 +67,9 @@ Only suggest free options:
 - Wait for the monthly free minutes to reset (GitHub Settings > Billing shows usage and the reset date).
 - Cut minutes per release: cache more of the build (the wine/rcedit icon install was already dropped).
 - Move the Suno music out of the repo so going public later wouldn't expose it.
+
+## Current bandaid (update this when it changes)
+
+- Public since 2026-11-17: Race-Track-Mayhem, KidRampage, 13thSignal.
+- Switch-back reminder: scheduled task `trig_01EbmSMiGpBh8e5KYZA3cZS9`, 2026-12-01 9:00 AM Arizona time.
+  If another repo goes public before then, add it to that task's prompt (`update_trigger`) instead of making a new one.
