@@ -645,9 +645,10 @@ func _build_ui() -> void:
 	root.add_child(_count_label)
 
 	_mode_button = _button(root, "", _toggle_mode)
-	_mode_button.add_theme_font_size_override("font_size", 20)
+	_mode_button.add_theme_font_size_override("font_size", 18)
 	_mode_button.tooltip_text = "Easy: big simple pieces.  Advanced: every piece and more tools."
 	RaceHud.pin(_mode_button, Vector2(1, 0), Vector2(-232, 14), Vector2(218, 52))
+	_mode_button.grow_horizontal = Control.GROW_DIRECTION_BEGIN
 	# Build Anywhere: drag pieces around the floor like a real toy track set.
 	var anywhere := _button(top, "Build Anywhere!", _to_build_anywhere)
 	anywhere.add_theme_font_size_override("font_size", 20)
@@ -675,6 +676,7 @@ func _build_ui() -> void:
 	# --- right: tools for the picked piece ---
 	_tools = PanelContainer.new()
 	RaceHud.pin(_tools, Vector2(1, 0), Vector2(-282, 110), Vector2(270, 300))
+	_tools.grow_horizontal = Control.GROW_DIRECTION_BEGIN   # if it needs more room, grow left, not off-screen
 	root.add_child(_tools)
 	var tbox := VBoxContainer.new()
 	tbox.add_theme_constant_override("separation", 6)
@@ -715,16 +717,6 @@ func _build_ui() -> void:
 	RaceHud.pin(_status, Vector2(0.5, 1), Vector2(-280, -224), Vector2(600, 44))
 	root.add_child(_status)
 	_hint = RaceHud.make_label("Tap the track where you want to add pieces.   Drag to turn the view   Pinch or wheel: zoom", 16, Color(1, 1, 1, 0.8), 6)
-	# Zoom buttons (handy on phones).
-	var zoom := HBoxContainer.new()
-	zoom.add_theme_constant_override("separation", 6)
-	RaceHud.pin(zoom, Vector2(1, 1), Vector2(-132, -270), Vector2(120, 50))
-	root.add_child(zoom)
-	for z in [["-", 1.15], ["+", 0.87]]:
-		var factor: float = z[1]
-		var zb := _button(zoom, z[0], func(): _cam_zoom = clampf(_cam_zoom * factor, 0.4, 1.6))
-		zb.custom_minimum_size = Vector2(56, 48)
-		zb.add_theme_font_size_override("font_size", 26)
 	RaceHud.pin(_hint, Vector2(1, 0), Vector2(-830, 74), Vector2(810, 24))
 	_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	root.add_child(_hint)
@@ -732,8 +724,9 @@ func _build_ui() -> void:
 	# --- bottom bar ---
 	var bottom := HBoxContainer.new()
 	bottom.alignment = BoxContainer.ALIGNMENT_CENTER
-	bottom.add_theme_constant_override("separation", 14)
+	bottom.add_theme_constant_override("separation", 8)
 	RaceHud.pin(bottom, Vector2(0.5, 1), Vector2(-500, -86), Vector2(1000, 76))
+	bottom.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	root.add_child(bottom)
 	_button(bottom, "Back", _back)
 	_button(bottom, "Undo", _undo)
@@ -742,11 +735,17 @@ func _build_ui() -> void:
 	_button(bottom, "Save", func(): _save())
 	var race := _button(bottom, "Race It!", _race_it)
 	race.add_theme_font_size_override("font_size", 36)
+	# Zoom buttons (handy on phones), in the bottom bar so nothing can cover them.
+	for z in [["-", 1.15], ["+", 0.87]]:
+		var factor: float = z[1]
+		var zb := _button(bottom, z[0], func(): _cam_zoom = clampf(_cam_zoom * factor, 0.4, 1.6))
+		zb.custom_minimum_size = Vector2(46, 0)
+		zb.add_theme_font_size_override("font_size", 24)
 
 
 ## The piece buttons: 8 big ones in Easy mode, all of them in Advanced.
 func _fill_palette() -> void:
-	_mode_button.text = "Mode: Advanced" if _advanced() else "Mode: Easy"
+	_mode_button.text = "Advanced Mode" if _advanced() else "Easy Mode"
 	for c in _palette_grid.get_children():
 		_palette_grid.remove_child(c)
 		c.queue_free()
