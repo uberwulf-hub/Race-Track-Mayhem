@@ -325,12 +325,12 @@ func _build_lobby() -> void:
 	car_row.add_theme_constant_override("separation", 8)
 	lbox.add_child(car_row)
 	car_row.add_child(RaceHud.make_label("Your car:", 24))
-	_button(car_row, "<", func(): _change_car(-1))
+	_arrow(car_row, "<", func(): _change_car(-1))
 	_car_label = RaceHud.make_label("", 24, Color(1.0, 0.9, 0.4), 8)
 	_car_label.custom_minimum_size = Vector2(190, 0)
 	_car_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	car_row.add_child(_car_label)
-	_button(car_row, ">", func(): _change_car(1))
+	_arrow(car_row, ">", func(): _change_car(1))
 	# A little spinning 3D picture of the car you've picked.
 	var view_box := SubViewportContainer.new()
 	view_box.stretch = true
@@ -392,9 +392,12 @@ func _build_lobby() -> void:
 	bottom.alignment = BoxContainer.ALIGNMENT_CENTER
 	bottom.add_theme_constant_override("separation", 16)
 	_lobby.add_child(bottom)
-	_button(bottom, "Leave", func():
+	var leave := _button(bottom, "Leave", func():
 		Net.leave("")
 		_show_browse())
+	# Fixed size and roomy, so no font (Comic Sans on Windows) can cut letters off.
+	leave.add_theme_font_size_override("font_size", 32)
+	leave.custom_minimum_size = Vector2(190, 0)
 	_start_button = _button(bottom, "START RACE!", func(): Net.start_race())
 	_start_button.add_theme_font_size_override("font_size", 40)
 	_wait_label = RaceHud.make_label("Waiting for the host to start...", 26, Color(0.7, 0.9, 1.0), 8)
@@ -524,7 +527,8 @@ func _setting(label: String, value: String, change: Callable) -> void:
 	if Net.is_host:
 		var b := _button(_settings_box, value, change)
 		b.custom_minimum_size = Vector2(300, 0)
-		b.add_theme_font_size_override("font_size", 24)
+		# Long track names get smaller text so they fit instead of being cut off.
+		b.add_theme_font_size_override("font_size", 24 if value.length() <= 14 else (20 if value.length() <= 18 else 17))
 		b.clip_text = true
 	else:
 		_settings_box.add_child(RaceHud.make_label(value, 24, Color(1.0, 0.9, 0.4), 6))
@@ -537,6 +541,14 @@ func _button(parent: Node, text: String, cb: Callable) -> Button:
 		Sfx.play("select")
 		cb.call())
 	parent.add_child(b)
+	return b
+
+
+## A < or > button with room to spare around the arrow.
+func _arrow(parent: Node, text: String, cb: Callable) -> Button:
+	var b := _button(parent, text, cb)
+	b.add_theme_font_size_override("font_size", 30)
+	b.custom_minimum_size = Vector2(76, 56)
 	return b
 
 
