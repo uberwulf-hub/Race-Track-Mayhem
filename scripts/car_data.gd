@@ -128,6 +128,18 @@ const CARS: Array[Dictionary] = [
 		"secret": true,
 		"unlock": "car_surf",
 	},
+	# Always last, so the other cars keep their numbers (saves and online use them).
+	{
+		"id": "my_build",
+		"name": "My Build",
+		"blurb": "Your very own car! Snap on parts in the Car Builder. Parts change how it drives.",
+		"style": "custom",
+		"body": Color(0.1, 0.72, 0.62),
+		"accent": Color(1.0, 0.8, 0.15),
+		"number": 99,
+		"stats": {"speed": 3, "accel": 3, "handling": 3, "weight": 3},   # replaced by the parts
+		"build": true,
+	},
 ]
 
 const STAT_LABELS := {
@@ -152,9 +164,22 @@ static func get_car(index: int) -> Dictionary:
 	return CARS[wrapi(index, 0, CARS.size())]
 
 
+## The car's 1..5 stats. "My Build" gets them from its parts (in the look).
+static func stats_for(car: Dictionary, look: Dictionary = {}) -> Dictionary:
+	if car.get("build", false):
+		return CarParts.stats_for(look.get("build", {}))
+	return car["stats"]
+
+
+## Is this a car the computer can drive / pick for goals? (Not secret, not My Build.)
+static func is_regular(index: int) -> bool:
+	var c := get_car(index)
+	return not c.get("secret", false) and not c.get("build", false)
+
+
 ## Converts the 1..5 kid-friendly stats into numbers the driving code uses.
-static func physics_for(car: Dictionary) -> Dictionary:
-	var s: Dictionary = car["stats"]
+static func physics_for(car: Dictionary, look: Dictionary = {}) -> Dictionary:
+	var s := stats_for(car, look)
 	return {
 		"top_speed": 27.0 + float(s["speed"]) * 3.2,     # units / second
 		"accel": 9.0 + float(s["accel"]) * 3.2,          # units / second^2

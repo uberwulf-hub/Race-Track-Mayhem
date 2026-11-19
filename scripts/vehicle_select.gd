@@ -27,6 +27,12 @@ var _size_slider: HSlider
 var _swatches: Dictionary = {}     # "color"/"accent" -> Array[Button]
 var _refreshing := false
 var _bottom: Control
+var _build_panel: Control
+var _build_button: Button
+var _build_rows: Dictionary = {}   # slot -> [name Label, effect Label]
+var _build_pips: Dictionary = {}   # stat key -> Array[Panel]
+var _build_next: Label
+var _star_hint: Label
 
 ## Colours for the Car Designer ("" = the car's own).
 const DESIGN_COLORS := ["", "e8241c", "ff7a1a", "ffd21f", "7ed321", "1fae4b", "1fc8d8", "2f6fe8",
@@ -57,6 +63,12 @@ func _input(event: InputEvent) -> void:
 		if event.is_action_pressed("ui_cancel"):
 			Sfx.play("back")
 			_close_designer()
+			get_viewport().set_input_as_handled()
+		return
+	if _build_panel and _build_panel.visible:
+		if event.is_action_pressed("ui_cancel"):
+			Sfx.play("back")
+			_close_builder()
 			get_viewport().set_input_as_handled()
 		return
 	if event.is_action_pressed("ui_left") or event.is_action_pressed("steer_left"):
@@ -104,14 +116,9 @@ func _show_car(animate: bool) -> void:
 	var own := ToyCarModel._html_color(Game.custom_for(car["id"])["color"])
 	_name_label.add_theme_color_override("font_color", (own if own.a > 0.0 and unlocked else car["body"] as Color).lightened(0.25))
 	_blurb_label.text = car["blurb"]
-	for key in _stat_rows:
-		var value: int = car["stats"][key]
-		var pips: Array = _stat_rows[key]
-		for i in pips.size():
-			var sb := StyleBoxFlat.new()
-			sb.set_corner_radius_all(8)
-			sb.bg_color = Color(1.0, 0.8, 0.2) if i < value else Color(1, 1, 1, 0.18)
-			(pips[i] as Panel).add_theme_stylebox_override("panel", sb)
+	_fill_pips(_stat_rows, CarData.stats_for(car, Game.custom_for(car["id"])))
+	_build_button.visible = car.get("build", false)
+	_star_hint.visible = not _build_button.visible   # no room for both
 	for i in _dots.get_child_count():
 		var dot := _dots.get_child(i) as Panel
 		var sb := StyleBoxFlat.new()
@@ -121,6 +128,18 @@ func _show_car(animate: bool) -> void:
 		sb.border_color = Color.WHITE
 		dot.add_theme_stylebox_override("panel", sb)
 		dot.custom_minimum_size = Vector2(30, 30) if i == _index else Vector2(20, 20)
+
+
+## Colours a set of 1..5 stat bars.
+func _fill_pips(rows: Dictionary, stats: Dictionary) -> void:
+	for key in rows:
+		var value := int(stats.get(key, 0))
+		var pips: Array = rows[key]
+		for i in pips.size():
+			var sb := StyleBoxFlat.new()
+			sb.set_corner_radius_all(8)
+			sb.bg_color = Color(1.0, 0.8, 0.2) if i < value else Color(1, 1, 1, 0.18)
+			(pips[i] as Panel).add_theme_stylebox_override("panel", sb)
 
 
 func _choose() -> void:
@@ -346,12 +365,17 @@ func _build_ui() -> void:
 	hint_row.alignment = BoxContainer.ALIGNMENT_CENTER
 	hint_row.add_theme_constant_override("separation", 14)
 	box.add_child(hint_row)
+	_build_button = _make_button(hint_row, "Car Builder", _open_builder)
+	_build_button.add_theme_font_size_override("font_size", 22)
+	_build_button.add_theme_color_override("font_color", Color(1.0, 0.85, 0.4))
 	_design_button = _make_button(hint_row, "Car Designer", _open_designer)
 	_design_button.add_theme_font_size_override("font_size", 22)
 	_design_button.add_theme_color_override("font_color", Color(0.75, 1.0, 1.0))
 	var hint := RaceHud.make_label("★ %d - win races\nto unlock more!" % Game.stars, 17, Color(1.0, 0.9, 0.3), 6)
 	hint_row.add_child(hint)
+	_star_hint = hint
 	_design_panel = _build_designer(root)
+	_build_panel = _build_builder(root)
 
 	_lock_label = RaceHud.make_label("", 34, Color(1.0, 0.75, 0.3), 12)
 	_lock_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -577,3 +601,140 @@ func _rebuild_model() -> void:
 	_car_model = ToyCarModel.new().setup(car, true, Game.custom_for(car["id"]))
 	_car_model.scale = Vector3.ONE * 3.0
 	_car_holder.add_child(_car_model)
+
+
+# ---------------------------------------------------------------------------
+# Car Builder: snap parts onto "My Build". Parts change how it drives.
+# ---------------------------------------------------------------------------
+
+func _build_builder(root: Control) -> Control:
+	var panel := PanelContainer.new()
+	RaceHud.pin(panel, Vector2(1, 0.5), Vector2(-580, -300), Vector2(560, 600))
+	panel.visible = false
+	root.add_child(panel)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 6)
+	panel.add_child(box)
+	var title := RaceHud.make_label("CAR BUILDER", 36, Color(1.0, 0.85, 0.4), 12)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(title)
+
+	var grid := GridContainer.new()
+	grid.columns = 4
+	grid.add_theme_constant_override("h_separation", 8)
+	grid.add_theme_constant_override("v_separation", 2)
+	box.add_child(grid)
+	for slot: String in CarParts.SLOTS:
+		var l := RaceHud.make_label(CarParts.SLOT_NAMES[slot], 22, Color(1.0, 0.9, 0.5), 8)
+		l.custom_minimum_size = Vector2(90, 0)
+		grid.add_child(l)
+		var minus := _make_button(grid, "<", func(): _cycle_part(slot, -1))
+		var mid := VBoxContainer.new()
+		mid.add_theme_constant_override("separation", -4)
+		mid.custom_minimum_size = Vector2(270, 0)
+		grid.add_child(mid)
+		var name_l := RaceHud.make_label("", 22, Color.WHITE, 8)
+		name_l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		mid.add_child(name_l)
+		var eff := RaceHud.make_label("", 15, Color(0.7, 1.0, 0.8), 5)
+		eff.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		mid.add_child(eff)
+		var plus := _make_button(grid, ">", func(): _cycle_part(slot, 1))
+		for b: Button in [minus, plus]:
+			b.add_theme_font_size_override("font_size", 20)
+			b.custom_minimum_size = Vector2(48, 40)
+		_build_rows[slot] = [name_l, eff]
+
+	var stats := GridContainer.new()
+	stats.columns = 2
+	stats.add_theme_constant_override("h_separation", 18)
+	stats.add_theme_constant_override("v_separation", 4)
+	stats.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	box.add_child(stats)
+	for key in ["speed", "accel", "handling", "weight"]:
+		stats.add_child(RaceHud.make_label(CarData.STAT_LABELS[key], 20, Color.WHITE, 8))
+		var pips_box := HBoxContainer.new()
+		pips_box.add_theme_constant_override("separation", 5)
+		var pips: Array = []
+		for i in 5:
+			var pip := Panel.new()
+			pip.custom_minimum_size = Vector2(32, 16)
+			pip.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+			pips_box.add_child(pip)
+			pips.append(pip)
+		stats.add_child(pips_box)
+		_build_pips[key] = pips
+
+	_build_next = RaceHud.make_label("", 17, Color(1.0, 0.9, 0.3), 6)
+	_build_next.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_build_next.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_build_next.custom_minimum_size = Vector2(520, 0)
+	box.add_child(_build_next)
+
+	var done := _make_button(box, "Done!", _close_builder)
+	done.add_theme_font_size_override("font_size", 30)
+	done.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	done.custom_minimum_size = Vector2(200, 0)
+	return panel
+
+
+func _open_builder() -> void:
+	if not CarData.get_car(_index).get("build", false):
+		return
+	_stats_panel.visible = false
+	_bottom.visible = false
+	_lock_label.visible = false
+	_build_panel.visible = true
+	_sync_builder()
+
+
+func _close_builder() -> void:
+	_build_panel.visible = false
+	_stats_panel.visible = true
+	_bottom.visible = true
+	Game.save_settings()
+	_show_car(true)
+	_race_button.grab_focus.call_deferred()
+
+
+## Next (or previous) unlocked part for a slot.
+func _cycle_part(slot: String, d: int) -> void:
+	var car := CarData.get_car(_index)
+	var build: Dictionary = Game.custom_for(car["id"])["build"]
+	var options: Array = []
+	for p in CarParts.of_slot(slot):
+		if Game.is_unlocked(p["id"]):
+			options.append(p["id"])
+	if options.is_empty():
+		return
+	var i := wrapi(options.find(build[slot]) + d, 0, options.size())
+	build[slot] = options[i]
+	Game.set_custom(car["id"], "build", build)
+	Sfx.play("click", 1.0 + d * 0.1)
+	_rebuild_model()
+	_bounce = 0.6
+	_sync_builder()
+
+
+func _sync_builder() -> void:
+	var build: Dictionary = Game.custom_for(CarData.get_car(_index)["id"])["build"]
+	for slot in _build_rows:
+		var part := CarParts.get_part(build[slot])
+		(_build_rows[slot][0] as Label).text = part.get("name", "")
+		(_build_rows[slot][1] as Label).text = CarParts.effect_text(part)
+	_fill_pips(_build_pips, CarParts.stats_for(build))
+	# Tease the next locked part.
+	var best := {}
+	for p in CarParts.PARTS:
+		if Game.is_unlocked(p["id"]):
+			continue
+		var it := Unlocks.get_item(p["id"])
+		if best.is_empty() or int(it.get("stars", 0)) < int(best.get("stars", 0)):
+			best = it
+	if best.is_empty():
+		_build_next.text = "You've got every part!"
+	else:
+		var how := Unlocks.requirement_text(best)
+		_build_next.text = "Next part: %s. %s (you have ★ %d)" % [best["name"], how, Game.stars] if not best.has("how") \
+			else "Next part: %s. %s!" % [best["name"], how]
+

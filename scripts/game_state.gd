@@ -743,7 +743,11 @@ func award_trophy(place: int) -> Array:
 
 
 func is_unlocked(item_id: String) -> bool:
-	return extras.has(item_id) or Unlocks.available(stars, trophies).has(item_id)
+	if extras.has(item_id) or Unlocks.available(stars, trophies).has(item_id):
+		return true
+	# Some things unlock by doing something counted in stats (e.g. beating a boss).
+	var it := Unlocks.get_item(item_id)
+	return it.has("stat") and int(stats.get(String(it["stat"]), 0)) >= int(it.get("goal", 1))
 
 
 ## Unlocks a special item (holiday car, badge rewards, story mode...).
@@ -827,7 +831,9 @@ func custom_for(car_id: String) -> Dictionary:
 		# sticker sits (-1 front .. 1 back), how big it is, and the car's name.
 		"color": String(c.get("color", "")), "accent": String(c.get("accent", "")),
 		"sticker_at": float(c.get("sticker_at", 0.0)), "sticker_size": float(c.get("sticker_size", 1.0)),
-		"nickname": String(c.get("nickname", ""))}
+		"nickname": String(c.get("nickname", "")),
+		# Car Builder parts (only used by "My Build"; see CarParts).
+		"build": CarParts.clean(c.get("build", {}))}
 
 
 func set_custom(car_id: String, slot: String, item_id: Variant) -> void:

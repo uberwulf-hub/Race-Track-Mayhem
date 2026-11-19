@@ -16,8 +16,8 @@ var _start_button: Button
 var _wait_label: Label
 var _lobby_cols: Control
 var _code: LineEdit
-var _feed: Label
-var _feed_lines: Array = []
+var _pops: EmotePops
+var _stat_pips: Dictionary = {}   # stat key -> Array[Panel], for your car
 var _friends_button: Button
 var _friends_panel: Control
 var _friends_list: VBoxContainer
@@ -54,6 +54,8 @@ func _ready() -> void:
 	_build_browse()
 	_build_lobby()
 	_build_friends()
+	_pops = EmotePops.new()
+	add_child(_pops)
 	var back := _button(self, "< Back", _go_back)
 	back.add_theme_font_size_override("font_size", 24)
 	RaceHud.pin(back, Vector2(0, 0), Vector2(16, 16), Vector2(140, 56))
@@ -332,11 +334,35 @@ func _build_lobby() -> void:
 	car_row.add_child(_car_label)
 	_arrow(car_row, ">", func(): _change_car(1))
 	# A little spinning 3D picture of the car you've picked.
+	# The car on the left, its stats on the right.
+	var car_box := HBoxContainer.new()
+	car_box.add_theme_constant_override("separation", 12)
+	car_box.alignment = BoxContainer.ALIGNMENT_CENTER
+	lbox.add_child(car_box)
 	var view_box := SubViewportContainer.new()
 	view_box.stretch = true
-	view_box.custom_minimum_size = Vector2(460, 150)
-	view_box.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	lbox.add_child(view_box)
+	view_box.custom_minimum_size = Vector2(230, 150)
+	view_box.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	car_box.add_child(view_box)
+	var stats := GridContainer.new()
+	stats.columns = 2
+	stats.add_theme_constant_override("h_separation", 10)
+	stats.add_theme_constant_override("v_separation", 6)
+	stats.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	car_box.add_child(stats)
+	for key in ["speed", "accel", "handling", "weight"]:
+		stats.add_child(RaceHud.make_label(CarData.STAT_LABELS[key], 20, Color.WHITE, 6))
+		var pips_box := HBoxContainer.new()
+		pips_box.add_theme_constant_override("separation", 4)
+		pips_box.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		var pips: Array = []
+		for i in 5:
+			var pip := Panel.new()
+			pip.custom_minimum_size = Vector2(24, 16)
+			pips_box.add_child(pip)
+			pips.append(pip)
+		stats.add_child(pips_box)
+		_stat_pips[key] = pips
 	var vp := SubViewport.new()
 	vp.own_world_3d = true
 	vp.transparent_bg = true
@@ -373,19 +399,28 @@ func _build_lobby() -> void:
 	_settings_box.add_theme_constant_override("v_separation", 6)
 	rbox.add_child(_settings_box)
 
-	# Emote buttons and the latest messages.
+	# Emote buttons: funny faces, then words. They pop up on the left (EmotePops).
+	var faces := HBoxContainer.new()
+	faces.alignment = BoxContainer.ALIGNMENT_CENTER
+	faces.add_theme_constant_override("separation", 8)
+	_lobby.add_child(faces)
 	var emotes := HBoxContainer.new()
 	emotes.alignment = BoxContainer.ALIGNMENT_CENTER
 	emotes.add_theme_constant_override("separation", 8)
 	_lobby.add_child(emotes)
 	for i in Net.EMOTES.size():
 		var idx := i
-		var e := _button(emotes, Net.EMOTES[i], func(): Net.send_emote(idx))
-		e.add_theme_font_size_override("font_size", 20)
-		e.add_theme_color_override("font_color", Net.EMOTE_COLORS[i])
-	_feed = RaceHud.make_label("", 22, Color.WHITE, 6)
-	_feed.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_lobby.add_child(_feed)
+		var e: Button
+		if i >= Net.WORD_EMOTES:
+			e = _button(faces, "", func(): Net.send_emote(idx))
+			e.icon = EmoteFaces.texture(Net.EMOTES[i], 46)
+			e.custom_minimum_size = Vector2(72, 58)
+			e.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			e.tooltip_text = EmoteFaces.FACES[Net.EMOTES[i]]
+		else:
+			e = _button(emotes, Net.EMOTES[i], func(): Net.send_emote(idx))
+			e.add_theme_font_size_override("font_size", 20)
+			e.add_theme_color_override("font_color", Net.EMOTE_COLORS[i])
 	Net.emote_received.connect(_on_emote)
 
 	var bottom := HBoxContainer.new()
@@ -408,10 +443,7 @@ func _on_emote(peer_id: int, text: String) -> void:
 	if not is_inside_tree():
 		return
 	var who := "You" if peer_id == Net.my_id() else Net.player_name_of(peer_id)
-	_feed_lines.append("%s: %s" % [who, text])
-	while _feed_lines.size() > 2:
-		_feed_lines.pop_front()
-	_feed.text = "    ".join(_feed_lines)
+	_pops.pop(who, text)
 	Sfx.play("click", 1.4)
 
 
@@ -714,3 +746,11 @@ func _show_preview(index: int) -> void:
 	var car := CarData.get_car(index)
 	var model := ToyCarModel.new().setup(car, false, Game.custom_for(car["id"]))
 	_preview_spin.add_child(model)
+	var st := CarData.stats_for(car, Game.custom_for(car["id"]))
+	for key in _stat_pips:
+		var pips: Array = _stat_pips[key]
+		for i in pips.size():
+			var sb := StyleBoxFlat.new()
+			sb.set_corner_radius_all(6)
+			sb.bg_color = Color(1.0, 0.8, 0.2) if i < int(st.get(key, 0)) else Color(1, 1, 1, 0.18)
+			(pips[i] as Panel).add_theme_stylebox_override("panel", sb)

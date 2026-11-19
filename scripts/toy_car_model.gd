@@ -62,6 +62,8 @@ func setup(car_def: Dictionary, with_shadow := true, look: Dictionary = {}) -> T
 			_build_pumpkin()
 		"surf":
 			_build_surf()
+		"custom":
+			_build_custom(CarParts.clean(look.get("build", {})))
 		_:
 			_build_sport()
 	if paint.get("metal", false):
@@ -960,3 +962,211 @@ func _star(pos: Vector3, side: float, size: float, mat: Material) -> void:
 		tri.rotation = Vector3(0, 0, PI * 0.5)
 		tri.rotate_object_local(Vector3.UP, PI * k / 3.0 + PI / 6.0)
 		body_root.add_child(tri)
+
+
+# ---------------------------------------------------------------------------
+# My Build: put together from Car Builder parts (see CarParts)
+# ---------------------------------------------------------------------------
+
+func _build_custom(build: Dictionary) -> void:
+	var body := paint(car["body"])
+	var accent := plastic(car["accent"])
+	var dark := plastic(Color(0.15, 0.15, 0.18), 0.4)
+	var gl := glass()
+	# Each body says where things go: half width, front/back, the deck the engine
+	# sits on, the roof the topper sits on, light height and sticker band.
+	var a := {}
+	match String(build["body"]):
+		"part_body_truck":
+			_box(body_root, Vector3(0.9, 0.2, 1.7), Vector3(0, 0.5, 0), dark)
+			_box(body_root, Vector3(1.15, 0.5, 2.0), Vector3(0, 0.85, 0), body)
+			_box(body_root, Vector3(0.95, 0.4, 0.85), Vector3(0, 1.3, -0.3), gl)
+			_box(body_root, Vector3(1.0, 0.07, 0.9), Vector3(0, 1.53, -0.3), body)
+			_box(body_root, Vector3(1.17, 0.08, 0.95), Vector3(0, 1.12, 0.52), accent)       # truck bed rim
+			_seam(0.575, 0.62, 1.05, 0.12)
+			_handles(0.575, 0.95, -0.05)
+			_mirrors(0.5, 1.25, -0.6, accent)
+			a = {"hw": 0.575, "front": -1.0, "back": 1.0, "deck": 1.1, "roof": 1.57, "top_z": -0.3,
+				"light": 0.9, "side_y": 0.85, "side_h": 0.4, "len": 2.0}
+		"part_body_buggy":
+			_box(body_root, Vector3(1.0, 0.25, 1.9), Vector3(0, 0.42, 0), body)
+			_box(body_root, Vector3(0.45, 0.3, 0.4), Vector3(0, 0.7, 0.2), accent)              # seat
+			for side: float in [-1.0, 1.0]:
+				_bar(body_root, Vector3(side * 0.42, 0.55, 0.45), Vector3(side * 0.36, 1.35, 0.25), 0.05, dark)
+				_bar(body_root, Vector3(side * 0.42, 0.55, -0.25), Vector3(side * 0.36, 1.35, 0.05), 0.05, dark)
+				_bar(body_root, Vector3(side * 0.36, 1.35, 0.25), Vector3(side * 0.36, 1.35, 0.05), 0.05, dark)
+			_bar(body_root, Vector3(-0.36, 1.35, 0.15), Vector3(0.36, 1.35, 0.15), 0.05, dark)
+			a = {"hw": 0.5, "front": -0.95, "back": 0.95, "deck": 0.55, "roof": 1.38, "top_z": 0.15,
+				"light": 0.5, "side_y": 0.42, "side_h": 0.22, "len": 1.9}
+		"part_body_van":
+			_box(body_root, Vector3(1.18, 0.95, 2.1), Vector3(0, 0.8, 0.05), body)
+			_box(body_root, Vector3(1.12, 0.45, 0.4), Vector3(0, 0.55, -1.12), body)          # bonnet
+			_box(body_root, Vector3(1.0, 0.35, 0.05), Vector3(0, 1.0, -1.0), gl, Vector3(-0.35, 0, 0))
+			for side: float in [-1.0, 1.0]:
+				_box(body_root, Vector3(0.02, 0.3, 1.5), Vector3(side * 0.6, 1.02, 0.15), gl)
+			_seam(0.59, 0.36, 1.2, -0.6)
+			_handles(0.59, 0.88, -0.7)
+			_mirrors(0.52, 1.02, -0.9, accent)
+			a = {"hw": 0.59, "front": -1.32, "back": 1.1, "deck": 1.28, "roof": 1.28, "top_z": -0.1,
+				"light": 0.62, "side_y": 0.66, "side_h": 0.36, "len": 2.1}
+		"part_body_bullet":
+			var hull := MeshInstance3D.new()
+			var cap := CapsuleMesh.new()
+			cap.radius = 0.48
+			cap.height = 2.3
+			hull.mesh = cap
+			hull.material_override = body
+			hull.rotation.x = PI * 0.5
+			hull.position = Vector3(0, 0.62, 0.05)
+			body_root.add_child(hull)
+			var bubble := _sphere(body_root, 0.32, Vector3(0, 0.98, -0.15), gl, Vector3(1.0, 0.8, 1.5))
+			bubble.name = "Bubble"
+			_box(body_root, Vector3(1.0, 0.06, 1.6), Vector3(0, 0.62, 0.05), accent, Vector3.ZERO, 0.0)   # belt line
+			a = {"hw": 0.48, "front": -1.18, "back": 1.2, "deck": 0.98, "roof": 1.24, "top_z": -0.15,
+				"light": 0.62, "side_y": 0.6, "side_h": 0.25, "len": 1.8}
+		_:   # racer
+			_box(body_root, Vector3(1.12, 0.36, 2.05), Vector3(0, 0.45, 0.0), body)
+			_box(body_root, Vector3(0.9, 0.34, 0.95), Vector3(0, 0.78, 0.15), gl)
+			_box(body_root, Vector3(0.86, 0.06, 0.8), Vector3(0, 0.96, 0.18), body)
+			_box(body_root, Vector3(1.16, 0.07, 1.9), Vector3(0, 0.56, 0.0), accent)       # stripe band
+			_seam(0.56, 0.3, 0.52, -0.3)
+			_handles(0.56, 0.47, 0.42)
+			_mirrors(0.45, 0.76, -0.28, accent)
+			a = {"hw": 0.56, "front": -1.03, "back": 1.03, "deck": 0.63, "roof": 0.99, "top_z": 0.18,
+				"light": 0.45, "side_y": 0.42, "side_h": 0.3, "len": 2.0}
+	var hw: float = a["hw"]
+	var front: float = a["front"]
+	var back: float = a["back"]
+	var deck: float = a["deck"]
+	var light: float = a["light"]
+
+	# --- front ---
+	match String(build["front"]):
+		"part_front_bumper":
+			_box(body_root, Vector3(hw * 2.0 + 0.1, 0.18, 0.2), Vector3(0, light - 0.16, front - 0.06), dark)
+			_box(body_root, Vector3(hw * 2.0, 0.04, 0.03), Vector3(0, light - 0.12, front - 0.17), chrome())
+		"part_front_ram":
+			_box(body_root, Vector3(hw * 2.0 + 0.3, 0.42, 0.08), Vector3(0, light - 0.08, front - 0.3), chrome(), Vector3(0.35, 0, 0))
+			for side: float in [-1.0, 1.0]:
+				_bar(body_root, Vector3(side * hw * 0.6, light - 0.1, front + 0.05), Vector3(side * hw * 0.6, light - 0.1, front - 0.28), 0.05, dark)
+			for i in 4:
+				_box(body_root, Vector3(0.06, 0.36, 0.03), Vector3(-hw + 0.15 + i * (hw * 2.0 - 0.3) / 3.0, light - 0.08, front - 0.36), dark, Vector3(0.35, 0, 0))
+		_:   # pointy nose: a squashed cone pointing forward
+			var nose := MeshInstance3D.new()
+			var cone := CylinderMesh.new()
+			cone.top_radius = 0.03
+			cone.bottom_radius = hw * 0.78
+			cone.height = 0.62
+			cone.radial_segments = 16
+			nose.mesh = cone
+			nose.material_override = accent
+			nose.rotation.x = -PI * 0.5
+			nose.scale = Vector3(1.0, 1.0, 0.45)   # flatten it (z is up once it's turned)
+			nose.position = Vector3(0, light - 0.02, front - 0.24)
+			body_root.add_child(nose)
+	_lights(front, back, light, hw * 0.68)
+	_plate(light, back + 0.01)
+
+	# --- engine (at the back, on the deck) ---
+	var ez := back - 0.4
+	match String(build["engine"]):
+		"part_engine_big":
+			_box(body_root, Vector3(0.56, 0.3, 0.55), Vector3(0, deck + 0.15, ez), plastic(Color(0.25, 0.25, 0.28), 0.3))
+			_box(body_root, Vector3(0.36, 0.14, 0.4), Vector3(0, deck + 0.36, ez), chrome())                    # air scoop
+			_box(body_root, Vector3(0.3, 0.1, 0.06), Vector3(0, deck + 0.38, ez - 0.2), dark)
+			for side: float in [-1.0, 1.0]:
+				for i in 3:
+					_capsule(body_root, 0.045, 0.22, Vector3(side * 0.34, deck + 0.12, ez - 0.18 + i * 0.18), chrome(), Vector3(0, 0, PI * 0.5))
+			_exhausts(0.28, light - 0.18, back + 0.1)
+		"part_engine_electric":
+			_box(body_root, Vector3(0.62, 0.26, 0.5), Vector3(0, deck + 0.13, ez), plastic(Color(0.2, 0.3, 0.6), 0.3))
+			for i in 3:
+				_box(body_root, Vector3(0.64, 0.04, 0.06), Vector3(0, deck + 0.14, ez - 0.16 + i * 0.16), glowing(Color(0.3, 0.9, 1.0), 2.2), Vector3.ZERO, 0.0)
+			_box(body_root, Vector3(0.12, 0.08, 0.12), Vector3(0, deck + 0.3, ez), chrome())                  # the + terminal
+		"part_engine_jet":
+			var jet := _capsule(body_root, 0.24, 0.9, Vector3(0, deck + 0.24, ez), plastic(Color(0.8, 0.82, 0.88), 0.15), Vector3(PI * 0.5, 0, 0))
+			jet.name = "Jet"
+			_sphere(body_root, 0.2, Vector3(0, deck + 0.24, ez + 0.5), glowing(Color(1.0, 0.55, 0.15), 3.0), Vector3(1.0, 1.0, 0.7))
+			for side: float in [-1.0, 1.0]:
+				_box(body_root, Vector3(0.05, 0.26, 0.3), Vector3(side * 0.22, deck + 0.3, ez + 0.2), accent, Vector3(0, 0, side * 0.6))
+		_:   # zippy motor
+			_box(body_root, Vector3(0.42, 0.22, 0.36), Vector3(0, deck + 0.11, ez), accent)
+			_capsule(body_root, 0.05, 0.25, Vector3(0.12, deck + 0.12, ez + 0.28), chrome(), Vector3(PI * 0.5, 0, 0))
+
+	# --- spoiler ---
+	match String(build["spoiler"]):
+		"part_spoiler_wing":
+			for side: float in [-1.0, 1.0]:
+				_box(body_root, Vector3(0.06, 0.3, 0.06), Vector3(side * hw * 0.7, deck + 0.15, back - 0.08), accent)
+			_box(body_root, Vector3(hw * 2.0 + 0.1, 0.06, 0.32), Vector3(0, deck + 0.32, back - 0.05), accent)
+		"part_spoiler_big":
+			for side: float in [-1.0, 1.0]:
+				_box(body_root, Vector3(0.08, 0.6, 0.08), Vector3(side * hw * 0.75, deck + 0.3, back - 0.05), dark)
+				_box(body_root, Vector3(0.04, 0.3, 0.45), Vector3(side * (hw + 0.12), deck + 0.62, back), accent)   # end plates
+			_box(body_root, Vector3(hw * 2.0 + 0.25, 0.07, 0.45), Vector3(0, deck + 0.62, back), accent)
+			_box(body_root, Vector3(hw * 2.0 + 0.25, 0.05, 0.25), Vector3(0, deck + 0.75, back + 0.08), body)
+
+	# --- on top (just for looks) ---
+	var roof: float = a["roof"]
+	var tz: float = a["top_z"]
+	match String(build["topper"]):
+		"part_topper_driver":
+			if String(build["body"]) == "part_body_buggy":   # sits in the seat, under the roll cage
+				roof = 0.82
+				tz = 0.2
+			_sphere(body_root, 0.17, Vector3(0, roof + 0.16, tz), plastic(Color(1.0, 0.85, 0.7), 0.5))
+			_sphere(body_root, 0.19, Vector3(0, roof + 0.22, tz + 0.02), plastic(car["accent"]), Vector3(1.0, 0.85, 1.0))
+			_box(body_root, Vector3(0.26, 0.07, 0.02), Vector3(0, roof + 0.17, tz - 0.17), plastic(Color(0.2, 0.2, 0.3), 0.05))
+		"part_topper_flag":
+			_bar(body_root, Vector3(0.25, roof, tz + 0.2), Vector3(0.25, roof + 0.9, tz + 0.2), 0.025, chrome())
+			var flag := _box(body_root, Vector3(0.02, 0.28, 0.42), Vector3(0.25, roof + 0.74, tz + 0.43), accent, Vector3.ZERO, 0.0)
+			flag.name = "Flag"
+		"part_topper_lights":
+			_box(body_root, Vector3(0.8, 0.07, 0.12), Vector3(0, roof + 0.04, tz), chrome())
+			for i in 4:
+				var col := Color(1.0, 0.2, 0.2) if i < 2 else Color(0.25, 0.45, 1.0)
+				_sphere(body_root, 0.06, Vector3(-0.3 + i * 0.2, roof + 0.1, tz), glowing(col, 1.6))
+		"part_topper_fin":
+			_box(body_root, Vector3(0.06, 0.45, 0.55), Vector3(0, roof + 0.2, tz + 0.05), body, Vector3(-0.45, 0, 0))
+		"part_topper_crown":
+			var gold := plastic(Color(1.0, 0.8, 0.2), 0.1)
+			gold.metallic = 0.3
+			var ring := MeshInstance3D.new()
+			var rc := CylinderMesh.new()
+			rc.top_radius = 0.2
+			rc.bottom_radius = 0.2
+			rc.height = 0.14
+			ring.mesh = rc
+			ring.material_override = gold
+			ring.position = Vector3(0, roof + 0.07, tz)
+			body_root.add_child(ring)
+			for i in 5:
+				var ang := i * TAU / 5.0
+				_sphere(body_root, 0.045, Vector3(sin(ang) * 0.19, roof + 0.2, tz + cos(ang) * 0.19), gold)
+				_sphere(body_root, 0.03, Vector3(sin(ang) * 0.2, roof + 0.07, tz + cos(ang) * 0.2), glowing(Color(1.0, 0.2, 0.4), 1.2))
+
+	_number_decals(a["side_y"], hw, 0.0 if String(build["body"]) != "part_body_bullet" else 0.25, roof)
+	_side = {"hw": hw, "y": a["side_y"], "len": a["len"], "h": a["side_h"]}
+
+	# --- wheels: bigger wheels lift the whole body up ---
+	var r := CarParts.wheel_radius(build)
+	var width := 0.22
+	var lift := r - 0.3
+	match String(build["wheels"]):
+		"part_wheels_big":
+			width = 0.28
+		"part_wheels_monster":
+			width = 0.42
+			lift += 0.12
+	_wheel_radius = r
+	body_root.position.y = lift
+	var wx := hw + width * 0.5 + (0.12 if r > 0.5 else 0.03)
+	var zf := front * 0.62
+	var zb := back * 0.62
+	for side: float in [-1.0, 1.0]:
+		_wheel(Vector3(side * wx, r, zf), r, width, true, car["accent"] if r > 0.5 else Color(0.85, 0.85, 0.9))
+		_wheel(Vector3(side * wx, r, zb), r, width, false, car["accent"] if r > 0.5 else Color(0.85, 0.85, 0.9))
+		if r > 0.5:   # chunky suspension arms down to the big wheels
+			for z: float in [zf, zb]:
+				_bar(self, Vector3(side * hw * 0.5, r + 0.05, z), Vector3(side * (wx - width * 0.5), r, z), 0.06, dark)
+

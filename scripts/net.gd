@@ -20,7 +20,7 @@ const PORT := 24680
 const DISCOVERY_PORT := 24681
 const MAX_CLIENTS := 5          # plus the host = 6 racers
 const MAX_RACERS := 6
-const PROTOCOL := 5             # the game's version for racing together: bump when tracks,
+const PROTOCOL := 6             # the game's version for racing together: bump when tracks,
                                 # cars or messages change, so mismatched copies can't join
 const RELAY_PROTOCOL := 1       # the race server's message format (server/relay)
 const SEND_RATE := 1.0 / 20.0
@@ -43,8 +43,17 @@ signal friends_changed                     # who's online changed (or their name
 signal invite_received(from_name: String, room: String)   # a friend said "Race me!"
 
 ## Quick messages players can send (no typing, so they're kid-safe).
-const EMOTES := ["Nice!", "Wow!", "Haha!", "GG!", "Go go go!", "Oops!"]
+## Quick messages: six words, then six funny faces (drawn by EmoteFaces).
+## Sent by number, so only add to the end (and bump PROTOCOL).
+const EMOTES := ["Nice!", "Wow!", "Haha!", "GG!", "Go go go!", "Oops!",
+	":laugh:", ":silly:", ":cool:", ":shock:", ":wink:", ":dizzy:"]
+const WORD_EMOTES := 6
 const EMOTE_COLORS := [Color(0.5, 1.0, 0.6), Color(1.0, 0.85, 0.3), Color(1.0, 0.6, 0.85), Color(0.6, 0.85, 1.0), Color(1.0, 0.55, 0.3), Color(0.8, 0.7, 1.0)]
+
+
+static func emote_color(text: String) -> Color:
+	var i := EMOTES.find(text)
+	return EMOTE_COLORS[i] if i >= 0 and i < EMOTE_COLORS.size() else Color.WHITE
 
 var active := false        # in an online lobby or race
 var is_host := false
@@ -599,7 +608,7 @@ func start_race() -> void:
 		names.shuffle()
 		var pool: Array = []
 		for i in CarData.count():
-			if not CarData.get_car(i).get("secret", false) and not used_cars.has(i):
+			if CarData.is_regular(i) and not used_cars.has(i):
 				pool.append(i)
 		if pool.is_empty():
 			pool = [0, 1, 2, 3]

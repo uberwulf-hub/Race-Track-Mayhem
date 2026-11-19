@@ -194,7 +194,7 @@ func _make_roster() -> Array:
 	roster.append({"name": me, "car": Game.selected_car, "player": 1})
 	var pool: Array[int] = []
 	for i in CarData.count():
-		if not CarData.get_car(i).get("secret", false) and i != Game.selected_car:
+		if CarData.is_regular(i) and i != Game.selected_car:
 			pool.append(i)
 	pool.shuffle()
 	var names := AI_NAMES.filter(func(n): return String(n).to_lower() != me.to_lower())
@@ -492,11 +492,15 @@ func _update_rubber_band(delta: float) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	# Online: number keys 1-6 send a quick emote.
+	# Online: number keys 1-6 send a quick word, 7-0 a funny face.
 	if online and event is InputEventKey and event.pressed and not event.echo:
 		var k := (event as InputEventKey).keycode
 		if k >= KEY_1 and k <= KEY_6:
 			Net.send_emote(k - KEY_1)
+			return
+		var face := [KEY_7, KEY_8, KEY_9, KEY_0].find(k)   # 7 8 9 0 = the first four faces
+		if face >= 0:
+			Net.send_emote(Net.WORD_EMOTES + face)
 			return
 	if (event.is_action_pressed("pause") or event.is_action_pressed("ui_cancel")) and not _results_shown:
 		_toggle_pause()
@@ -1126,9 +1130,14 @@ func _show_results() -> void:
 		box.add_child(cheers)
 		for i in Net.EMOTES.size():
 			var idx := i
-			var e := _add_button(cheers, Net.EMOTES[i], func(): Net.send_emote(idx))
-			e.add_theme_font_size_override("font_size", 18)
-			e.add_theme_color_override("font_color", Net.EMOTE_COLORS[i])
+			var e := _add_button(cheers, "" if i >= Net.WORD_EMOTES else Net.EMOTES[i], func(): Net.send_emote(idx))
+			if i >= Net.WORD_EMOTES:
+				e.icon = EmoteFaces.texture(Net.EMOTES[i], 36)
+				e.custom_minimum_size = Vector2(54, 44)
+				e.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			else:
+				e.add_theme_font_size_override("font_size", 18)
+				e.add_theme_color_override("font_color", Net.EMOTE_COLORS[i])
 	elif Game.story_active:
 		if beat_boss and Game.story_chapter + 1 < Story.count() and not Game.story_super:
 			var next := Game.story_chapter + 1
@@ -1283,7 +1292,7 @@ func _add_unlock_lines(box: Container, fresh: Array) -> void:
 	flow.custom_minimum_size = Vector2(680, 0)
 	box.add_child(flow)
 	for it: Dictionary in items:
-		var kind: String = {"paint": "paint", "sticker": "sticker", "wheels": "wheels", "car": "SECRET CAR!"}.get(it["kind"], "")
+		var kind: String = {"paint": "paint", "sticker": "sticker", "wheels": "wheels", "car": "SECRET CAR!", "part": "(Car Builder part)"}.get(it["kind"], "")
 		var chip := PanelContainer.new()
 		var sb := StyleBoxFlat.new()
 		sb.bg_color = Color(0.55, 0.2, 0.6, 0.85) if it["kind"] != "car" else Color(0.75, 0.45, 0.1, 0.9)
@@ -1328,6 +1337,8 @@ func _count_badges(order: Array, new_record: bool) -> Array:
 		Game.add_stat("records")
 	if _wall_bumps == 0:
 		Game.add_stat("clean_races")
+	if player.car.get("build", false):
+		Game.add_stat("built_races")
 	if online:
 		Game.add_stat("online_races")
 		if won and racers.size() > 1:
@@ -1392,17 +1403,37 @@ func _refresh_results() -> void:
 
 ## A speech bubble over the car of whoever sent the emote (and a line on the HUD).
 func _on_emote(peer_id: int, text: String) -> void:
+	# Everyone's emotes pop up down the left side of the screen.
+	if _pops == null:
+		var layer := CanvasLayer.new()
+		layer.layer = 5
+		add_child(layer)
+		_pops = EmotePops.new()
+		layer.add_child(_pops)
+	var who := "You" if peer_id == Net.my_id() else Net.player_name_of(peer_id)
+	_pops.pop(who, text)
 	var r: Racer = _by_key.get("p%d" % peer_id)
 	if r == null or not is_instance_valid(r):
 		return
-	var bubble := Label3D.new()
-	bubble.text = text
-	bubble.font_size = 72
-	bubble.pixel_size = 0.012
-	bubble.outline_size = 18
-	bubble.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	bubble.no_depth_test = true
-	bubble.modulate = Net.EMOTE_COLORS[Net.EMOTES.find(text)] if Net.EMOTES.has(text) else Color.WHITE
+	var bubble: Node3D
+	if EmoteFaces.is_face(text):
+		var face := Sprite3D.new()
+		face.texture = EmoteFaces.texture(text)
+		face.pixel_size = 0.012
+		face.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		face.no_depth_test = true
+		face.shaded = false
+		bubble = face
+	else:
+		var word := Label3D.new()
+		word.text = text
+		word.font_size = 72
+		word.pixel_size = 0.012
+		word.outline_size = 18
+		word.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		word.no_depth_test = true
+		word.modulate = Net.emote_color(text)
+		bubble = word
 	bubble.position = Vector3(0, 2.6, 0)
 	r.add_child(bubble)
 	var tw := bubble.create_tween()
@@ -1414,6 +1445,7 @@ func _on_emote(peer_id: int, text: String) -> void:
 
 
 var _rematch_votes: Dictionary = {}
+var _pops: EmotePops
 
 func _on_rematch_vote(peer_id: int) -> void:
 	_rematch_votes[peer_id] = true

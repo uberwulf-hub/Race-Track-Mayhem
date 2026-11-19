@@ -1,6 +1,6 @@
 class_name Unlocks
 extends RefCounted
-## Everything you can unlock: paint jobs, stickers, wheels and a secret car.
+## Everything you can unlock: paint jobs, stickers, wheels, secret cars and Car Builder parts.
 ## You earn stars by finishing races (3 for 1st, 2 for 2nd, 1 for finishing),
 ## plus bonus stars for Grand Prix trophies. Winning a Grand Prix unlocks the
 ## secret car.
@@ -30,6 +30,32 @@ const ITEMS: Array[Dictionary] = [
 	{"id": "car_rocket", "kind": "car", "name": "Rocket Rascal", "stars": 25, "trophy": true},
 	{"id": "car_fire", "kind": "car", "name": "Fire Engine Fred", "stars": 30},
 	{"id": "car_icecream", "kind": "car", "name": "Ice Cream Dream", "stars": 40},
+	# --- Car Builder parts (see CarParts). Starter parts are free. ---
+	{"id": "part_body_racer", "kind": "part", "name": "Racer body", "stars": 0},
+	{"id": "part_body_truck", "kind": "part", "name": "Truck body", "stars": 0},
+	{"id": "part_body_buggy", "kind": "part", "name": "Buggy body", "stars": 0},
+	{"id": "part_body_van", "kind": "part", "name": "Van body", "stars": 0},
+	{"id": "part_front_bumper", "kind": "part", "name": "Bumper", "stars": 0},
+	{"id": "part_front_nose", "kind": "part", "name": "Pointy Nose", "stars": 0},
+	{"id": "part_engine_small", "kind": "part", "name": "Zippy Motor", "stars": 0},
+	{"id": "part_engine_big", "kind": "part", "name": "Big Engine", "stars": 0},
+	{"id": "part_wheels_small", "kind": "part", "name": "Small Wheels", "stars": 0},
+	{"id": "part_wheels_big", "kind": "part", "name": "Grippy Wheels", "stars": 0},
+	{"id": "part_spoiler_none", "kind": "part", "name": "No Spoiler", "stars": 0},
+	{"id": "part_spoiler_wing", "kind": "part", "name": "Wing", "stars": 0},
+	{"id": "part_topper_none", "kind": "part", "name": "Nothing on top", "stars": 0},
+	{"id": "part_topper_driver", "kind": "part", "name": "Toy Driver", "stars": 0},
+	{"id": "part_topper_flag", "kind": "part", "name": "Flag", "stars": 0},
+	{"id": "part_topper_lights", "kind": "part", "name": "Light Bar", "stars": 4},
+	{"id": "part_front_ram", "kind": "part", "name": "Bulldozer", "stars": 6},
+	{"id": "part_spoiler_big", "kind": "part", "name": "Giant Wing", "stars": 9},
+	{"id": "part_engine_electric", "kind": "part", "name": "Battery Zap", "stars": 12},
+	{"id": "part_wheels_monster", "kind": "part", "name": "Monster Wheels", "stars": 15},
+	{"id": "part_topper_fin", "kind": "part", "name": "Shark Fin", "stars": 18},
+	{"id": "part_body_bullet", "kind": "part", "name": "Bullet body", "stars": 22},
+	{"id": "part_topper_crown", "kind": "part", "name": "Golden Crown", "stars": 35, "trophy": true},
+	{"id": "part_engine_jet", "kind": "part", "name": "Jet Engine", "stars": 999999, "how": "Beat a Story Mode boss",
+		"stat": "bosses", "goal": 1},
 	# Special unlocks: earned by doing something, not with stars (see Game.grant()).
 	{"id": "car_sleigh", "kind": "car", "name": "Santa's Sleigh", "stars": 999999, "how": "Finish the holiday track (December only!)"},
 	{"id": "car_pumpkin", "kind": "car", "name": "Pumpkin Rider", "stars": 999999, "how": "Finish the Halloween track (October only!)"},

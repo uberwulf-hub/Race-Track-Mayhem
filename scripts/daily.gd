@@ -54,7 +54,7 @@ static func goals_for(day: int) -> Array:
 		elif g["kind"] == "car":
 			var cars: Array = []
 			for i in CarData.count():
-				if not CarData.get_car(i).get("secret", false):
+				if CarData.is_regular(i):
 					cars.append(i)
 			var ci: int = cars[rng.randi() % cars.size()]
 			g["car"] = CarData.get_car(ci)["id"]

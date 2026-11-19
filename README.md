@@ -122,9 +122,10 @@ on the phone, download the .apk and open it (allow "install unknown apps" when A
 **For little racers:** **Auto-Go** (Options, or when making a new player) drives forward by itself, so they
 only steer. On phones, **Tilt to steer** turns the car by tipping the phone like a steering wheel.
 
-**Cheers online:** six quick, kid-safe messages (Nice!, Wow!, Haha!, GG!, Go go go!, Oops!) in the lobby, on
-the results, or with keys 1-6 in a race, where they pop up over your car. After a race, players can ask the host
-for a **Rematch!**
+**Cheers online:** six quick, kid-safe words (Nice!, Wow!, Haha!, GG!, Go go go!, Oops!) and six funny faces
+(laughing, silly, cool shades, shocked, wink and dizzy) in the lobby, on the results, or in a race with keys 1-6
+(words) and 7-0 (faces). They pop up as bubbles down the left side of the screen, and over your car in a race.
+After a race, players can ask the host for a **Rematch!** The lobby shows your car's stats next to it.
 
 **Race Online (home network).** Race other computers in your house:
 - One computer taps **Race Online! > Host a Race**. The others tap **Race Online!** and the race shows up
@@ -225,6 +226,13 @@ soft patter and the odd flash of lightning.
 
 **Car Designer** (in the garage): pick your own body and trim colours, slide the sticker toward the front or back,
 make it bigger or smaller, and give your car a name. Its name shows in the results and in online lobbies.
+
+**Car Builder** (pick **My Build** in the garage): build your own car from parts: a body (Racer, Truck, Buggy, Van
+or Bullet), a front, an engine, wheels, a spoiler and something on top. Parts change how it drives: a Jet Engine
+adds top speed but makes it harder to steer, Monster Wheels make it heavy, a Giant Wing helps it grip. Every build
+comes out about as strong as the garage's cars, so it stays fair online. The starter parts are free; more unlock
+with stars, a Grand Prix win (the Golden Crown) and beating a Story Mode boss (the Jet Engine). Race your build
+to earn the **Inventor** badge.
 
 **Looks.**
 - Godot's full renderer: soft shadows, contact shadows, bounce lighting, sunbeams and reflections, with Low, Medium and High settings.
