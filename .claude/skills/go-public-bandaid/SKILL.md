@@ -26,7 +26,8 @@ visibility for them, never present it as the normal way to release, and never sk
 3. **Check for secrets first.** Before switching, scan the full history for keys/passwords/tokens/keystores, e.g.:
    ```
    git log --all --name-only --format= | sort -u | grep -iE "keystore|\.jks|\.env|secret|credential|\.pem|\.key$"
-   git log --all -p | grep -iE "(api[_-]?key|token|password)\s*[:=]\s*['\"][A-Za-z0-9_\-]{12,}"
+   git log --all -p | grep -iE "(api[_-]?key|token|password|secret)[\"']?\s*[:=]\s*['\"][-A-Za-z0-9_/+]{12,}"
+   git log --all -p | grep -E "AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{30,}|github_pat_|sk-[A-Za-z0-9]{20,}|-----BEGIN .*PRIVATE KEY"
    ```
    If anything turns up, **stop**: don't go public until it's removed and the secret is rotated.
    (Last scan, 2026-11-17: nothing found.)
