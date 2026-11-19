@@ -72,9 +72,8 @@ func _make_room_for_buttons() -> void:
 		_turbo_label.text = "TURBO"
 		_turbo_label.add_theme_font_size_override("font_size", 22)
 	if _minimap:
-		_minimap.set_anchors_preset(Control.PRESET_TOP_LEFT)
-		_minimap.position = Vector2(20, 316)
-		_minimap.size = Vector2(170, 150)
+		# Turbo and Item buttons are on the left now, so the map goes top right, under the speed.
+		pin(_minimap, Vector2(1, 0), Vector2(-200, 206), Vector2(180, 160))
 
 
 static func pin(c: Control, anchor: Vector2, offset: Vector2, size: Vector2) -> void:

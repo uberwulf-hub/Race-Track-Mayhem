@@ -46,8 +46,9 @@ func _layout() -> void:
 	_place("right", Vector2(215, h - 200))
 	_place("go", Vector2(w - 220, h - 220))
 	_place("brake", Vector2(w - 380, h - 150))
-	_place("turbo", Vector2(w - 190, h - 380))
-	_place("item", Vector2(w - 360, h - 300))
+	# Turbo and Item on the left, above the steering, so your right thumb can stay on GO.
+	_place("turbo", Vector2(40, h - 380))
+	_place("item", Vector2(215, h - 360))
 	_place("pause", Vector2(w * 0.5 - 86, 12))
 	_place("respawn", Vector2(w * 0.5 + 10, 12))
 

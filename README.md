@@ -114,8 +114,8 @@ A blinking **INCOMING!** warning (with an arrow for the side) shows when a bubbl
 
 **Android (phones and tablets).** Each release also has `RaceTrackMayhem-android.apk`. Open the release page
 on the phone, download the .apk and open it (allow "install unknown apps" when Android asks).
-- Big on-screen buttons: steer < >, GO, BRAKE, TURBO, ITEM, pause and R (back on track). Steer with one thumb
-  and hold GO with the other. Options > Touch buttons: Auto (on for phones/tablets), On or Off.
+- Big on-screen buttons: steer < >, TURBO and ITEM on the left; GO and BRAKE on the right; pause and R (back on
+  track) at the top. Steer, turbo and use items with your left thumb while your right thumb holds GO. Options > Touch buttons: Auto (on for phones/tablets), On or Off.
 - Phones start on Low graphics, and the back button works like Back. Race Online works on phones too.
 - Track Builder: tap the track to choose where to build, drag to turn the view, pinch or +/- to zoom.
 
