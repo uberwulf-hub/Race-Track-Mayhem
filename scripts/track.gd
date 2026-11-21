@@ -146,6 +146,7 @@ const PIECES: Array[Dictionary] = [
 static func for_index(index: int) -> Track:
 	var t := Track.new()
 	t.layout_id = index
+	t.room = String(Game.track_info(index).get("room", ""))
 	if Game.EVENTS.has(index):
 		t.layout_id = int(Game.EVENTS[index]["layout"])   # a seasonal re-theme of a built-in layout
 		return t
@@ -235,6 +236,24 @@ static func piece_info(id: String) -> Dictionary:
 const TRACK_COLOR := Color(1.0, 0.45, 0.05)
 const TRACK_DARK := Color(0.85, 0.32, 0.02)
 const TRACK_EDGE := Color(1.0, 0.56, 0.18)
+
+## Each room's track gets its own rail and clip colours (the road stays orange),
+## so the tracks don't all look the same. [rail, clip]
+const ROOM_TRIM := {
+	"bedroom": [Color(1.0, 0.5, 0.72), Color(1.0, 0.85, 0.2)],
+	"playroom": [Color(0.15, 0.78, 0.8), Color(0.65, 0.35, 0.95)],
+	"kitchen": [Color(0.9, 0.22, 0.25), Color(0.98, 0.98, 0.95)],
+	"bathroom": [Color(0.25, 0.6, 1.0), Color(1.0, 0.85, 0.15)],
+	"living_room": [Color(0.6, 0.35, 0.92), Color(1.0, 0.82, 0.2)],
+	"garden": [Color(1.0, 0.82, 0.12), Color(0.9, 0.2, 0.25)],
+	"garage": [Color(0.88, 0.16, 0.16), Color(1.0, 0.8, 0.1)],
+	"attic": [Color(0.28, 0.4, 0.9), Color(1.0, 0.8, 0.25)],
+	"snowyard": [Color(0.72, 0.9, 1.0), Color(0.9, 0.15, 0.2)],
+	"spooky": [Color(0.55, 0.25, 0.8), Color(0.55, 1.0, 0.25)],
+	"beach": [Color(0.1, 0.8, 0.8), Color(1.0, 0.45, 0.4)],
+}
+
+var room := ""   # which room the track is in (picks the rail colours); "" = all orange
 
 # Final, evenly spaced samples along the centre line of the road surface.
 var points := PackedVector3Array()
@@ -1235,6 +1254,7 @@ func _add_tri(st: SurfaceTool, a: Vector3, b: Vector3, c: Vector3, n: Vector3, c
 
 func _build_mesh() -> void:
 	var prof := _profile()
+	var rail: Color = ROOM_TRIM[room][0] if ROOM_TRIM.has(room) else TRACK_EDGE
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	for i in count:
@@ -1253,7 +1273,9 @@ func _build_mesh() -> void:
 			if e == 2:
 				col = TRACK_DARK if joint else TRACK_COLOR
 			elif e == 0 or e == 4:
-				col = TRACK_EDGE
+				col = rail if not joint else rail.darkened(0.15)
+			elif e == 5 or e == 7:
+				col = rail.darkened(0.12)
 			else:
 				col = TRACK_DARK
 			var ai := ti.origin + ti.basis.x * a.x + ti.basis.y * a.y
@@ -1512,7 +1534,7 @@ func _build_road_details() -> void:
 	add_child(mi)
 
 	var clip_mat := StandardMaterial3D.new()
-	clip_mat.albedo_color = Color(0.15, 0.45, 1.0)
+	clip_mat.albedo_color = ROOM_TRIM[room][1] if ROOM_TRIM.has(room) else Color(0.15, 0.45, 1.0)
 	clip_mat.roughness = 0.3
 	var mm := MultiMesh.new()
 	mm.transform_format = MultiMesh.TRANSFORM_3D

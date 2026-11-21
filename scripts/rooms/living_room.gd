@@ -26,7 +26,8 @@ func _configure() -> void:
 
 
 func _floor_image() -> Image:
-	return Room.carpet_image(Color(0.82, 0.72, 0.58), Color(0.7, 0.6, 0.48))
+	# A soft teal carpet, so the brown sofa and wooden table stand out.
+	return Room.carpet_image(Color(0.42, 0.68, 0.74), Color(0.34, 0.58, 0.66))
 
 
 func _wall_image() -> Image:

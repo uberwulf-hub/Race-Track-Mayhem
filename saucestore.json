@@ -13,6 +13,7 @@
   ],
   "rightsConfirmed": true,
   "credits": [
+    { "asset": "Fredoka font (menus and on-screen text)", "author": "The Fredoka Project Authors (Milena Brandao, Hafontia)", "license": "SIL Open Font License 1.1", "source": "https://fonts.google.com/specimen/Fredoka" },
     { "asset": "Godot Engine (game engine, bundled in the .exe)", "author": "Juan Linietsky, Ariel Manzur and Godot Engine contributors", "license": "MIT", "source": "https://godotengine.org/license" },
     { "asset": "Sound effects, voices, jingles and UI sounds", "author": "Kenney (www.kenney.nl)", "license": "CC0 1.0", "source": "https://kenney.nl/assets" },
     { "asset": "Tire skid and brake sound", "author": "Landeplage", "license": "CC0 1.0", "source": "https://github.com/KenneyNL/Starter-Kit-Racing" },

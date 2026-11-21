@@ -638,9 +638,17 @@ func _make_theme() -> Theme:
 	var t := Theme.new()
 	t.default_font_size = 26
 
-	var font := SystemFont.new()
-	font.font_names = PackedStringArray(["Comic Sans MS", "Chalkboard SE", "Fredoka", "Nunito", "Arial Rounded MT Bold", "Verdana", "sans-serif"])
-	font.font_weight = 800
+	# Fredoka (bundled, SIL Open Font License) so the game looks the same on every
+	# computer and phone. The system font stays as a backup for symbols like the star.
+	var system := SystemFont.new()
+	system.font_names = PackedStringArray(["Comic Sans MS", "Chalkboard SE", "Nunito", "Arial Rounded MT Bold", "Verdana", "sans-serif"])
+	system.font_weight = 800
+	var font: Font = system
+	var fredoka := load("res://assets/fonts/fredoka-latin-600-normal.woff2") as FontFile
+	if fredoka:
+		var ext := load("res://assets/fonts/fredoka-latin-ext-600-normal.woff2") as FontFile
+		fredoka.fallbacks = [ext, system] if ext else [system]
+		font = fredoka
 	t.default_font = font
 
 	var normal := _box(Color(1.0, 0.55, 0.1), Color(0.75, 0.3, 0.0))

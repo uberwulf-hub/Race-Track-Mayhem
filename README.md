@@ -252,6 +252,9 @@ to earn the **Inventor** badge.
 - Real bump physics: cars shove and spin each other depending on where they're hit.
 - Results with best times, stars and new unlocks, and an announcer for the final lap, new records and unlocks.
 
+**Font.** [Fredoka](https://fonts.google.com/specimen/Fredoka) is bundled (SIL Open Font License, see
+`licenses/FREDOKA-OFL.txt`), so the game looks the same on every computer and phone.
+
 **Sound.** CC0 sound effects plus our own Mesa Mayhem soundtrack (see [assets/audio/CREDITS.md](assets/audio/CREDITS.md)), with separate Music and Sound volume sliders:
 - A two-layer engine that revs with speed, brake squeals, and 3D engine sounds with a Doppler effect on the other cars.
 - The Mesa Mayhem theme on the menu and pickers, its own race song for each room and a victory fanfare.

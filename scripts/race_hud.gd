@@ -435,6 +435,7 @@ class Minimap extends Control:
 	var hud: RaceHud
 	var _poly := PackedVector2Array()
 	var _rect: Rect2
+	var _panel: StyleBoxFlat
 
 	func _draw() -> void:
 		if hud == null or hud.track == null:
@@ -445,9 +446,16 @@ class Minimap extends Control:
 			for k in range(0, t.count, 3):
 				_poly.append(Vector2(t.points[k].x, t.points[k].z))
 			_poly.append(_poly[0])
-		var sc := minf(size.x / _rect.size.x, size.y / _rect.size.y) * 0.9
+		var sc := minf(size.x / _rect.size.x, size.y / _rect.size.y) * 0.82
 		var off := size * 0.5 - _rect.get_center() * sc
-		draw_rect(Rect2(Vector2.ZERO, size), Color(0, 0, 0, 0.3), true)
+		# A little toy-style panel: rounded navy with a yellow rim, like the menus.
+		if _panel == null:
+			_panel = StyleBoxFlat.new()
+			_panel.bg_color = Color(0.1, 0.07, 0.28, 0.55)
+			_panel.border_color = Color(1.0, 0.82, 0.25, 0.9)
+			_panel.set_border_width_all(3)
+			_panel.set_corner_radius_all(16)
+		draw_style_box(_panel, Rect2(Vector2.ZERO, size))
 		var pts := PackedVector2Array()
 		for p in _poly:
 			pts.append(p * sc + off)

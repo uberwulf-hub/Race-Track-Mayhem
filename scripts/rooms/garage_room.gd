@@ -11,15 +11,18 @@ const TOOL_COLORS := [Color(0.9, 0.2, 0.15), Color(0.2, 0.45, 0.9), Color(0.95, 
 func _configure() -> void:
 	background_color = Color(0.7, 0.75, 0.8)
 	ambient_color = Color(0.95, 0.97, 1.0)
-	ambient_energy = 0.4
-	sun_energy = 0.75
-	sun_color = Color(0.95, 0.97, 1.0)
+	ambient_energy = 0.32
+	sun_energy = 0.6
+	sun_color = Color(0.85, 0.9, 1.0)       # cool daylight on the walls...
+	lamp_color = Color(1.0, 0.82, 0.55)     # ...and a warm work lamp
+	lamp_energy = 0.45
+	exposure = 0.8
 	curtain_color = Color(0.45, 0.5, 0.55)
 	door_color = Color(0.75, 0.78, 0.8)
 	floor_tile_size = 28.0
 	floor_roughness = 0.6
 	wall_tile_size = 10.0
-	saturation = 1.05
+	saturation = 1.15
 
 
 func _floor_image() -> Image:

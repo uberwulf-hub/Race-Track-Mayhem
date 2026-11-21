@@ -17,14 +17,16 @@ func _configure() -> void:
 	floor_tile_size = 12.0
 	floor_roughness = 0.2
 	wall_tile_size = 10.0
+	exposure = 0.78          # less washed out
+	saturation = 1.25
 
 
 func _floor_image() -> Image:
-	return Room.checker_image(Color(0.97, 0.98, 1.0), Color(0.55, 0.78, 0.95), 4, Color(0.8, 0.85, 0.9))
+	return Room.checker_image(Color(0.95, 0.97, 1.0), Color(0.4, 0.66, 0.95), 4, Color(0.75, 0.82, 0.9))
 
 
 func _wall_image() -> Image:
-	return Room.tiles_image(Color(0.8, 0.93, 0.97), Color(0.95, 0.98, 1.0), 4, Color(0.55, 0.8, 0.95))
+	return Room.tiles_image(Color(0.7, 0.88, 0.96), Color(0.92, 0.97, 1.0), 4, Color(0.4, 0.7, 0.95))
 
 
 func _build_props() -> void:

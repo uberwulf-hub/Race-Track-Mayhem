@@ -426,6 +426,7 @@ func _process(delta: float) -> void:
 	for v in views:
 		_update_view_extras(v, delta)
 		_update_camera(v, delta)
+	_spread_name_tags()
 
 
 func _physics_process(delta: float) -> void:
@@ -758,8 +759,13 @@ func _chase_pose(r: Racer) -> Array:
 	var fwd := -frame.basis.z
 	var up := frame.basis.y
 	var car_pos := r.global_position
-	var pos := car_pos - fwd * 5.8 + up * 2.7
-	var look := car_pos + fwd * 3.0 + up * 0.7
+	# Close enough that your car is big on screen; eases back a little at top
+	# speed and on turbo so you can still see what's coming.
+	var fast := clampf((r.speed - 28.0) / 22.0, 0.0, 1.0)
+	var back := 4.5 + fast * 0.8
+	var high := 2.15 + fast * 0.35 + (0.7 if r.mode == Racer.Mode.AIRBORNE else 0.0)   # lift on jumps
+	var pos := car_pos - fwd * back + up * high
+	var look := car_pos + fwd * 3.2 + up * 0.75
 	return [pos, look, up]
 
 
@@ -781,7 +787,7 @@ func _update_camera(v: View, delta: float) -> void:
 			cam.global_position = a.lerp(b, e)
 			var look: Vector3 = _intro_look.lerp(pose[1], e)
 			v.cam_up = Vector3.UP
-			cam.fov = lerpf(55.0, 64.0, e)
+			cam.fov = lerpf(55.0, 60.0, e)
 			cam.look_at(look, v.cam_up)
 			# Tilt-shift blur: everything looks like a tiny model.
 			_set_tilt_shift(v, cam.global_position.distance_to(look), 1.0 - e * 0.85)
@@ -793,7 +799,7 @@ func _update_camera(v: View, delta: float) -> void:
 				return
 			cam.global_position = cam.global_position.lerp(pose[0], k)
 			v.cam_up = v.cam_up.slerp(pose[2], 1.0 - exp(-delta * 4.0)).normalized()
-			var fov_target := 64.0 + clampf(r.speed - 25.0, 0.0, 30.0) * 0.35
+			var fov_target := 60.0 + clampf(r.speed - 25.0, 0.0, 30.0) * 0.28
 			cam.fov = lerpf(cam.fov, fov_target, k * 0.5)
 			_safe_look_at(cam, pose[1], v.cam_up)
 			if v.shake > 0.0:
@@ -1194,6 +1200,42 @@ func _name_tag(r: Racer) -> void:
 	l.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	l.position = Vector3(0, 2.1, 0)
 	r.add_child(l)
+
+
+## Keeps the names over the computer cars from piling on top of each other:
+## nearer cars keep their spot, a tag that would overlap one is nudged up,
+## and tags on cars far away fade out.
+func _spread_name_tags() -> void:
+	if camera == null:
+		return
+	var eye := camera.global_position
+	var list: Array = []
+	for r in racers:
+		var tag := r.get_node_or_null("NameTag") as Label3D
+		if tag:
+			list.append([eye.distance_to(r.global_position), r, tag])
+	list.sort_custom(func(a, b): return a[0] < b[0])
+	var placed: Array[Vector2] = []
+	for e in list:
+		var d: float = e[0]
+		var tag: Label3D = e[2]
+		tag.position.y = 2.1
+		tag.modulate.a = clampf((70.0 - d) / 20.0, 0.0, 1.0) * (1.0 if e[1].human else 0.9)
+		tag.visible = tag.modulate.a > 0.02 and not camera.is_position_behind(tag.global_position)
+		if not tag.visible:
+			continue
+		var sp := camera.unproject_position(tag.global_position)
+		for tries in 4:
+			var clash := false
+			for p in placed:
+				if absf(sp.x - p.x) < 120.0 and absf(sp.y - p.y) < 30.0:
+					clash = true
+					break
+			if not clash:
+				break
+			tag.position.y += 0.4 + d * 0.012
+			sp = camera.unproject_position(tag.global_position)
+		placed.append(sp)
 
 
 ## A gold "BOSS" sign floating over the boss car.

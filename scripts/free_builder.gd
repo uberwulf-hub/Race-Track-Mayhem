@@ -746,6 +746,7 @@ func _rebuild(fit_view := false) -> void:
 		_track = Track.new()
 		_track.custom = true
 		_track.custom_pieces = _chain_ids.duplicate()
+		_track.room = _room_theme
 		add_child(_track)
 		_track.build()
 	for n in _loose_nodes:
@@ -1016,6 +1017,7 @@ func _cycle_room() -> void:
 	_room_theme = Game.ROOM_THEMES[(i + 1) % Game.ROOM_THEMES.size()][0]
 	_room_button.text = "Room: " + Game.room_name(_room_theme).trim_prefix("The ")
 	_apply_floor()
+	_rebuild()   # the rails take the room's colours
 	Sfx.play("click")
 
 

@@ -52,6 +52,7 @@ func _ready() -> void:
 	Sfx.play_music("menu")
 	track = Track.new()
 	track.layout_id = randi() % Track.TRACKS.size()
+	track.room = Track.TRACKS[track.layout_id]["room"]
 	add_child(track)
 	track.build()
 	var room := Room.create(Track.TRACKS[track.layout_id]["room"])
@@ -457,6 +458,7 @@ func _build_credits(root: Control) -> Control:
 		"Godot is (c) Juan Linietsky, Ariel Manzur and contributors, MIT license",
 		"",
 		"Sound effects: Kenney (kenney.nl) and Landeplage, CC0",
+		"Font: Fredoka by the Fredoka Project Authors, SIL Open Font License",
 		"Music: the Mesa Mayhem soundtrack by Andrew Saulls, made with Suno",
 		"",
 		"Full license texts are in the licenses folder.",
