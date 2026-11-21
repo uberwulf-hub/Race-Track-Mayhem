@@ -319,7 +319,8 @@ func _build_environment() -> void:
 	sun.light_color = sun_color
 	sun.light_energy = sun_energy
 	sun.shadow_enabled = true
-	sun.directional_shadow_max_distance = 240.0
+	sun.directional_shadow_max_distance = 150.0   # shorter = sharper, less jagged shadows near the car
+	sun.shadow_blur = 1.4
 	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
 	sun.rotation_degrees = sun_rotation
 	add_child(sun)
